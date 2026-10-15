@@ -331,6 +331,27 @@ struct MemorisedCandlestickChart: View {
         }
     }
 
+    @ChartContentBuilder
+    private func trendMarks(_ line: MemorisedTrendLine) -> some ChartContent {
+        if let start = bar(containing: line.drawn.drawStartX), let end = bar(containing: line.drawn.drawEndX) {
+            let series = "trend-\(line.id)"
+            LineMark(
+                x: .value("Days", label(start)),
+                y: .value("Trend", line.drawn.model.calcY(line.drawn.drawStartX)),
+                series: .value("Trend", series)
+            )
+            .foregroundStyle(line.color)
+            .lineStyle(line.style)
+            LineMark(
+                x: .value("Days", label(end)),
+                y: .value("Trend", line.drawn.model.calcY(line.drawn.drawEndX)),
+                series: .value("Trend", series)
+            )
+            .foregroundStyle(line.color)
+            .lineStyle(line.style)
+        }
+    }
+
     /// `tooltipDate`: the bar's days, relative to today.
     private func title(_ bar: MemorisedCandlestick.Bar) -> String {
         let left = dates.date(for: dates.today + bar.label).formatted(date: .numeric, time: .omitted)
@@ -350,23 +371,8 @@ struct MemorisedCandlestickChart: View {
                 )
                 .foregroundStyle(bar.positive ? Color.green : Color.red)
             }
-            ForEach(Array((trends + (preview.map { [$0] } ?? [])).enumerated()), id: \.offset) { index, item in
-                if let start = bar(containing: item.1.drawStartX), let end = bar(containing: item.1.drawEndX) {
-                    LineMark(
-                        x: .value("Days", label(start)),
-                        y: .value("Trend", item.1.model.calcY(item.1.drawStartX)),
-                        series: .value("Trend", "trend-\(index)")
-                    )
-                    .foregroundStyle(item.0)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: index >= trends.count ? [4, 2] : []))
-                    LineMark(
-                        x: .value("Days", label(end)),
-                        y: .value("Trend", item.1.model.calcY(item.1.drawEndX)),
-                        series: .value("Trend", "trend-\(index)")
-                    )
-                    .foregroundStyle(item.0)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: index >= trends.count ? [4, 2] : []))
-                }
+            ForEach(MemorisedTrendLine.lines(trends, preview: preview)) { line in
+                trendMarks(line)
             }
             if let selected {
                 RuleMark(x: .value("Selected", label(selected)))
@@ -485,5 +491,30 @@ struct MemorisedBwMatrixView: View {
         } else {
             Color.clear.frame(maxWidth: .infinity, minHeight: 24)
         }
+    }
+}
+
+/// A trend (or the pending one, dashed) as the charts draw it.
+struct MemorisedTrendLine: Identifiable {
+    let id: Int
+    let color: Color
+    let drawn: MemorisedTrend.Drawn
+    let isPreview: Bool
+
+    static func lines(
+        _ trends: [(Color, MemorisedTrend.Drawn)],
+        preview: (Color, MemorisedTrend.Drawn)?
+    ) -> [Self] {
+        var lines = trends.enumerated().map { index, trend in
+            Self(id: index, color: trend.0, drawn: trend.1, isPreview: false)
+        }
+        if let preview {
+            lines.append(Self(id: trends.count, color: preview.0, drawn: preview.1, isPreview: true))
+        }
+        return lines
+    }
+
+    var style: StrokeStyle {
+        StrokeStyle(lineWidth: 1.5, dash: isPreview ? [4, 2] : [])
     }
 }

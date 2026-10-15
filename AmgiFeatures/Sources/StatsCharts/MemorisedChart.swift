@@ -288,6 +288,25 @@ struct MemorisedLineChart: View {
         min(max(drawn.model.calcY(x), 0), yAxisMax)
     }
 
+    @ChartContentBuilder
+    private func trendMarks(_ line: MemorisedTrendLine) -> some ChartContent {
+        let series = "trend-\(line.id)"
+        LineMark(
+            x: .value("Date", dates.date(for: Int(line.drawn.drawStartX)), unit: .day),
+            y: .value("Trend", trendY(line.drawn, line.drawn.drawStartX)),
+            series: .value("Series", series)
+        )
+        .foregroundStyle(line.color)
+        .lineStyle(line.style)
+        LineMark(
+            x: .value("Date", dates.date(for: Int(line.drawn.drawEndX)), unit: .day),
+            y: .value("Trend", trendY(line.drawn, line.drawn.drawEndX)),
+            series: .value("Series", series)
+        )
+        .foregroundStyle(line.color)
+        .lineStyle(line.style)
+    }
+
     var body: some View {
         Chart {
             ForEach(points) { point in
@@ -300,21 +319,8 @@ struct MemorisedLineChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
                 .interpolationMethod(.linear)
             }
-            ForEach(Array((trends + (preview.map { [$0] } ?? [])).enumerated()), id: \.offset) { index, item in
-                LineMark(
-                    x: .value("Date", dates.date(for: Int(item.1.drawStartX)), unit: .day),
-                    y: .value("Trend", trendY(item.1, item.1.drawStartX)),
-                    series: .value("Series", "trend-\(index)")
-                )
-                .foregroundStyle(item.0)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: index >= trends.count ? [4, 2] : []))
-                LineMark(
-                    x: .value("Date", dates.date(for: Int(item.1.drawEndX)), unit: .day),
-                    y: .value("Trend", trendY(item.1, item.1.drawEndX)),
-                    series: .value("Series", "trend-\(index)")
-                )
-                .foregroundStyle(item.0)
-                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: index >= trends.count ? [4, 2] : []))
+            ForEach(MemorisedTrendLine.lines(trends, preview: preview)) { line in
+                trendMarks(line)
             }
             if let selectedDay {
                 RuleMark(x: .value("Selected", dates.date(for: selectedDay), unit: .day))
