@@ -173,7 +173,7 @@ final class DeckConfigModel {
         case .fsrsError(let title, _): title
         case .presetError: "Couldn't change preset"
         case .deletePresetConfirm: "Delete \"\(currentPresetName ?? "this preset")\"?"
-        case .discardChanges: "Unsaved changes"
+        case .discardChanges, .unsavedBeforePresetChange: "Unsaved changes"
         case nil: ""
         }
     }
@@ -181,6 +181,9 @@ final class DeckConfigModel {
     var hasLoadedConfig: Bool { loaded != nil }
     var currentPresetName: String? { loaded?.config.name }
     var deleteFallbackPresetName: String? { deleteFallbackPreset?.name }
+    /// `removalWilLForceFullSync`: removing a saved preset modifies the
+    /// schema, unless it was already modified since the last sync.
+    var deleteRequiresFullSync: Bool { loaded?.context.schemaModified == false }
 
     var presetOptions: [DeckConfigsForUpdate.ConfigWithExtra] {
         (loaded?.context.allConfig ?? [])

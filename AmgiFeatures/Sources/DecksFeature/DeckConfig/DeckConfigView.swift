@@ -50,10 +50,13 @@ struct DeckConfigView: View {
                 currentPresetName: model.currentPresetName,
                 deletingPresetName: model.currentPresetName,
                 fallbackPresetName: model.deleteFallbackPresetName,
-                onCreate: { await model.createPreset() },
+                deleteRequiresFullSync: model.deleteRequiresFullSync,
+                onCreate: { await model.createPreset(fromDefaults: $0) },
                 onRename: { await model.renamePreset() },
                 onDelete: { Task { await model.deletePreset() } },
-                onDiscard: onDismiss
+                onDiscard: onDismiss,
+                onSaveThen: { action in Task { await model.saveThenPerform(action) } },
+                onDiscardThen: { action in Task { await model.discardThenPerform(action) } }
             ))
             .task { await model.loadConfig() }
     }
@@ -103,16 +106,11 @@ struct DeckConfigView: View {
             canDeletePreset: model.canDeletePreset,
             isPresetMutating: model.isPresetMutating,
             hasLoadedConfig: model.hasLoadedConfig,
-            onSelect: { target in Task { await model.selectPreset(target) } },
-            onAdd: {
-                model.newPresetName = ""
-                model.destination = .prompt(.createPreset)
-            },
-            onRename: {
-                model.renamePresetDraft = model.currentPresetName ?? ""
-                model.destination = .prompt(.renamePreset)
-            },
-            onDelete: { model.destination = .alert(.deletePresetConfirm) }
+            onSelect: { model.requestPresetAction(.select($0)) },
+            onAdd: { model.requestPresetAction(.add) },
+            onClone: { model.requestPresetAction(.clone) },
+            onRename: { model.requestPresetAction(.rename) },
+            onDelete: { model.requestPresetAction(.delete) }
         )
         SchedulerSection(
             fsrsEnabled: $model.fsrsEnabled,

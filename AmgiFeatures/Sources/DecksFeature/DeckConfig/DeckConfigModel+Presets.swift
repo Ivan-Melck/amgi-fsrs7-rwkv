@@ -11,6 +11,49 @@ import Dependencies
 import Foundation
 
 extension DeckConfigModel {
+    /// Preset changes reload the page, so unsaved edits are saved or
+    /// discarded first (the desktop keeps them across presets until Save).
+    func requestPresetAction(_ action: DeckConfigPresetAction) {
+        if hasUnsavedChanges {
+            destination = .alert(.unsavedBeforePresetChange(action))
+        } else {
+            performPresetAction(action)
+        }
+    }
+
+    func saveThenPerform(_ action: DeckConfigPresetAction) async {
+        guard await saveConfig() else { return }
+        await loadConfig()
+        performPresetAction(action)
+    }
+
+    func discardThenPerform(_ action: DeckConfigPresetAction) async {
+        if let loaded {
+            apply(config: loaded.config, context: loaded.context)
+        }
+        // Let the alert finish dismissing before a prompt is presented.
+        try? await Task.sleep(for: .milliseconds(350))
+        performPresetAction(action)
+    }
+
+    func performPresetAction(_ action: DeckConfigPresetAction) {
+        switch action {
+        case .select(let target):
+            Task { await selectPreset(target) }
+        case .add:
+            newPresetName = ""
+            destination = .prompt(.createPreset)
+        case .clone:
+            newPresetName = ""
+            destination = .prompt(.clonePreset)
+        case .rename:
+            renamePresetDraft = currentPresetName ?? ""
+            destination = .prompt(.renamePreset)
+        case .delete:
+            destination = .alert(.deletePresetConfirm)
+        }
+    }
+
     func selectPreset(_ target: DeckConfig) async {
         isPresetMutating = true
         defer { isPresetMutating = false }
@@ -22,9 +65,15 @@ extension DeckConfigModel {
         }
     }
 
-    func createPreset() async -> String? {
+    /// `addConfig` starts from the defaults; `cloneConfig` copies the
+    /// current preset.
+    func createPreset(fromDefaults: Bool) async -> String? {
         let name = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, let base = loaded?.config else { return nil }
+        guard !name.isEmpty, let loaded else { return nil }
+        var base = loaded.config
+        if fromDefaults, let defaults = loaded.context.defaults {
+            base.config = defaults.config
+        }
         isPresetMutating = true
         defer { isPresetMutating = false }
         do {

@@ -25,6 +25,7 @@ struct PresetSection: View {
     let hasLoadedConfig: Bool
     let onSelect: (DeckConfig) -> Void
     let onAdd: () -> Void
+    let onClone: () -> Void
     let onRename: () -> Void
     let onDelete: () -> Void
 
@@ -67,6 +68,10 @@ struct PresetSection: View {
                 Button { onAdd() } label: {
                     Label("Add Preset…", systemImage: "plus")
                 }
+                Button { onClone() } label: {
+                    Label("Clone Preset…", systemImage: "plus.square.on.square")
+                }
+                .disabled(!hasLoadedConfig)
                 Button { onRename() } label: {
                     Label("Rename Preset…", systemImage: "pencil")
                 }
