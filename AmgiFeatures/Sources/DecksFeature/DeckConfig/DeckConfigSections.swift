@@ -532,6 +532,8 @@ struct FsrsSection: View {
     let isOptimizingFsrs: Bool
     let isCheckingHealth: Bool
     let isCheckingSameDayDecision: Bool
+    /// The running (or last) FSRS job's progress.
+    let computeProgress: FsrsComputeProgress?
     let onCheckHealth: () -> Void
     let onOptimizeCurrent: () -> Void
     let onCheckSameDayDecision: () -> Void
@@ -545,6 +547,26 @@ struct FsrsSection: View {
     /// The desktop's `computing`: one FSRS job at a time.
     private var isComputing: Bool {
         isOptimizingFsrs || isCheckingHealth || isCheckingSameDayDecision
+    }
+
+    /// The desktop's progress line under the optimize buttons: the running
+    /// job's progress, then the reviews the last one used.
+    @ViewBuilder
+    private var computeProgressRow: some View {
+        if isComputing, let computeProgress {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(computeProgress.text)
+                    .amgiFont(.caption)
+                    .foregroundStyle(palette.textSecondary)
+                if let percent = computeProgress.percent {
+                    ProgressView(value: percent, total: 100)
+                }
+            }
+        } else if !isComputing, let computeProgress {
+            Text(computeProgress.reviewsText)
+                .amgiFont(.caption)
+                .foregroundStyle(palette.textSecondary)
+        }
     }
 
     var body: some View {
@@ -661,13 +683,15 @@ struct FsrsSection: View {
                     Button("Cancel", role: .cancel, action: onCancelOptimize)
                 }
 
-                Button(action: onCheckHealth) {
-                    HStack {
-                        if isCheckingHealth { ProgressView().controlSize(.small) }
-                        Text(isCheckingHealth ? "Checking Health…" : "Check Health")
-                    }
+                // As on the desktop, the running check turns into Cancel.
+                if isCheckingHealth {
+                    Button("Cancel", role: .cancel, action: onCancelOptimize)
+                } else {
+                    Button("Check Health", action: onCheckHealth)
+                        .disabled(isComputing)
                 }
-                .disabled(isComputing)
+
+                computeProgressRow
 
                 Button(action: onOpenSimulatorReview) {
                     Label("Open FSRS Simulator", systemImage: "chart.line.uptrend.xyaxis")

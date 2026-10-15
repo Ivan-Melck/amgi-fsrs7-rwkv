@@ -256,42 +256,6 @@ extension DeckConfigModel {
         return formatter.date(from: date)
     }
 
-    /// The desktop's Check Health (`evaluateParams`): trains on the
-    /// optimize search and reports the fit on the evaluation search.
-    func checkFsrsHealth() async {
-        guard let loaded else { return }
-        isCheckingFsrsHealth = true
-        defer { isCheckingFsrsHealth = false }
-        let version = schedulerSelection.fsrsVersion
-        let isFsrs7 = version == .seven
-        let evaluation = fsrsEvaluationSearch.trimmingCharacters(in: .whitespacesAndNewlines)
-        let request = FsrsEvaluateRequest(
-            search: evaluation.isEmpty ? effectiveParamSearch() : fsrsEvaluationSearch,
-            searchForTraining: effectiveParamSearch(),
-            ignoreRevlogsBefore: Self.ignoreRevlogsBefore(
-                editedConfig(from: loaded.config).config.ignoreRevlogsBeforeDate
-            ),
-            relearningStepsPerDay: Int(relearningStepsInDay(parseSteps(relearningStepsText))),
-            fsrsVersion: version,
-            includeSameDayReviews: isFsrs7 ? fsrs7IncludeSameDayReviews : nil,
-            enableSchedulingPenalties: isFsrs7 && fsrs7SchedulingPenaltiesEnabled
-        )
-        do {
-            let result = try await deckClient.evaluateFsrsParams(request)
-            let rmse = String(format: "%.2f", result.rmseBins * 100)
-            destination = .alert(.notice(
-                title: "FSRS health",
-                message: "Log loss: \(String(format: "%.4f", result.logLoss)), RMSE(bins): \(rmse)%. "
-                    + "Smaller numbers indicate a better fit to your review history."
-            ))
-        } catch {
-            destination = .alert(.fsrsError(
-                title: "Couldn't check FSRS health",
-                message: error.localizedDescription
-            ))
-        }
-    }
-
     // MARK: - FSRS simulator entry
 
     func openSimulator(mode: FsrsSimulatorMode, compareWithRwkv: Bool = false) {

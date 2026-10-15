@@ -46,6 +46,10 @@ public struct DecksService: Sendable {
     ) throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) throws -> FsrsOptimizeResult
     public var evaluateFsrsParams: @Sendable (_ request: FsrsEvaluateRequest) throws -> FsrsEvaluation
+    /// Progress of the running FSRS fit or evaluation.
+    public var latestFsrsComputeProgress: @Sendable () -> FsrsComputeProgress?
+    /// Stops the running FSRS fit or evaluation.
+    public var abortFsrsComputation: @Sendable () -> Void
     public var evaluateFsrsParamsLegacy: @Sendable (_ request: FsrsEvaluateLegacyRequest) throws -> FsrsEvaluation
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsReviewSimulation
     public var simulateFsrsWorkload: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsWorkloadSimulation
@@ -168,6 +172,12 @@ extension DecksService: DependencyKey {
             },
             evaluateFsrsParams: { request in
                 try backend.invoke(.evaluateFsrsParams(request))
+            },
+            latestFsrsComputeProgress: {
+                (try? backend.invoke(.latestFsrsComputeProgress)) ?? nil
+            },
+            abortFsrsComputation: {
+                _ = try? backend.invoke(Request<Void>.setWantsAbort)
             },
             evaluateFsrsParamsLegacy: { request in
                 try backend.invoke(.evaluateFsrsParamsLegacy(request))

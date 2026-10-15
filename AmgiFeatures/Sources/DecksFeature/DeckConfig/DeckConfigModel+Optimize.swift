@@ -61,16 +61,82 @@ extension DeckConfigModel {
 
     // MARK: - Optimize
 
-    /// The desktop can abort the backend; here the result is ignored.
+    /// The desktop's `setWantsAbort`: the backend stops the running job,
+    /// whose result (an interrupted error) is then ignored.
     func cancelOptimize() {
         optimizeGeneration &+= 1
         isOptimizingFsrs = false
         isCheckingSameDayDecision = false
+        isCheckingFsrsHealth = false
+        Task { await deckClient.abortFsrsComputation() }
+    }
+
+    /// `runWithBackendProgress`: polls the backend's progress every 100 ms
+    /// while `work` runs. The last value stays, for its review count.
+    func withFsrsProgress<T>(_ work: () async throws -> T) async rethrows -> T {
+        fsrsComputeProgress = nil
+        let poll = Task { [deckClient] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { return }
+                if let progress = await deckClient.latestFsrsComputeProgress() {
+                    fsrsComputeProgress = progress
+                }
+            }
+        }
+        defer { poll.cancel() }
+        return try await work()
+    }
+
+    // MARK: - Check Health
+
+    /// `checkHealth` (`evaluateParams`): trains on the optimize search and
+    /// reports the fit on the evaluation search.
+    func checkFsrsHealth() async {
+        guard loaded != nil, !isFsrsComputing else { return }
+        let params = activeFsrsParams()
+        let generation = optimizeGeneration
+        isCheckingFsrsHealth = true
+        defer { if generation == optimizeGeneration { isCheckingFsrsHealth = false } }
+        do {
+            try requireValidFsrsParams(.current, params)
+            let request = FsrsEvaluateRequest(
+                search: effectiveEvaluationSearch(),
+                searchForTraining: effectiveParamSearch(),
+                ignoreRevlogsBefore: editedIgnoreRevlogsBefore,
+                relearningStepsPerDay: Int(relearningStepsInDay(parseSteps(relearningStepsText))),
+                fsrsVersion: schedulerSelection.fsrsVersion,
+                includeSameDayReviews: includeSameDayOverride,
+                enableSchedulingPenalties: enableSchedulingPenaltiesOverride
+            )
+            let result = try await withFsrsProgress {
+                try await deckClient.evaluateFsrsParams(request)
+            }
+            guard generation == optimizeGeneration else { return }
+            let logLoss = JSNumberFormat.toFixed(Double(result.logLoss), 4)
+            let rmse = JSNumberFormat.toFixed(Double(result.rmseBins) * 100, 2)
+            destination = .alert(.notice(
+                title: "FSRS health",
+                message: "Log loss: \(logLoss), RMSE(bins): \(rmse)%. "
+                    // deck-config-smaller-is-better
+                    + "Smaller numbers indicate a better fit to your review history."
+            ))
+        } catch {
+            guard generation == optimizeGeneration else { return }
+            destination = .alert(.fsrsError(
+                title: "Couldn't check FSRS health",
+                message: optimizationFailureFeedback(error, params: params)
+            ))
+        }
     }
 
     /// `computeParams`: optimizes, then shows the Optimization Result unless
     /// the parameters are already optimal.
     func optimizeCurrentPreset() async {
+        await withFsrsProgress { await optimizeCurrentPresetJob() }
+    }
+
+    private func optimizeCurrentPresetJob() async {
         guard loaded != nil, !isFsrsComputing else { return }
         let generation = optimizeGeneration
         isOptimizingFsrs = true
@@ -186,6 +252,10 @@ extension DeckConfigModel {
     /// `checkSameDayDecision`: optimizes FSRS-7 with and without same-day
     /// reviews and scores both on all targets and on long-term ones.
     func checkSameDayDecision() async {
+        await withFsrsProgress { await checkSameDayDecisionJob() }
+    }
+
+    private func checkSameDayDecisionJob() async {
         guard loaded != nil, !isFsrsComputing else { return }
         let currentParams = activeFsrsParams()
         do {

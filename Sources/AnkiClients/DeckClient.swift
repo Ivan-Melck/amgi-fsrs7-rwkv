@@ -41,6 +41,8 @@ public struct DeckClient: Sendable {
     ) async throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) async throws -> FsrsOptimizeResult
     public var evaluateFsrsParams: @Sendable (_ request: FsrsEvaluateRequest) async throws -> FsrsEvaluation
+    public var latestFsrsComputeProgress: @Sendable () async -> FsrsComputeProgress?
+    public var abortFsrsComputation: @Sendable () async -> Void
     public var evaluateFsrsParamsLegacy: @Sendable (_ request: FsrsEvaluateLegacyRequest) async throws -> FsrsEvaluation
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsReviewSimulation
     public var simulateFsrsWorkload: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsWorkloadSimulation

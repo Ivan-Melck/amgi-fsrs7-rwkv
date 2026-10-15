@@ -111,3 +111,42 @@ extension Request where Response == UndoOutcome {
         )
     }
 }
+
+// MARK: - progress / abort
+
+extension Request where Response == FsrsComputeProgress? {
+    /// The running FSRS job's progress (`LatestProgress`), nil for other
+    /// jobs. Bypasses the call lock: it is polled while the job holds it.
+    public static var latestFsrsComputeProgress: Self {
+        Self(
+            serviceId: ServiceID.collection,
+            methodId: CollectionOpsMethod.latestProgress,
+            bypassesCallLock: true,
+            encode: { Data() },
+            decode: { bytes in
+                let progress = try Anki_Collection_Progress(serializedBytes: bytes)
+                guard case .computeParams(let value)? = progress.value else { return nil }
+                return FsrsComputeProgress(
+                    current: Int(value.current),
+                    total: Int(value.total),
+                    reviews: Int(value.reviews),
+                    isTrainingDynamicDesiredRetention: value.phase == .trainingDynamicDesiredRetention
+                )
+            }
+        )
+    }
+}
+
+extension Request where Response == Void {
+    /// Asks the running backend job to stop (`SetWantsAbort`); it then
+    /// fails with an interrupted error.
+    public static var setWantsAbort: Self {
+        Self(
+            serviceId: ServiceID.collection,
+            methodId: CollectionOpsMethod.setWantsAbort,
+            bypassesCallLock: true,
+            encode: { Data() },
+            decode: { _ in () }
+        )
+    }
+}

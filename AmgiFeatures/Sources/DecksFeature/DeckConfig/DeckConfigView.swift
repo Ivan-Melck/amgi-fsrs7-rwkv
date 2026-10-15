@@ -226,6 +226,7 @@ struct DeckConfigView: View {
             isOptimizingFsrs: model.isOptimizingFsrs,
             isCheckingHealth: model.isCheckingFsrsHealth,
             isCheckingSameDayDecision: model.isCheckingSameDayDecision,
+            computeProgress: model.fsrsComputeProgress,
             onCheckHealth: { Task { await model.checkFsrsHealth() } },
             onOptimizeCurrent: { Task { await model.optimizeCurrentPreset() } },
             onCheckSameDayDecision: { Task { await model.checkSameDayDecision() } },

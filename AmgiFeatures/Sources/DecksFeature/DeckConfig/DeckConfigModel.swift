@@ -118,6 +118,8 @@ final class DeckConfigModel {
     /// The running calibration step's progress, while polled.
     var rwkvCalibrationProgress: RwkvCalibrationProgress?
     var isCheckingFsrsHealth = false
+    /// The running (or last) FSRS job's backend progress.
+    var fsrsComputeProgress: FsrsComputeProgress?
     var isCheckingSameDayDecision = false
     var newPresetName = ""
     var renamePresetDraft = ""
