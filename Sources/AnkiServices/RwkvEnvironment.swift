@@ -6,7 +6,7 @@
 //  its state. Shared by every service that asks the bridge for RWKV scores.
 //
 
-import AnkiBackend
+package import AnkiBackend
 import Foundation
 
 package enum RwkvEnvironment {
