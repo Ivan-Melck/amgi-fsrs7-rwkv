@@ -9,6 +9,7 @@ use std::slice;
 use anki::backend::{init_backend, Backend};
 
 mod aux;
+mod rwkv;
 
 /// Create a new Anki backend instance.
 ///
@@ -118,7 +119,8 @@ pub unsafe extern "C" fn anki_free_response(data: *mut u8, len: usize) {
 #[no_mangle]
 pub unsafe extern "C" fn anki_close_backend(backend_ptr: i64) {
     if backend_ptr != 0 {
-        let _ = unsafe { Box::from_raw(backend_ptr as *mut Backend) };
+        let backend = unsafe { Box::from_raw(backend_ptr as *mut Backend) };
+        rwkv::forget_backend(&backend);
     }
 }
 

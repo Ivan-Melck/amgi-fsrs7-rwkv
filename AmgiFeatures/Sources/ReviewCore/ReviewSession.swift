@@ -155,6 +155,10 @@ public final class ReviewSession {
                 let (queue, name) = try await Task.detached { () -> (QueuedCardsResult, String) in
                     try decks.setCurrentDeck(deckId)
                     let name = (try? decks.getCurrentDeck().name) ?? ""
+                    // Readies RWKV and installs RWKV-Instant queue scores for
+                    // this deck. Best effort: without them the queue falls
+                    // back to due dates, as on the desktop.
+                    try? scheduler.beginSession(deckId)
                     return (try scheduler.getQueuedCards(200), name)
                 }.value
                 cardQueue = queue.cards
@@ -278,12 +282,15 @@ public final class ReviewSession {
         let notetypes = self.notetypes
         let notetypesClient = self.notetypesClient
         let cardRendering = self.cardRendering
+        let undoesAnswer = lastRating != nil
 
         Task {
             defer { isAdvancing = false }
             do {
                 let queue = try await Task.detached {
                     try collection.undoLast()
+                    // Puts RWKV's model state back to before the answer.
+                    try? scheduler.didUndo(undoesAnswer)
                     // Re-fetch queue — Anki places the undone card at the front
                     return try scheduler.getQueuedCards(200)
                 }.value

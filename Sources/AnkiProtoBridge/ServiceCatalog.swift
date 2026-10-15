@@ -32,6 +32,15 @@ enum ServiceID {
 
 enum AuxMethod {
     static let findDuplicates: UInt32 = 0
+
+    // RWKV scheduling, anki-bridge-rs/src/rwkv.
+    static let rwkvPrepare: UInt32 = 100
+    static let rwkvScoreDeck: UInt32 = 101
+    static let rwkvSchedulingStates: UInt32 = 102
+    static let rwkvAnswerCard: UInt32 = 103
+    static let rwkvUndoAnswer: UInt32 = 104
+    static let rwkvInvalidate: UInt32 = 105
+    static let rwkvSave: UInt32 = 106
 }
 
 enum CollectionOpsMethod {

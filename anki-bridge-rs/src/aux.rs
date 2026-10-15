@@ -29,12 +29,11 @@ const FIND_DUPLICATES: u32 = 0;
 /// `BackendError` — the same convention `run_service_method` uses, so the
 /// Swift side's `0 = ok / 1 = error-protobuf` handling is unchanged.
 ///
-/// `_input` is unused while `findDuplicates` is the only method — it takes no
-/// arguments. It stays in the signature because the next method will have some
-/// and because it mirrors what `anki_run_method` was handed.
-pub fn dispatch(backend: &Backend, method: u32, _input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+/// RWKV scheduling methods (100 and up) live in `crate::rwkv`.
+pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
     match method {
         FIND_DUPLICATES => find_duplicates(backend),
+        method if crate::rwkv::handles(method) => crate::rwkv::dispatch(backend, method, input),
         other => Err(error(
             ErrorKind::InvalidInput,
             format!("unknown aux method {other}"),
@@ -140,9 +139,9 @@ struct Row(i64, i64, String);
 
 // MARK: - Errors
 
-type ErrorKind = anki_proto::backend::backend_error::Kind;
+pub(crate) type ErrorKind = anki_proto::backend::backend_error::Kind;
 
-fn error(kind: ErrorKind, message: String) -> Vec<u8> {
+pub(crate) fn error(kind: ErrorKind, message: String) -> Vec<u8> {
     anki_proto::backend::BackendError {
         message,
         kind: kind as i32,

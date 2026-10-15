@@ -455,6 +455,7 @@ let package = Package(
                 .product(name: "AnkiKit", package: "amgi"),
                 .product(name: "AnkiBackend", package: "amgi"),
                 .product(name: "AnkiClients", package: "amgi"),
+                .product(name: "AnkiServices", package: "amgi"),
                 .product(name: "AnkiSync", package: "amgi"),
                 .product(name: "Reader", package: "AmgiReader"),
                 .product(name: "Theme", package: "AmgiUI"),

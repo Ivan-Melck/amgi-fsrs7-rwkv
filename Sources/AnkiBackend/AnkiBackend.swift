@@ -40,6 +40,11 @@ public final class AnkiBackend: Sendable {
         mediaFolderStorage.withLock { $0 }
     }
 
+    /// Absolute path of the open collection file, or nil if none is open.
+    public var currentCollectionPath: String? {
+        openPathsStorage.withLock { $0?.collection }
+    }
+
     public init(preferredLangs: [String] = ["en"]) throws {
         let t0 = DispatchTime.now().uptimeNanoseconds
         defer {
@@ -228,12 +233,12 @@ public final class AnkiBackend: Sendable {
 
     // MARK: - Raw FFI
 
-    private func callRaw(service: UInt32, method: UInt32, input: Data) throws(BackendError) -> Data {
+    private func callRaw(service: UInt32, method: UInt32, input: Data, locked: Bool = true) throws(BackendError) -> Data {
         let t0 = DispatchTime.now().uptimeNanoseconds
-        lock.lock()
+        if locked { lock.lock() }
         let tLocked = DispatchTime.now().uptimeNanoseconds
         defer {
-            lock.unlock()
+            if locked { lock.unlock() }
             Self.perfLog.debug(
                 """
                 rpc svc=\(service, privacy: .public) m=\(method, privacy: .public) \
@@ -309,7 +314,8 @@ public final class AnkiBackend: Sendable {
             bytes = try backend.callRaw(
                 service: request.serviceId,
                 method: request.methodId,
-                input: input
+                input: input,
+                locked: !request.bypassesCallLock
             )
         } catch {
             return .failure(error)

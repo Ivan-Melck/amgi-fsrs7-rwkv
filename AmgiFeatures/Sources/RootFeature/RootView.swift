@@ -10,6 +10,7 @@ import AppCore
 import AppShared
 import Theme
 import AnkiKit
+import AnkiServices
 import Dependencies
 import Foundation
 import ReaderFeature
@@ -32,6 +33,7 @@ public struct RootView: View {
     private var appFontRaw: String = AppFont.system.rawValue
 
     @Dependency(\.collectionStore) private var store
+    @Dependency(\.schedulerService) private var scheduler
     @Bindable private var accountStore = AccountStore.shared
 
     @State private var pendingReviewDeckId: DeckID?
@@ -52,8 +54,14 @@ public struct RootView: View {
             .id(accountStore.selectedID)
             .onChange(of: accountStore.selectedID) { pendingReviewDeckId = nil }
             .onChange(of: scenePhase) { _, newPhase in
+                let scheduler = scheduler
                 if newPhase == .active {
                     Task { await writeWidgetSnapshot() }
+                    // Warm RWKV's model state before the user starts a review.
+                    Task.detached(priority: .utility) { _ = try? scheduler.prepareRwkv() }
+                } else if newPhase == .background {
+                    // So the next launch restores instead of replaying history.
+                    Task.detached(priority: .utility) { try? scheduler.saveRwkvState() }
                 }
             }
             .onOpenURL { url in

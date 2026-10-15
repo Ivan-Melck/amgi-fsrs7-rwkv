@@ -1,0 +1,602 @@
+//! End-to-end checks of the RWKV orchestration against a real collection.
+//!
+//! The central invariant: after answering cards live through this bridge, the
+//! resident state must predict exactly what a fresh replay of the resulting
+//! revlog predicts. The replay uses the backend's canonical history builder
+//! (the same one the desktop uses), so any drift in how live answers are
+//! encoded (state kinds, elapsed time, day offsets, durations, presets) shows
+//! up here.
+//!
+//! Needs the model weights: `RWKV_MODEL=/path/to/RWKV_trained_on_5000_10000.bin`,
+//! or `anki-upstream` checked out next to this crate. Skipped otherwise.
+
+#![allow(clippy::unwrap_used)]
+
+use std::path::PathBuf;
+
+use anki::backend::init_backend;
+use anki::backend::Backend;
+use anki::services::BackendCollectionService;
+use anki::services::CollectionService;
+use anki::services::DeckConfigService;
+use anki::services::NotesService;
+use anki::services::NotetypesService;
+use anki::services::SchedulerService;
+use anki_proto::scheduler as pb;
+use data_encoding::BASE64;
+use prost::Message;
+
+use super::*;
+
+const DAY_MS: i64 = 86_400_000;
+
+fn model_path() -> Option<String> {
+    let path = std::env::var("RWKV_MODEL")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../anki-upstream/qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin")
+        });
+    path.exists().then(|| path.to_string_lossy().into_owned())
+}
+
+struct Fixture {
+    backend: Backend,
+    _dir: tempfile_dir::Dir,
+    card_ids: Vec<i64>,
+    model: String,
+}
+
+mod tempfile_dir {
+    pub struct Dir(pub std::path::PathBuf);
+    impl Dir {
+        pub fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "amgi-rwkv-{name}-{}-{}",
+                std::process::id(),
+                super::now_millis()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for Dir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+}
+
+fn sql(backend: &Backend, sql: &str, args: Vec<serde_json::Value>) -> Vec<Vec<serde_json::Value>> {
+    db_query(backend, sql, args).unwrap()
+}
+
+/// A collection 60 days old with `cards` Basic review cards, each with a month
+/// of learning and review history, all due today, plus `new_cards` unstudied
+/// cards, in a deck whose preset uses RWKV-Instant with RWKV-Curve as its
+/// due-date calculator. Some review cards were already answered earlier today,
+/// so their next answer goes through the same-day state machine.
+fn fixture(name: &str, cards: usize) -> Option<Fixture> {
+    fixture_with_new(name, cards, 0)
+}
+
+fn fixture_with_new(name: &str, cards: usize, new_cards: usize) -> Option<Fixture> {
+    let model = model_path()?;
+    let dir = tempfile_dir::Dir::new(name);
+    let backend =
+        init_backend(&anki_proto::backend::BackendInit::default().encode_to_vec()).unwrap();
+    backend
+        .open_collection(anki_proto::collection::OpenCollectionRequest {
+            collection_path: dir.0.join("collection.anki2").to_string_lossy().into(),
+            media_folder_path: dir.0.join("media").to_string_lossy().into(),
+            media_db_path: dir.0.join("media.db").to_string_lossy().into(),
+        })
+        .unwrap();
+
+    let now = now_millis();
+    sql(
+        &backend,
+        "update col set crt = crt - ?",
+        vec![serde_json::json!(60 * 86_400)],
+    );
+
+    let mut card_ids = vec![];
+    backend
+        .with_col(|col| {
+            let basic = NotetypesService::get_notetype_id_by_name(
+                col,
+                anki_proto::generic::String {
+                    val: "Basic".into(),
+                },
+            )?;
+            for i in 0..cards + new_cards {
+                let mut note = NotesService::new_note(col, basic)?;
+                note.fields = vec![format!("front {i}"), format!("back {i}")];
+                let _ = NotesService::add_note(
+                    col,
+                    anki_proto::notes::AddNoteRequest {
+                        note: Some(note),
+                        deck_id: 1,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let ids = sql(&backend, "select id from cards order by id", vec![]);
+    for (i, row) in ids.iter().take(cards).enumerate() {
+        let old = row[0].as_i64().unwrap();
+        // Created 40 days ago, a second apart.
+        let new = now - 40 * DAY_MS + i as i64 * 1000;
+        sql(
+            &backend,
+            "update cards set id = ? where id = ?",
+            vec![new.into(), old.into()],
+        );
+        card_ids.push(new);
+    }
+
+    // History: two learning steps 30 days ago, then reviews; some lapses.
+    for (i, cid) in card_ids.iter().enumerate() {
+        let base = now - 30 * DAY_MS + i as i64 * 7_000;
+        let mut rows: Vec<(i64, i64, i64, i64)> = vec![
+            (base, 3, 0, 1),                               // learn
+            (base + 600_000, 3, 0, 1),                     // learn (graduate)
+            (base + DAY_MS, 3, 1, 3),                      // review
+            (base + 6 * DAY_MS, 1 + (i as i64 % 4), 1, 8), // review, ease varies
+        ];
+        if i % 4 == 0 {
+            // A lapse relearned the same day.
+            rows.push((base + 6 * DAY_MS + 900_000, 3, 2, 1));
+        }
+        rows.push((base + 15 * DAY_MS, 3, 1, 10));
+        // Earlier today: a Review lapse, a Relearning step, or a Learning
+        // step; the next Review answer becomes Relearning or Filtered.
+        match i % 5 {
+            1 => rows.push((now - 7_200_000 + i as i64, 1, 1, 10)),
+            2 => rows.push((now - 7_200_000 + i as i64, 3, 2, 1)),
+            3 => rows.push((now - 7_200_000 + i as i64, 3, 0, 1)),
+            _ => {}
+        }
+        for (id, ease, kind, ivl) in rows {
+            sql(
+                &backend,
+                "insert into revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) values (?, ?, -1, ?, ?, 0, 2500, 8000, ?)",
+                vec![id.into(), (*cid).into(), ease.into(), ivl.into(), kind.into()],
+            );
+        }
+        let timing = backend
+            .with_col(SchedulerService::sched_timing_today)
+            .unwrap();
+        sql(
+            &backend,
+            "update cards set type = 2, queue = 2, ivl = 10, due = ?, factor = 2500, reps = 5 where id = ?",
+            vec![(i64::from(timing.days_elapsed) - 5).into(), (*cid).into()],
+        );
+    }
+
+    // RWKV-Instant, with RWKV-Curve as the due-date calculator, FSRS on.
+    backend
+        .with_col(|col| {
+            let mut config = DeckConfigService::get_deck_config(
+                col,
+                anki_proto::deck_config::DeckConfigId { dcid: 1 },
+            )?;
+            let inner = config.config.as_mut().unwrap();
+            inner.rwkv_review_enabled = true;
+            inner.rwkv_review_instant_order_enabled = true;
+            inner.rwkv_review_min_intervening_reviews = 2;
+            inner.rwkv_review_min_elapsed_secs = 0;
+            inner.reviews_per_day = 1000;
+            inner.new_per_day = 100;
+            let _ = DeckConfigService::update_deck_configs(
+                col,
+                anki_proto::deck_config::UpdateDeckConfigsRequest {
+                    target_deck_id: 1,
+                    configs: vec![config],
+                    fsrs: true,
+                    // Same-day reviews, so cards answered today stay eligible.
+                    fsrs_short_term_with_steps_enabled: true,
+                    ..Default::default()
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+
+    Some(Fixture {
+        backend,
+        _dir: dir,
+        card_ids,
+        model,
+    })
+}
+
+fn prepare(
+    engine: &mut Engine,
+    fx: &Fixture,
+    cache_dir: Option<&std::path::Path>,
+) -> PrepareResponse {
+    engine
+        .prepare(
+            &fx.backend,
+            PrepareRequest {
+                model_path: fx.model.clone(),
+                cache_dir: cache_dir.map(|d| d.to_string_lossy().into_owned()),
+                precision: None,
+            },
+        )
+        .unwrap()
+}
+
+/// Query inputs for every card, fixed once so two engines see identical inputs.
+fn all_queries(fx: &Fixture) -> Vec<ReviewInput> {
+    let rows = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::rwkv_review_input_rows_for_cards(
+                col,
+                pb::RwkvReviewInputRowsForCardsRequest {
+                    card_ids: fx.card_ids.clone(),
+                    include_disabled_decks: true,
+                    include_suspended_review: true,
+                    include_new_cards: true,
+                },
+            )
+        })
+        .unwrap();
+    assert!(!rows.rows.is_empty());
+    rows.rows.iter().map(query_input_from_row).collect()
+}
+
+fn assert_same_predictions(a: &[f32], b: &[f32]) {
+    assert_eq!(a.len(), b.len());
+    let worst = a
+        .iter()
+        .zip(b)
+        .map(|(x, y)| (x - y).abs())
+        .fold(0.0f32, f32::max);
+    assert!(worst <= 1e-6, "predictions differ by up to {worst}");
+}
+
+/// Shows and answers the next queued card the way the app does; returns its id.
+fn answer_next(engine: &mut Engine, fx: &Fixture, rating: u8) -> Option<i64> {
+    let queued = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap();
+    let queued = queued.cards.into_iter().next()?;
+    let card_id = queued.card.as_ref()?.id;
+    let shown = engine
+        .scheduling_states(
+            &fx.backend,
+            SchedulingStatesRequest {
+                card_id,
+                states: BASE64.encode(&queued.states?.encode_to_vec()),
+            },
+        )
+        .unwrap();
+    assert!(shown.active);
+    let states =
+        pb::SchedulingStates::decode(BASE64.decode(shown.states.as_bytes()).unwrap().as_slice())
+            .unwrap();
+    let new_state = match rating {
+        1 => states.again,
+        2 => states.hard,
+        3 => states.good,
+        _ => states.easy,
+    }
+    .unwrap();
+    engine
+        .answer_card(
+            &fx.backend,
+            AnswerCardRequest {
+                card_id,
+                rating,
+                milliseconds_taken: 5_000 + u32::from(rating) * 1_000,
+                current_state: BASE64.encode(&states.current.unwrap().encode_to_vec()),
+                new_state: BASE64.encode(&new_state.encode_to_vec()),
+            },
+        )
+        .unwrap();
+    Some(card_id)
+}
+
+#[test]
+fn live_answers_match_a_fresh_canonical_replay() {
+    let Some(fx) = fixture_with_new("parity", 15, 4) else {
+        return;
+    };
+    let mut live = Engine::default();
+    let prepared = prepare(&mut live, &fx, None);
+    assert!(prepared.active && prepared.ready);
+    assert_eq!(prepared.source, "replayed");
+    // Cards whose latest learning start is today's seeded Learning step keep
+    // only that review (`_benchmark_retained_historical_review_starts`).
+    // Per card i: 5 rows, +1 lapse when i % 4 == 0, +1 same-day row when
+    // i % 5 is 1 or 2; i % 5 == 3 keeps 1. Summed over i in 0..15: 72.
+    assert_eq!(prepared.replayed_reviews, 72);
+
+    let scored = live
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+    assert!(scored.instant);
+    assert!(scored.scored > 0);
+
+    // Mixed grades until the queue runs dry, so lapses and learning steps
+    // come back through learn-ahead.
+    let mut answered = vec![];
+    for rating in [3, 1, 3, 4, 2, 1, 3, 3, 1, 4, 3, 2].iter().cycle().take(60) {
+        match answer_next(&mut live, &fx, *rating) {
+            Some(card_id) => answered.push(card_id),
+            None => break,
+        }
+    }
+    assert_eq!(live.own_answers, answered.len() as u64);
+
+    // Every dataset state was exercised by a live answer.
+    let kinds: Vec<i64> = sql(
+        &fx.backend,
+        "select distinct type from revlog where id > ? order by type",
+        vec![(now_millis() - 600_000).into()],
+    )
+    .iter()
+    .map(|r| r[0].as_i64().unwrap())
+    .collect();
+    assert_eq!(
+        kinds,
+        vec![0, 1, 2, 3],
+        "live answers covered revlog kinds {kinds:?}"
+    );
+    let learn_starts = sql(
+        &fx.backend,
+        "select count() from revlog r where r.id > ? and r.type = 0 and not exists \
+         (select 1 from revlog p where p.cid = r.cid and p.id < r.id)",
+        vec![(now_millis() - 600_000).into()],
+    )[0][0]
+        .as_i64()
+        .unwrap();
+    assert!(learn_starts > 0, "no learn starts answered");
+
+    let queries = all_queries(&fx);
+    let live_predictions = live.predict_many(&queries).unwrap();
+
+    let mut fresh = Engine::default();
+    let replayed = prepare(&mut fresh, &fx, None);
+    assert_eq!(replayed.source, "replayed");
+    assert_eq!(
+        replayed.replayed_reviews,
+        prepared.replayed_reviews + answered.len() as u64
+    );
+    let fresh_predictions = fresh.predict_many(&queries).unwrap();
+    assert_same_predictions(&live_predictions, &fresh_predictions);
+
+    // The live engine's identity bookkeeping agrees with the collection.
+    live.trusted = false;
+    let revalidated = live.ensure_ready(&fx.backend).unwrap();
+    assert_eq!(revalidated.0, "revalidated");
+}
+
+#[test]
+fn curve_states_and_answer_metadata_reach_the_collection() {
+    let Some(fx) = fixture("curve", 6) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+
+    let queued = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap()
+        .cards
+        .remove(0);
+    let card_id = queued.card.unwrap().id;
+    let original = queued.states.unwrap();
+    let shown = engine
+        .scheduling_states(
+            &fx.backend,
+            SchedulingStatesRequest {
+                card_id,
+                states: BASE64.encode(&original.encode_to_vec()),
+            },
+        )
+        .unwrap();
+    assert!(shown.curve);
+    let r = shown.retrievability.unwrap();
+    assert!((0.0..=1.0).contains(&r));
+    let prediction = engine.session.prediction.unwrap();
+    assert!(prediction.interval_override_used);
+    let good_s90 = prediction.s90s[2].unwrap();
+
+    let states =
+        pb::SchedulingStates::decode(BASE64.decode(shown.states.as_bytes()).unwrap().as_slice())
+            .unwrap();
+    assert_ne!(
+        states.good, original.good,
+        "Curve should replace FSRS's Good state"
+    );
+    engine
+        .answer_card(
+            &fx.backend,
+            AnswerCardRequest {
+                card_id,
+                rating: 3,
+                milliseconds_taken: 4_000,
+                current_state: BASE64.encode(&states.current.clone().unwrap().encode_to_vec()),
+                new_state: BASE64.encode(&states.good.clone().unwrap().encode_to_vec()),
+            },
+        )
+        .unwrap();
+
+    // The revlog carries RWKV's review kind; the card RWKV's S90.
+    let row = &sql(
+        &fx.backend,
+        "select type, ease from revlog where cid = ? order by id desc limit 1",
+        vec![card_id.into()],
+    )[0];
+    assert_eq!(
+        row[0].as_i64(),
+        Some(1),
+        "review answered on a new day is a Review"
+    );
+    let card = get_card(&fx.backend, card_id).unwrap();
+    let stability = card.memory_state.unwrap().stability;
+    assert!(
+        (stability - good_s90).abs() < 1e-3,
+        "stability {stability} vs S90 {good_s90}"
+    );
+}
+
+#[test]
+fn undo_restores_the_state_before_the_answer() {
+    let Some(fx) = fixture("undo", 6) else { return };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+    let queries = all_queries(&fx);
+    let before = engine.predict_many(&queries).unwrap();
+
+    answer_next(&mut engine, &fx, 3).unwrap();
+    let after = engine.predict_many(&queries).unwrap();
+    assert!(before.iter().zip(&after).any(|(a, b)| a != b));
+
+    let _ = fx.backend.with_col(CollectionService::undo).unwrap();
+    assert!(engine.undo_answer(&fx.backend).unwrap().restored);
+    assert_same_predictions(&before, &engine.predict_many(&queries).unwrap());
+    engine.trusted = false;
+    assert_eq!(engine.ensure_ready(&fx.backend).unwrap().0, "revalidated");
+}
+
+#[test]
+fn persisted_state_restores_and_catches_up() {
+    let Some(fx) = fixture("persist", 8) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("persist-cache");
+    let mut engine = Engine::default();
+    assert_eq!(prepare(&mut engine, &fx, Some(&cache.0)).source, "replayed");
+    engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+
+    // Untouched collection: restored as is.
+    let mut restored = Engine::default();
+    assert_eq!(
+        prepare(&mut restored, &fx, Some(&cache.0)).source,
+        "restored"
+    );
+    let queries = all_queries(&fx);
+    assert_same_predictions(
+        &engine.predict_many(&queries).unwrap(),
+        &restored.predict_many(&queries).unwrap(),
+    );
+
+    // Answers after the save: restored, then only the newer reviews replayed.
+    for rating in [3, 1, 3] {
+        answer_next(&mut engine, &fx, rating);
+    }
+    let mut caught_up = Engine::default();
+    let prepared = prepare(&mut caught_up, &fx, Some(&cache.0));
+    assert_eq!(prepared.source, "restored+suffix");
+    assert_eq!(prepared.replayed_reviews, 3);
+    let queries = all_queries(&fx);
+    assert_same_predictions(
+        &engine.predict_many(&queries).unwrap(),
+        &caught_up.predict_many(&queries).unwrap(),
+    );
+
+    // Saving after live answers records the new identity.
+    assert!(engine.save(&fx.backend).unwrap().saved);
+    let mut reopened = Engine::default();
+    assert_eq!(
+        prepare(&mut reopened, &fx, Some(&cache.0)).source,
+        "restored"
+    );
+}
+
+#[test]
+fn inactive_collection_is_left_alone() {
+    let Some(fx) = fixture("inactive", 2) else {
+        return;
+    };
+    fx.backend
+        .with_col(|col| {
+            let mut config = DeckConfigService::get_deck_config(
+                col,
+                anki_proto::deck_config::DeckConfigId { dcid: 1 },
+            )?;
+            let inner = config.config.as_mut().unwrap();
+            inner.rwkv_review_enabled = false;
+            inner.rwkv_review_instant_order_enabled = false;
+            let _ = DeckConfigService::update_deck_configs(
+                col,
+                anki_proto::deck_config::UpdateDeckConfigsRequest {
+                    target_deck_id: 1,
+                    configs: vec![config],
+                    fsrs: true,
+                    ..Default::default()
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let mut engine = Engine::default();
+    let prepared = prepare(&mut engine, &fx, None);
+    assert!(!prepared.active);
+    let scored = engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+    assert!(!scored.instant);
+}

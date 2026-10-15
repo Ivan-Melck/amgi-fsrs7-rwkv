@@ -166,6 +166,9 @@ targets:
         type: folder
       - path: Resources/EPUBReader
         type: folder
+      # RWKV scheduler weights, straight from the anki-upstream fork.
+      - path: ../anki-upstream/qt/aqt/rwkv_inference/RWKV_trained_on_5000_10000.bin
+        buildPhase: resources
     dependencies:
       - package: AmgiFeatures
         product: RootFeature

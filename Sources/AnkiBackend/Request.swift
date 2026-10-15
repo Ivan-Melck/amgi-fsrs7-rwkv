@@ -22,15 +22,21 @@ public struct Request<Response: Sendable>: Sendable {
     package let methodId: UInt32
     package let encode: @Sendable () throws -> Data
     package let decode: @Sendable (Data) throws -> Response
+    /// Skips `AnkiBackend`'s process-wide call lock. Only for calls that
+    /// synchronize themselves in Rust and may run for a long time (the RWKV
+    /// history replay), so they cannot stall every other RPC meanwhile.
+    package let bypassesCallLock: Bool
 
     package init(
         serviceId: UInt32,
         methodId: UInt32,
+        bypassesCallLock: Bool = false,
         encode: @escaping @Sendable () throws -> Data,
         decode: @escaping @Sendable (Data) throws -> Response
     ) {
         self.serviceId = serviceId
         self.methodId = methodId
+        self.bypassesCallLock = bypassesCallLock
         self.encode = encode
         self.decode = decode
     }

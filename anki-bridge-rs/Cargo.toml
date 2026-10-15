@@ -16,6 +16,11 @@ anki_proto = { path = "../anki-upstream/rslib/proto" }
 prost = "0.13"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# RWKV orchestration (src/rwkv): the desktop's add-on preset hash, the
+# replay key, and base64 for scheduling-state bytes in JSON.
+blake2 = "0.10"
+data-encoding = "2"
+sha2 = "0.10"
 
 [profile.release]
 opt-level = "s"     # Optimize for size (iOS binary)

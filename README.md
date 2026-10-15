@@ -14,10 +14,16 @@
 > points at that fork, so the app runs its Rust scheduler (FSRS-7, same-day
 > learning options, review fuzz settings).
 >
-> - RWKV inference and queue scoring are driven by the desktop app's Python
->   layer, which is not available on iOS. RWKV presets therefore schedule with
->   their stored due dates (the preset's FSRS/Curve fallback), as on other
->   mobile clients.
+> - **RWKV runs on device.** `anki-bridge-rs/src/rwkv` ports the desktop's
+>   RWKV orchestration (`qt/aqt/rwkv_scheduler.py`) to Rust on top of the
+>   fork's own inference and scheduler RPCs: history replay into resident
+>   model state (persisted beside the collection), RWKV-Instant queue scores,
+>   RWKV-Curve answer intervals and S90s, the same-day review-kind state
+>   machine, and undo. The weights are bundled from the submodule. A parity
+>   test checks that live answers leave the model exactly where a fresh replay
+>   of the resulting history does.
+> - Not yet ported: RWKV deck-list counts (the deck list shows due-date
+>   counts), stats/card-info RWKV values, and the Curve reschedule action.
 > - `scripts/sync-dispatch-constants.py` regenerates the backend RPC indices
 >   after a submodule bump; CI runs it automatically.
 > - Deck option saves keep fork-only preset fields and collection-wide
