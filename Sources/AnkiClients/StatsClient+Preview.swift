@@ -15,6 +15,9 @@ extension StatsClient {
     public static let previewValue = StatsClient(
         fetchGraphs: { _, _ in
             GraphsSnapshot.sample
+        },
+        fetchCalibration: { _, _, _ in
+            .sample
         }
     )
 }

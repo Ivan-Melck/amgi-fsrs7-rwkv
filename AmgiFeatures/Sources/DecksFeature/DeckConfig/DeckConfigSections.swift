@@ -426,8 +426,15 @@ struct RwkvSection: View {
     @Binding var enforceGradeOrder: Bool
     let canRebuildState: Bool
     let isRebuildingState: Bool
+    let isRecomputingCalibration: Bool
+    let calibrationProgress: RwkvCalibrationProgress?
     let onRebuildState: () -> Void
+    let onRecomputeCalibration: () -> Void
+    let onCancelCalibration: () -> Void
     let onCompareWithFsrs: () -> Void
+
+    /// The desktop's `rwkvActionInProgress`.
+    private var isBusy: Bool { isRebuildingState || isRecomputingCalibration }
 
     var body: some View {
         if instantEnabled {
@@ -467,15 +474,36 @@ struct RwkvSection: View {
                         Text("Rebuild RWKV State")
                     }
                 }
-                .disabled(isRebuildingState)
+                .disabled(isBusy)
+                Button(action: onRecomputeCalibration) {
+                    if isRecomputingCalibration {
+                        HStack { ProgressView().controlSize(.small); Text("Calculating Calibration Graph Data...") }
+                    } else {
+                        Text("Calculate Calibration Graph Data")
+                    }
+                }
+                .disabled(isBusy)
+                if isBusy, let calibrationProgress {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(calibrationProgress.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let fraction = calibrationProgress.fraction {
+                            ProgressView(value: fraction)
+                        }
+                    }
+                }
+                if isRecomputingCalibration {
+                    Button("Cancel", role: .cancel, action: onCancelCalibration)
+                }
                 Button(action: onCompareWithFsrs) {
                     Label("Compare RWKV with FSRS", systemImage: "chart.line.uptrend.xyaxis")
                 }
-                .disabled(isRebuildingState)
+                .disabled(isBusy)
             } header: {
                 Text("RWKV maintenance")
             } footer: {
-                Text("Replays your whole review history, ignoring the saved state. Saves these options first. This can take a while on large collections.")
+                Text("Rebuilding replays your whole review history, ignoring the saved state, and rebuilds the historical RWKV and FSRS predictions the calibration graph uses; calculating the calibration graph data recomputes the RWKV ones only. Both save these options first and can take a while on large collections.")
             }
         }
     }

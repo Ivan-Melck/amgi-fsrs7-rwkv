@@ -12,6 +12,9 @@ import DependenciesMacros
 @DependencyClient
 public struct StatsClient: Sendable {
     public var fetchGraphs: @Sendable (_ search: String, _ days: Int) async throws -> GraphsSnapshot
+    /// The calibration and UM+ graphs' data for a search and period; with
+    /// `ensure`, missing RWKV data is generated first (long-running).
+    public var fetchCalibration: @Sendable (_ search: String, _ days: Int, _ ensure: Bool) async throws -> CalibrationReport
 }
 
 extension StatsClient: TestDependencyKey {

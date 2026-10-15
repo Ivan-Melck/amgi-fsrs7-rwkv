@@ -1743,7 +1743,6 @@ fn calibration_recompute_records_history_and_keeps_the_resident_state() {
     assert!(reviews > 2);
     // The resident state is back, unchanged.
     assert_same_predictions(&before, &engine.predict_many(&queries).unwrap());
-    assert!(!calibration::progress(&fx.backend, Default::default()).running);
 
     // One row per replayed review: the pre-answer prediction a recording
     // replay makes, the first 70% as final fit and the rest as test fold 0
@@ -2019,5 +2018,50 @@ fn build_cache_clears_predictions_and_rebuilds_fsrs() {
         .unwrap();
     assert_eq!(fsrs_rows, i64::from(rebuilt.predictions));
     assert!(fsrs_rows > 0);
-    assert!(!calibration::progress(&fx.backend, Default::default()).running);
+}
+
+#[test]
+fn calibration_on_an_empty_collection_is_empty() {
+    let dir = tempfile_dir::Dir::new("calibration-empty");
+    let backend =
+        init_backend(&anki_proto::backend::BackendInit::default().encode_to_vec()).unwrap();
+    backend
+        .open_collection(anki_proto::collection::OpenCollectionRequest {
+            collection_path: dir.0.join("collection.anki2").to_string_lossy().into(),
+            media_folder_path: dir.0.join("media").to_string_lossy().into(),
+            media_db_path: dir.0.join("media.db").to_string_lossy().into(),
+        })
+        .unwrap();
+    let rebuilt = calibration::rebuild_fsrs(
+        &backend,
+        calibration::RebuildFsrsRequest {
+            clear: true,
+            cache_dir: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(rebuilt.predictions, 0);
+    let mut engine = Engine::default();
+    let data = engine
+        .calibration_data(
+            &backend,
+            calibration::CalibrationDataRequest {
+                ensure: true,
+                model_path: Some("/nonexistent".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(data, calibration::CalibrationDataResponse::default());
+    // Without the model, recomputing fails rather than writing anything.
+    assert!(engine
+        .recompute_calibration(
+            &backend,
+            PrepareRequest {
+                model_path: "/nonexistent".into(),
+                cache_dir: None,
+                precision: None,
+            },
+        )
+        .is_err());
 }

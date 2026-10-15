@@ -27,6 +27,16 @@ public struct RwkvClient: Sendable {
     public var simulateWorkload: @Sendable (_ request: RwkvWorkloadRequest) async throws -> FsrsWorkloadSimulation
     /// Stops a running `simulateWorkload`.
     public var cancelWorkload: @Sendable () async -> Void
+    /// "Calculate Calibration Graph Data": RWKV's historical predictions for
+    /// the calibration graph. Long-running.
+    public var recomputeCalibration: @Sendable () async throws -> RwkvCalibrationRecomputeResult
+    /// Build Cache's first step: clears both historical prediction caches
+    /// and rebuilds FSRS's. Returns the FSRS predictions stored.
+    public var rebuildFsrsCalibration: @Sendable () async throws -> Int
+    /// The running calibration operation's progress.
+    public var calibrationProgress: @Sendable () async -> RwkvCalibrationProgress?
+    /// Stops a running calibration operation.
+    public var cancelCalibration: @Sendable () async -> Void
 }
 
 extension RwkvClient: TestDependencyKey {
@@ -37,7 +47,11 @@ extension RwkvClient: TestDependencyKey {
         reschedule: { _ in RwkvRescheduleResult(built: true, predicted: 0, updated: 0) },
         rebuildState: { RwkvPrepareResult(active: true, ready: true, source: "replayed") },
         simulateWorkload: { _ in FsrsWorkloadSimulation(cost: [:], memorized: [:], reviewCount: [:]) },
-        cancelWorkload: {}
+        cancelWorkload: {},
+        recomputeCalibration: { RwkvCalibrationRecomputeResult(recomputed: true, reviews: 0) },
+        rebuildFsrsCalibration: { 0 },
+        calibrationProgress: { nil },
+        cancelCalibration: {}
     )
 }
 
