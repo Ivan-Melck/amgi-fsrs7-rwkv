@@ -32,6 +32,9 @@ pub(super) struct Header {
     pub replay_key: String,
     pub model_digest: String,
     pub identity: Identity,
+    /// `Engine::lineage`; absent in caches written before it existed.
+    #[serde(default)]
+    pub lineage: Option<String>,
 }
 
 fn path(dir: &Path) -> PathBuf {

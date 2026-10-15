@@ -17,6 +17,7 @@
 //! Methods are app-only aux RPCs (service 200, JSON in/out); see `dispatch`.
 
 mod cache;
+mod calibration;
 pub mod inputs;
 mod views;
 mod workload;
@@ -69,9 +70,13 @@ pub const REBUILD_STATE: u32 = 114;
 pub const SIMULATE_WORKLOAD: u32 = 115;
 pub const CANCEL_WORKLOAD: u32 = 116;
 pub const WORKLOAD_PROGRESS: u32 = 117;
+pub const RECOMPUTE_CALIBRATION: u32 = 120;
+pub const REBUILD_FSRS_CALIBRATION: u32 = 121;
+pub const CALIBRATION_DATA: u32 = 122;
+pub const CALIBRATION_PROGRESS: u32 = 123;
 
 pub fn handles(method: u32) -> bool {
-    (PREPARE..=WORKLOAD_PROGRESS).contains(&method)
+    (PREPARE..=CALIBRATION_PROGRESS).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -99,6 +104,19 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         WORKLOAD_PROGRESS => {
             return call(input, |_: Empty| Ok(workload::progress()))
                 .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        CALIBRATION_PROGRESS => {
+            return call(input, |req| Ok(calibration::progress(backend, req)))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        // Needs no model; like the desktop's, it doesn't hold up reviews.
+        REBUILD_FSRS_CALIBRATION => {
+            return call(input, |req| calibration::rebuild_fsrs(backend, req)).map_err(|err| {
+                crate::aux::error(
+                    crate::aux::ErrorKind::InvalidInput,
+                    format!("rwkv: {}", err.0),
+                )
+            });
         }
         _ => {}
     }
@@ -129,6 +147,8 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         REBUILD_FILTERED_DECK => call(input, |req| engine.rebuild_filtered_deck(backend, req)),
         REBUILD_STATE => call(input, |req| engine.rebuild_state(backend, req)),
         SIMULATE_WORKLOAD => call(input, |req| engine.simulate_workload(backend, req)),
+        RECOMPUTE_CALIBRATION => call(input, |req| engine.recompute_calibration(backend, req)),
+        CALIBRATION_DATA => call(input, |req| engine.calibration_data(backend, req)),
         other => Err(Error(format!("unknown rwkv method {other}"))),
     };
     result.map_err(|err| {
@@ -427,6 +447,10 @@ struct Engine {
     /// Set by `rebuild_state`: replay the whole history, ignoring the
     /// resident and saved states.
     force_replay: bool,
+    /// Names the full replay the resident state descends from (kept across
+    /// suffix replays, answers and saves), like the desktop state cache's
+    /// store generation; calibration epochs refer to it.
+    lineage: Option<String>,
     undo: Vec<UndoFrame>,
 }
 
@@ -436,7 +460,7 @@ impl Engine {
     fn prepare(&mut self, backend: &Backend, req: PrepareRequest) -> Result<PrepareResponse> {
         let started = Instant::now();
         self.follow_collection(backend)?;
-        self.cache_dir = req.cache_dir.map(PathBuf::from);
+        self.cache_dir = req.cache_dir.as_ref().map(PathBuf::from);
         let configs = all_deck_configs(backend)?;
         let active = configs.iter().any(rwkv_active);
         if !active {
@@ -450,9 +474,24 @@ impl Engine {
             });
         }
 
+        self.load_model(&req)?;
+        let (source, replayed_reviews) = self.ensure_ready(backend)?;
+        Ok(PrepareResponse {
+            active,
+            ready: true,
+            source,
+            replayed_reviews,
+            elapsed_ms: started.elapsed().as_millis() as u64,
+        })
+    }
+
+    /// Loads the model (once per path and precision), without touching the
+    /// resident state's history.
+    fn load_model(&mut self, req: &PrepareRequest) -> Result<()> {
         // `state_precision_for_profile`: unknown values fall back to int8.
         let precision_name = req
             .precision
+            .clone()
             .filter(|p| StatePrecision::parse(p).is_ok())
             .unwrap_or_else(|| "int8".into());
         let precision = StatePrecision::parse(&precision_name).map_err(|e| Error(e.to_string()))?;
@@ -478,14 +517,7 @@ impl Engine {
             });
             self.forget_state();
         }
-        let (source, replayed_reviews) = self.ensure_ready(backend)?;
-        Ok(PrepareResponse {
-            active,
-            ready: true,
-            source,
-            replayed_reviews,
-            elapsed_ms: started.elapsed().as_millis() as u64,
-        })
+        Ok(())
     }
 
     /// The deck options' "Build Cache" (`force_build_rwkv_state_cache`):
@@ -501,6 +533,7 @@ impl Engine {
     /// Drops everything tied to the resident state's history.
     fn forget_state(&mut self) {
         self.base = None;
+        self.lineage = None;
         self.own_review_ids.clear();
         self.trusted = false;
         self.collection_mod = None;
@@ -668,6 +701,7 @@ impl Engine {
         let count = response.reviews.len() as u64;
         self.warm_up(response.reviews.iter().map(history_review_input).collect())?;
         self.adopt(backend, params, identity)?;
+        self.lineage = Some(calibration::new_lineage());
         self.unsaved = true;
         self.save_now(backend);
         Ok(count)
@@ -711,10 +745,12 @@ impl Engine {
             .map(history_review_input)
             .collect();
         let count = suffix.len() as u64;
+        let lineage = self.lineage.clone();
         // A failed replay leaves the state partly advanced: never reuse it.
         self.forget_state();
         self.warm_up(suffix)?;
         self.adopt(backend, params, identity)?;
+        self.lineage = lineage;
         self.unsaved = true;
         self.save_now(backend);
         Ok(Some(count))
@@ -761,6 +797,7 @@ impl Engine {
         if fingerprint.history_is_valid && fingerprint.review_count == header.identity.review_count
         {
             self.adopt(backend, params, header.identity)?;
+            self.lineage = header.lineage;
             self.unsaved = false;
             return Ok(Some(("restored", 0)));
         }
@@ -768,6 +805,7 @@ impl Engine {
         // replay adopts the full history.
         self.base = Some(header.identity.clone());
         self.replay_key = Some(params.replay_key.clone());
+        self.lineage = header.lineage.clone();
         match self.replay_suffix(backend, params, &header.identity)? {
             Some(replayed) => Ok(Some(("restored+suffix", replayed))),
             None => {
@@ -817,6 +855,7 @@ impl Engine {
             replay_key: key,
             model_digest: digest,
             identity,
+            lineage: self.lineage.clone(),
         };
         let Some(model) = self.model.as_ref() else {
             return false;
@@ -1361,8 +1400,14 @@ impl Engine {
                             preset_id: identity.preset_id,
                             ..input
                         };
+                        let record_calibration = self.calibration_epoch_current();
                         let model = self.model_mut()?;
                         let before = model.warm_up_state(&input);
+                        // `_rwkv_answer_calibration_prediction`: queried
+                        // before the answer updates the state.
+                        let calibration_prediction = record_calibration
+                            .then(|| calibration::answer_prediction(model, &input, &before))
+                            .flatten();
                         let runtime = model.state_for_card(input.card_id);
                         let frame = UndoFrame {
                             review_id,
@@ -1374,6 +1419,9 @@ impl Engine {
                             runtime,
                         };
                         model.review(input, review_state(&before))?;
+                        if let Some(prediction) = calibration_prediction {
+                            calibration::record_answer_prediction(backend, review_id, prediction);
+                        }
                         self.own_review_ids.push(review_id);
                         self.collection_mod = Some(collection_mod(backend)?);
                         self.unsaved = true;

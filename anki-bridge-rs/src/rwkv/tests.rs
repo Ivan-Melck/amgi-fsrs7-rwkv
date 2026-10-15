@@ -12,6 +12,7 @@
 
 #![allow(clippy::unwrap_used)]
 
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use anki::backend::init_backend;
@@ -1437,4 +1438,586 @@ fn rwkv_workload_runs_on_the_resident_state() {
     // Sampling scales the result back up to the whole deck.
     let sampled = engine.simulate_workload(&fx.backend, request(6)).unwrap();
     assert_eq!(sampled.points.len(), full.points.len());
+}
+
+// MARK: - Calibration
+
+fn revlog(id: i64, cid: i64, ease: i64, kind: i64, factor: i64) -> calibration::RevlogRow {
+    calibration::RevlogRow {
+        id,
+        cid,
+        ease,
+        kind,
+        factor,
+    }
+}
+
+fn utc(_: i64) -> i32 {
+    0
+}
+
+#[test]
+fn calibration_samples_reuse_review_time_predictions() {
+    // The add-on's "Calibration samples can be reused with alternate
+    // review-time predictions": `review(1, 3)` then `review(3, 3)` a day
+    // later; only the second has an earlier review.
+    let revlogs = [revlog(1, 0, 3, 1, 200), revlog(1 + DAY_MS, 0, 3, 1, 200)];
+    let samples = calibration::calibration_samples(&revlogs, 0, &mut utc);
+    assert_eq!(
+        samples,
+        vec![calibration::Sample {
+            revlog_id: 1 + DAY_MS,
+            card_id: 0,
+            actual: 1
+        }]
+    );
+}
+
+#[test]
+fn calibration_samples_follow_get_memorised_days() {
+    let base = 1_700_000_000_000 - 1_700_000_000_000 % DAY_MS;
+    let hour = 3_600_000;
+    let mut revlogs = vec![
+        // Card 1: learn, same-day step (elapsed 0), then a lapse 2 days
+        // later, an unrated row and a cram review in between.
+        revlog(base + 10 * hour, 1, 3, 0, 0),
+        revlog(base + 11 * hour, 1, 3, 0, 0),
+        revlog(base + DAY_MS + 9 * hour, 1, 0, 4, 2500),
+        revlog(base + DAY_MS + 10 * hour, 1, 3, 3, 0),
+        revlog(base + 3 * DAY_MS + 10 * hour, 1, 1, 1, 2500),
+        // Card 2: reviewed at 23:00, then 01:00 and 05:00 the next day; with
+        // a 4am rollover only the 05:00 review is a day later.
+        revlog(base + 23 * hour, 2, 3, 1, 2500),
+        revlog(base + DAY_MS + hour, 2, 3, 1, 2500),
+        revlog(base + DAY_MS + 5 * hour, 2, 4, 1, 2500),
+        // Card 3: reset (Forget) after its second review; earlier reviews
+        // are no samples, those after the reset are (the reset keeps the
+        // last review date).
+        revlog(base + 10 * hour, 3, 3, 1, 2500),
+        revlog(base + 2 * DAY_MS + 10 * hour, 3, 2, 1, 2500),
+        revlog(base + 2 * DAY_MS + 11 * hour, 3, 0, 4, 0),
+        revlog(base + 4 * DAY_MS + 10 * hour, 3, 3, 0, 0),
+        revlog(base + 6 * DAY_MS + 10 * hour, 3, 3, 1, 2500),
+    ];
+    // Enough cards sharing the test cards' first intervals (0 and 1 days)
+    // that `applyOutlierFilter` keeps them.
+    for cid in 100..150 {
+        let start = base + 20 * DAY_MS + cid * 1000;
+        let third = if cid < 125 { 2 * hour } else { DAY_MS + hour };
+        revlogs.push(revlog(start, cid, 3, 0, 0));
+        revlogs.push(revlog(start + hour, cid, 3, 1, 2500));
+        revlogs.push(revlog(start + third, cid, 3, 1, 2500));
+    }
+    revlogs.sort_by_key(|r| r.id);
+    let samples = |rollover| -> Vec<(i64, u8)> {
+        calibration::calibration_samples(&revlogs, rollover, &mut utc)
+            .iter()
+            .filter(|s| s.card_id < 100)
+            .map(|s| (s.revlog_id, s.actual))
+            .collect()
+    };
+    assert_eq!(
+        samples(4),
+        vec![
+            (base + DAY_MS + 5 * hour, 1),
+            (base + 3 * DAY_MS + 10 * hour, 0),
+            (base + 4 * DAY_MS + 10 * hour, 1),
+            (base + 6 * DAY_MS + 10 * hour, 1),
+        ]
+    );
+    // Without the rollover, 01:00 is already the next day.
+    assert!(samples(0).contains(&(base + DAY_MS + hour, 1)));
+    // The fillers a day apart are samples too.
+    let fillers = calibration::calibration_samples(&revlogs, 4, &mut utc)
+        .iter()
+        .filter(|s| s.card_id >= 100)
+        .count();
+    assert_eq!(fillers, 25);
+}
+
+#[test]
+fn review_days_use_local_midnight_like_javascript_dates() {
+    let hour = 3_600_000;
+    // UTC+10 (Australia, -600 minutes west): 15:00 UTC is 01:00 the next
+    // local day, whose midnight is 14:00 UTC.
+    let mut east = |_: i64| -600;
+    assert_eq!(calibration::local_review_day(15 * hour, 0, &mut east), 0);
+    assert_eq!(calibration::local_review_day(13 * hour, 0, &mut east), -1);
+    // UTC-5: 03:00 UTC is 22:00 the previous local day; midnight 05:00 UTC.
+    let mut west = |_: i64| 300;
+    assert_eq!(
+        calibration::local_review_day(DAY_MS + 3 * hour, 0, &mut west),
+        0
+    );
+    assert_eq!(
+        calibration::local_review_day(DAY_MS + 6 * hour, 0, &mut west),
+        1
+    );
+    // London: in summer local midnight is 23:00 UTC the day before, so
+    // `dateDiffInDays` sees the previous UTC date, and the first summer day
+    // shares its date with the next one (the add-on's quirk).
+    let mut london = |ms: i64| if ms >= 50 * DAY_MS { -60 } else { 0 };
+    assert_eq!(
+        calibration::local_review_day(10 * DAY_MS + 10 * hour, 0, &mut london),
+        10
+    );
+    assert_eq!(
+        calibration::local_review_day(100 * DAY_MS + 10 * hour, 0, &mut london),
+        99
+    );
+    assert_eq!(
+        calibration::local_review_day(50 * DAY_MS + 10 * hour, 0, &mut london),
+        50
+    );
+    assert_eq!(
+        calibration::local_review_day(51 * DAY_MS + 10 * hour, 0, &mut london),
+        50
+    );
+    // The rollover moves early hours to the previous day.
+    assert_eq!(
+        calibration::local_review_day(DAY_MS + 3 * hour, 4 * hour, &mut utc),
+        0
+    );
+}
+
+#[test]
+fn outlier_filter_drops_rare_first_intervals() {
+    let mut revlogs = vec![];
+    let mut add_card = |cid: i64, first: i64, delta_t: i64| {
+        let start = cid * 1000;
+        revlogs.push(revlog(start, cid, first, 0, 0));
+        revlogs.push(revlog(start + DAY_MS, cid, 3, 1, 2500));
+        revlogs.push(revlog(start + (1 + delta_t) * DAY_MS, cid, 3, 1, 2500));
+        revlogs.push(revlog(start + (30 + delta_t) * DAY_MS, cid, 3, 1, 2500));
+    };
+    // Rating 3: 30 cards waited 2 days, 3 cards 5 days (removed: the
+    // smallest groups up to 20 reviews go first).
+    for cid in 0..30 {
+        add_card(cid, 3, 2);
+    }
+    for cid in 30..33 {
+        add_card(cid, 3, 5);
+    }
+    // Rating 4: 25 cards with a 400 day first interval (over 365).
+    for cid in 33..58 {
+        add_card(cid, 4, 400);
+    }
+    // Rating 1: 10 cards, all removed as the smallest groups.
+    for cid in 58..68 {
+        add_card(cid, 1, 3);
+    }
+    // Unrated first rows are never filtered.
+    for cid in 68..70 {
+        add_card(cid, 0, 1000);
+    }
+    revlogs.sort_by_key(|r| r.id);
+    let excluded = calibration::outlier_filter(&revlogs);
+    let excluded_cards: std::collections::BTreeSet<i64> = revlogs
+        .iter()
+        .filter(|r| excluded.contains(&r.id))
+        .map(|r| r.cid)
+        .collect();
+    let expected: std::collections::BTreeSet<i64> = (30..68).collect();
+    assert_eq!(excluded_cards, expected);
+    // Every review of an excluded card goes.
+    assert_eq!(excluded.len(), expected.len() * 4);
+}
+
+#[test]
+fn calibration_folds_fall_back_to_a_chronological_split() {
+    let ids: Vec<i64> = (1..=10).collect();
+    let (roles, folds) = calibration::fold_role_maps_for(&ids, None);
+    for id in 1..=7 {
+        assert_eq!(roles[&id], "final_fit");
+        assert_eq!(folds[&id], -1);
+    }
+    for id in 8..=10 {
+        assert_eq!(roles[&id], "test_fold");
+        assert_eq!(folds[&id], 0);
+    }
+    // FSRS validation folds win.
+    let fsrs = HashMap::from([(2, 0), (9, 3)]);
+    let (roles, folds) = calibration::fold_role_maps_for(&ids, Some(&fsrs));
+    assert_eq!(roles[&2], "test_fold");
+    assert_eq!(folds[&9], 3);
+    assert_eq!(roles[&10], "final_fit");
+    assert_eq!(folds[&10], -1);
+    // Two reviews: one of each; one review: nothing.
+    let (roles, _) = calibration::fold_role_maps_for(&[1, 2], None);
+    assert_eq!(
+        (roles[&1].as_str(), roles[&2].as_str()),
+        ("final_fit", "test_fold")
+    );
+    assert!(calibration::fold_role_maps_for(&[1], None).0.is_empty());
+}
+
+#[test]
+fn calibration_progress_labels_match_the_desktop() {
+    assert_eq!(
+        calibration::replay_progress_label("Recomputing RWKV calibration data", 1234, 5000, 65.0),
+        "Recomputing RWKV calibration data: 1,234/5,000 reviews | elapsed: 1m 05s | remaining: 3m 18s"
+    );
+    assert_eq!(
+        calibration::replay_progress_label("Recomputing", 0, 1_234_567, 0.4),
+        "Recomputing: 0/1,234,567 reviews | elapsed: 0s"
+    );
+    assert_eq!(calibration::format_progress_time(3_725.9), "1h 02m 05s");
+    // `_revlog_lower_limit`.
+    assert_eq!(calibration::revlog_lower_limit(1_000_000, 4, 0), 0.0);
+    assert_eq!(
+        calibration::revlog_lower_limit(10 * 86_400 + 4 * 3600, 4, 3),
+        7.0 * 86_400_000.0
+    );
+}
+
+fn calibration_rows(fx: &Fixture) -> Vec<(i64, f64, String, i64, String)> {
+    sql(
+        &fx.backend,
+        "select revlog_id, prediction, sample_role, fold_index, source \
+         from search_stats_rwkv_review_retrievability order by revlog_id, sample_role",
+        vec![],
+    )
+    .into_iter()
+    .map(|r| {
+        (
+            r[0].as_i64().unwrap(),
+            r[1].as_f64().unwrap(),
+            r[2].as_str().unwrap().to_string(),
+            r[3].as_i64().unwrap(),
+            r[4].as_str().unwrap().to_string(),
+        )
+    })
+    .collect()
+}
+
+/// What a fresh replay recording predictions (the recompute's replay)
+/// records for the current history, by review id.
+fn recorded_replay_predictions(fx: &Fixture) -> HashMap<i64, f32> {
+    let params = history_params(&fx.backend, "int8").unwrap();
+    let history = history_inputs(&fx.backend, &params).unwrap();
+    let mut model = RwkvInference::load_with_precision(
+        PathBuf::from(&fx.model),
+        TARGET_RETENTION,
+        MAX_INTERVAL_DAYS,
+        StatePrecision::parse("int8").unwrap(),
+    )
+    .unwrap();
+    let mut out = HashMap::new();
+    for chunk in history.reviews.chunks(WARM_UP_CHUNK) {
+        let inputs = chunk.iter().map(history_review_input).collect();
+        for (index, p) in model.warm_up_reviews(inputs, true).unwrap() {
+            out.insert(chunk[index].review_id, p);
+        }
+    }
+    out
+}
+
+fn recompute(engine: &mut Engine, fx: &Fixture, cache: &std::path::Path) -> u64 {
+    let response = engine
+        .recompute_calibration(
+            &fx.backend,
+            PrepareRequest {
+                model_path: fx.model.clone(),
+                cache_dir: Some(cache.to_string_lossy().into_owned()),
+                precision: None,
+            },
+        )
+        .unwrap();
+    assert!(response.recomputed);
+    response.reviews
+}
+
+#[test]
+fn calibration_recompute_records_history_and_keeps_the_resident_state() {
+    let Some(fx) = fixture("calibration", 10) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("calibration-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    let queries = all_queries(&fx);
+    let before = engine.predict_many(&queries).unwrap();
+    assert!(!engine.calibration_epoch_current());
+
+    let reviews = recompute(&mut engine, &fx, &cache.0);
+    assert!(reviews > 2);
+    // The resident state is back, unchanged.
+    assert_same_predictions(&before, &engine.predict_many(&queries).unwrap());
+    assert!(!calibration::progress(&fx.backend, Default::default()).running);
+
+    // One row per replayed review: the pre-answer prediction a recording
+    // replay makes, the first 70% as final fit and the rest as test fold 0
+    // (there are no FSRS validation folds).
+    let rows = calibration_rows(&fx);
+    assert_eq!(rows.len() as u64, reviews);
+    let expected = recorded_replay_predictions(&fx);
+    let train_end = (reviews as f64 * 0.7) as usize;
+    for (index, (id, prediction, role, fold, source)) in rows.iter().enumerate() {
+        assert_eq!(source, "rwkv_calibration_recompute");
+        assert!((*prediction as f32 - expected[id]).abs() < 1e-6);
+        if index < train_end {
+            assert_eq!((role.as_str(), *fold), ("final_fit", -1));
+        } else {
+            assert_eq!((role.as_str(), *fold), ("test_fold", 0));
+        }
+    }
+    // The resident state is current, so later answers extend this epoch.
+    assert!(engine.calibration_epoch_current());
+    assert!(engine
+        .calibration_data_available(&fx.backend, &history_params(&fx.backend, "int8").unwrap()));
+
+    // A second run rewrites nothing and prunes nothing.
+    assert_eq!(recompute(&mut engine, &fx, &cache.0), reviews);
+    assert_eq!(calibration_rows(&fx), rows);
+}
+
+#[test]
+fn calibration_follows_fsrs_validation_folds_and_relabels() {
+    let Some(fx) = fixture("calibration-folds", 24) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("calibration-folds-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    let params = history_params(&fx.backend, "int8").unwrap();
+    let history: Vec<i64> = history_inputs(&fx.backend, &params)
+        .unwrap()
+        .reviews
+        .iter()
+        .map(|r| r.review_id)
+        .collect();
+    let set_fsrs_folds = |folds: &[(i64, i64)], updated_at: i64| {
+        for (id, fold) in folds {
+            sql(
+                &fx.backend,
+                "insert into search_stats_fsrs_review_retrievability \
+                 (revlog_id, prediction, source, updated_at, sample_role, fold_index) \
+                 values (?, 0.8, 'test', ?, 'validation_fold', ?)",
+                vec![(*id).into(), updated_at.into(), (*fold).into()],
+            );
+        }
+    };
+    let first: Vec<(i64, i64)> = vec![(history[3], 0), (history[8], 1), (history[20], 4)];
+    set_fsrs_folds(&first, 1);
+    recompute(&mut engine, &fx, &cache.0);
+    let test_folds = |fx: &Fixture| -> Vec<(i64, i64)> {
+        calibration_rows(fx)
+            .into_iter()
+            .filter(|r| r.2 == "test_fold")
+            .map(|r| (r.0, r.3))
+            .collect()
+    };
+    assert_eq!(test_folds(&fx), first);
+    assert!(engine.calibration_data_available(&fx.backend, &params));
+
+    // New FSRS folds: the data is stale, and only the roles are rewritten.
+    let second: Vec<(i64, i64)> = vec![(history[5], 2), (history[8], 3)];
+    set_fsrs_folds(&second, 2);
+    assert!(!engine.calibration_data_available(&fx.backend, &params));
+    let predictions: HashMap<i64, f64> = calibration_rows(&fx)
+        .into_iter()
+        .map(|r| (r.0, r.1))
+        .collect();
+    assert!(engine.ensure_calibration_data(&fx.backend).unwrap());
+    // The newest FSRS rows are history[5] and history[8]; history[3] and
+    // history[20] keep their older validation rows.
+    let expected = vec![
+        (history[3], 0),
+        (history[5], 2),
+        (history[8], 3),
+        (history[20], 4),
+    ];
+    assert_eq!(test_folds(&fx), expected);
+    assert!(engine.calibration_data_available(&fx.backend, &params));
+    // Relabelled, not recomputed: same predictions, one row per review.
+    let rows = calibration_rows(&fx);
+    assert_eq!(rows.len(), history.len());
+    assert!(rows.iter().all(|r| predictions[&r.0] == r.1));
+
+    // Reads see test folds (RWKV) and validation folds (FSRS) only.
+    let response = engine
+        .calibration_data(
+            &fx.backend,
+            calibration::CalibrationDataRequest {
+                search: "deck:current".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(!response.sample_revlog_ids.is_empty());
+    for ids in [&response.rwkv_revlog_ids, &response.fsrs_revlog_ids] {
+        assert!(ids.iter().all(|id| expected.iter().any(|(t, _)| t == id)));
+        assert!(ids.iter().all(|id| response.sample_revlog_ids.contains(id)));
+    }
+    assert_eq!(response.rwkv_revlog_ids, response.fsrs_revlog_ids);
+}
+
+#[test]
+fn calibration_data_reads_samples_and_generates_missing_rwkv_rows() {
+    let Some(fx) = fixture("calibration-read", 24) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("calibration-read-cache");
+    let request = |ensure| calibration::CalibrationDataRequest {
+        search: "deck:current".into(),
+        day_range: 0,
+        model_path: Some(fx.model.clone()),
+        cache_dir: Some(cache.0.to_string_lossy().into_owned()),
+        precision: None,
+        ensure,
+    };
+    let mut engine = Engine::default();
+    let empty = engine
+        .calibration_data(&fx.backend, request(false))
+        .unwrap();
+    // Every review after the graduating step a day or more later:
+    // fixture cards have 3 such reviews, a third of them 4 (lapses).
+    assert!(!empty.sample_revlog_ids.is_empty());
+    assert_eq!(empty.sample_revlog_ids.len(), empty.sample_card_ids.len());
+    assert!(empty.rwkv_revlog_ids.is_empty());
+    assert!(empty.fsrs_revlog_ids.is_empty());
+    assert!(engine.model.is_none());
+
+    // Ensuring loads the model and recomputes, without a resident state.
+    let full = engine.calibration_data(&fx.backend, request(true)).unwrap();
+    assert_eq!(full.sample_revlog_ids, empty.sample_revlog_ids);
+    assert!(!full.rwkv_revlog_ids.is_empty());
+    let test_rows: HashMap<i64, f64> = calibration_rows(&fx)
+        .into_iter()
+        .filter(|r| r.2 == "test_fold")
+        .map(|r| (r.0, r.1))
+        .collect();
+    let samples: HashSet<i64> = full.sample_revlog_ids.iter().copied().collect();
+    let mut expected: Vec<i64> = test_rows
+        .keys()
+        .filter(|id| samples.contains(id))
+        .copied()
+        .collect();
+    expected.sort_unstable();
+    assert_eq!(full.rwkv_revlog_ids, expected);
+    for (id, p) in full.rwkv_revlog_ids.iter().zip(&full.rwkv_predictions) {
+        assert_eq!(test_rows[id], *p);
+    }
+    // No resident state, so no epoch for answers to extend.
+    assert!(!engine.calibration_epoch_current());
+
+    // A short period only reads its own reviews (all fixture history is
+    // older than a day, except today's).
+    let recent = engine
+        .calibration_data(
+            &fx.backend,
+            calibration::CalibrationDataRequest {
+                day_range: 1,
+                ..request(false)
+            },
+        )
+        .unwrap();
+    assert!(recent.sample_revlog_ids.len() < full.sample_revlog_ids.len());
+    let cutoff = now_millis() - 2 * DAY_MS;
+    assert!(recent.sample_revlog_ids.iter().all(|id| *id > cutoff));
+}
+
+#[test]
+fn answers_record_calibration_predictions_in_the_current_epoch() {
+    let Some(fx) = fixture("calibration-answers", 8) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("calibration-answers-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+    recompute(&mut engine, &fx, &cache.0);
+    let before = calibration_rows(&fx).len();
+
+    answer_next(&mut engine, &fx, 3).unwrap();
+    let review_id = engine.own_review_ids[0];
+    let rows = calibration_rows(&fx);
+    let recorded: Vec<_> = rows
+        .iter()
+        .filter(|r| r.0 == review_id && r.4 == "rwkv_calibration_recompute")
+        .collect();
+    assert_eq!(recorded.len(), 1);
+    assert_eq!((recorded[0].2.as_str(), recorded[0].3), ("final_fit", -1));
+    // What the recompute's replay would record for it.
+    let expected = recorded_replay_predictions(&fx)[&review_id];
+    assert!((recorded[0].1 as f32 - expected).abs() < 1e-6);
+    // The resident state still matches a fresh replay.
+    let queries = all_queries(&fx);
+    let mut fresh = Engine::default();
+    prepare(&mut fresh, &fx, None);
+    assert_same_predictions(
+        &engine.predict_many(&queries).unwrap(),
+        &fresh.predict_many(&queries).unwrap(),
+    );
+    // The answer was saved, and its new row completes the data again.
+    engine.save(&fx.backend).unwrap();
+    let params = history_params(&fx.backend, "int8").unwrap();
+    assert!(engine.calibration_data_available(&fx.backend, &params));
+
+    // A rebuilt state starts a new epoch: answers stop recording.
+    let rebuilt = engine
+        .rebuild_state(
+            &fx.backend,
+            PrepareRequest {
+                model_path: fx.model.clone(),
+                cache_dir: Some(cache.0.to_string_lossy().into_owned()),
+                precision: None,
+            },
+        )
+        .unwrap();
+    assert!(rebuilt.ready);
+    assert!(!engine.calibration_epoch_current());
+    let count = calibration_rows(&fx).len();
+    answer_next(&mut engine, &fx, 3).unwrap();
+    let rows = calibration_rows(&fx);
+    // rslib's own answer row (`rwkv_review`, post optimization) only.
+    let review_id = *engine.own_review_ids.last().unwrap();
+    assert!(rows
+        .iter()
+        .filter(|r| r.0 == review_id)
+        .all(|r| r.4 == "rwkv_review"));
+    assert!(rows.len() <= count + 1);
+    assert!(before < count);
+}
+
+#[test]
+fn build_cache_clears_predictions_and_rebuilds_fsrs() {
+    let Some(fx) = fixture("calibration-build", 6) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("calibration-build-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    recompute(&mut engine, &fx, &cache.0);
+    assert!(cache.0.join("calibration-epoch-v1.json").exists());
+    assert!(!calibration_rows(&fx).is_empty());
+
+    let rebuilt = calibration::rebuild_fsrs(
+        &fx.backend,
+        calibration::RebuildFsrsRequest {
+            clear: true,
+            cache_dir: Some(cache.0.to_string_lossy().into_owned()),
+        },
+    )
+    .unwrap();
+    assert!(calibration_rows(&fx).is_empty());
+    assert!(!cache.0.join("calibration-epoch-v1.json").exists());
+    let fsrs_rows = sql(
+        &fx.backend,
+        "select count() from search_stats_fsrs_review_retrievability",
+        vec![],
+    )[0][0]
+        .as_i64()
+        .unwrap();
+    assert_eq!(fsrs_rows, i64::from(rebuilt.predictions));
+    assert!(fsrs_rows > 0);
+    assert!(!calibration::progress(&fx.backend, Default::default()).running);
 }
