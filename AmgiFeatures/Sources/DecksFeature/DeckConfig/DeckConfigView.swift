@@ -65,7 +65,9 @@ struct DeckConfigView: View {
         }
         ToolbarItem(placement: .confirmationAction) {
             Button("Save") { Task { if await model.saveConfig() { onDismiss() } } }
-                .disabled(!model.hasLoadedConfig || model.isSaving)
+                // Without the real context the collection-wide values shown
+                // are guesses; saving them would overwrite the stored ones.
+                .disabled(!model.hasLoadedConfig || model.isSaving || model.isFallbackContext)
         }
     }
 
@@ -87,6 +89,12 @@ struct DeckConfigView: View {
 
     @ViewBuilder
     private var loadedSections: some View {
+        if model.isFallbackContext {
+            Section {
+                Text("Some deck options couldn't be loaded, so saving is turned off. Close and reopen this screen to try again.")
+                    .foregroundStyle(.secondary)
+            }
+        }
         PresetSection(
             presetOptions: model.presetOptions,
             selectedPresetID: model.selectedPresetID,
@@ -183,6 +191,7 @@ struct DeckConfigView: View {
             paramsLabel: model.fsrsParamsLabel,
             defaultParamSearch: model.defaultParamSearch,
             desiredRetentionPercent: $model.desiredRetentionPercent,
+            deckDesiredRetentionPercent: $model.deckDesiredRetentionPercent,
             historicalRetentionPercent: $model.historicalRetentionPercent,
             fsrsHealthCheck: $model.fsrsHealthCheck,
             fsrsMinimumIntervalSecs: $model.fsrsMinimumIntervalSecs,

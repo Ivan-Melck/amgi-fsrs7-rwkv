@@ -30,7 +30,8 @@ public struct DecksService: Sendable {
     public var fetchDeckConfigContext: @Sendable (_ deckId: DeckID) throws -> DeckConfigsForUpdate
     public var getDeckConfig: @Sendable (_ deckId: DeckID) throws -> DeckConfig
     /// `schedulingSettings` carries the edited collection-wide scheduler
-    /// settings; `nil` echoes the values currently stored.
+    /// settings and `limits` the deck's edited own limits (its desired
+    /// retention override); `nil` echoes the values currently stored.
     public var updateDeckConfig: @Sendable (
         _ deckId: DeckID,
         _ config: DeckConfig,
@@ -39,7 +40,8 @@ public struct DecksService: Sendable {
         _ newCardsIgnoreReviewLimit: Bool,
         _ applyAllParentLimits: Bool,
         _ fsrsHealthCheck: Bool,
-        _ schedulingSettings: CollectionSchedulingSettings?
+        _ schedulingSettings: CollectionSchedulingSettings?,
+        _ limits: DeckConfigsForUpdate.CurrentDeck.Limits?
     ) throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) throws -> FsrsOptimizeResult
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsReviewSimulation
@@ -138,14 +140,14 @@ extension DecksService: DependencyKey {
                     message: "Deck \(deckId.rawValue) has no valid config id and no defaults available"
                 )
             },
-            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, newCardsIgnoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings in
+            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, newCardsIgnoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings, limits in
                 let context = try backend.invoke(.deckConfigsForUpdate(deckId: deckId))
                 let request = UpdateDeckConfigsRequest(
                     targetDeckID: deckId,
                     configs: [config],
                     mode: applyToChildren ? .applyToChildren : .normal,
                     cardStateCustomizer: context.cardStateCustomizer,
-                    limits: context.currentDeck?.limits,
+                    limits: limits ?? context.currentDeck?.limits,
                     newCardsIgnoreReviewLimit: newCardsIgnoreReviewLimit,
                     fsrs: fsrsEnabled,
                     applyAllParentLimits: applyAllParentLimits,

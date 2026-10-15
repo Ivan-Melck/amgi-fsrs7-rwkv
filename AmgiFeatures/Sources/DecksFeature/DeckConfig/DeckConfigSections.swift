@@ -119,8 +119,8 @@ struct NewCardsSection: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
             }
-            Stepper("Graduating interval: \(graduatingGoodDays)d", value: $graduatingGoodDays, in: 0...365)
-            Stepper("Easy interval: \(graduatingEasyDays)d", value: $graduatingEasyDays, in: 0...365)
+            Stepper("Graduating interval: \(graduatingGoodDays)d", value: $graduatingGoodDays, in: 1...36500)
+            Stepper("Easy interval: \(graduatingEasyDays)d", value: $graduatingEasyDays, in: 1...36500)
         }
     }
 }
@@ -314,14 +314,14 @@ struct AdvancedSection: View {
             LabeledSlider(
                 label: "Hard multiplier",
                 value: $hardMultiplierPercent,
-                in: 80...200,
+                in: 50...130,
                 step: 1,
                 valueText: "\(Int(hardMultiplierPercent))%"
             )
             LabeledSlider(
                 label: "Easy multiplier",
                 value: $easyMultiplierPercent,
-                in: 100...300,
+                in: 100...500,
                 step: 1,
                 valueText: "\(Int(easyMultiplierPercent))%"
             )
@@ -432,6 +432,7 @@ struct FsrsSection: View {
     let paramsLabel: String
     let defaultParamSearch: String
     @Binding var desiredRetentionPercent: Double
+    @Binding var deckDesiredRetentionPercent: Double?
     @Binding var historicalRetentionPercent: Double
     @Binding var fsrsHealthCheck: Bool
     @Binding var fsrsMinimumIntervalSecs: Int
@@ -454,16 +455,33 @@ struct FsrsSection: View {
     var body: some View {
         Section("FSRS") {
             LabeledSlider(
-                label: "Desired retention",
+                label: "Desired retention (preset)",
                 value: $desiredRetentionPercent,
                 in: 10...99,
                 step: 1,
                 valueText: "\(Int(desiredRetentionPercent))%"
             )
+            // The desktop's "This deck" tab: an override for this deck only.
+            Toggle("Different desired retention for this deck", isOn: Binding(
+                get: { deckDesiredRetentionPercent != nil },
+                set: { deckDesiredRetentionPercent = $0 ? (deckDesiredRetentionPercent ?? desiredRetentionPercent) : nil }
+            ))
+            if let deckRetention = deckDesiredRetentionPercent {
+                LabeledSlider(
+                    label: "Desired retention (this deck)",
+                    value: Binding(
+                        get: { deckRetention },
+                        set: { deckDesiredRetentionPercent = $0 }
+                    ),
+                    in: 10...99,
+                    step: 1,
+                    valueText: "\(Int(deckRetention))%"
+                )
+            }
             LabeledSlider(
                 label: "Historical retention",
                 value: $historicalRetentionPercent,
-                in: 70...100,
+                in: 70...97,
                 step: 1,
                 valueText: "\(Int(historicalRetentionPercent))%"
             )
@@ -625,13 +643,16 @@ struct EasyDaysSection: View {
         Section {
             if fsrsEnabled {
                 ForEach(0..<7, id: \.self) { idx in
-                    LabeledSlider(
-                        label: Self.weekdayLabel(idx),
-                        value: $easyDayPercentages[idx],
-                        in: 50...150,
-                        step: 5,
-                        valueText: "\(Int(easyDayPercentages[idx]))%"
-                    )
+                    // The desktop's three positions; the scheduler reads 1.0
+                    // as Normal, 0.0 as Minimum and anything else as Reduced.
+                    Picker(Self.weekdayLabel(idx), selection: $easyDayPercentages[idx]) {
+                        Text("Normal").tag(100.0)
+                        Text("Reduced").tag(50.0)
+                        Text("Minimum").tag(0.0)
+                        if ![0.0, 50.0, 100.0].contains(easyDayPercentages[idx]) {
+                            Text("Reduced (\(Int(easyDayPercentages[idx].rounded()))%)").tag(easyDayPercentages[idx])
+                        }
+                    }
                 }
             } else {
                 Text("Enable FSRS to configure Easy Days.")
@@ -640,7 +661,7 @@ struct EasyDaysSection: View {
         } header: {
             Text("Easy Days")
         } footer: {
-            Text("Reduce the daily workload on specific weekdays. 100% means a normal day; lower values back off reviews on that day.")
+            Text("Reduced and Minimum days get fewer reviews, moved to the days around them. Minimum keeps only the reviews that can't be moved.")
         }
     }
 }

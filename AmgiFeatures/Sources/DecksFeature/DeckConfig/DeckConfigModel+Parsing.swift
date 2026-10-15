@@ -11,21 +11,48 @@ import Dependencies
 import Foundation
 
 extension DeckConfigModel {
+    /// The desktop's `stringToSteps` (ts/routes/deck-options/steps.ts):
+    /// whole numbers with an s/m/h/d suffix (minutes when absent); zeros and
+    /// unparsable entries are dropped.
     func parseSteps(_ text: String) -> [Float] {
         text
             .split(whereSeparator: { $0 == " " || $0 == "," || $0 == "\n" || $0 == "\t" })
-            .compactMap { token -> Float? in
-                let t = String(token).lowercased()
-                if t.hasSuffix("m"), let v = Float(t.dropLast()) { return v }
-                if t.hasSuffix("h"), let v = Float(t.dropLast()) { return v * 60 }
-                if t.hasSuffix("d"), let v = Float(t.dropLast()) { return v * 1440 }
-                return Float(t)
-            }
+            .map { Self.stepMinutes(String($0).lowercased()) }
+            .filter { $0 != 0 }
     }
 
+    /// `stringToMinutes`.
+    nonisolated static func stepMinutes(_ token: String) -> Float {
+        let digits = token.prefix(while: \.isNumber)
+        guard let number = Double(digits) else { return 0 }
+        let unitSeconds: Double = switch token.dropFirst(digits.count) {
+        case "s": 1
+        case "h": 3600
+        case "d": 86_400
+        default: 60
+        }
+        // Representable as negative i32 seconds in a revlog.
+        return Float(min(number * unitSeconds, 2_147_483_648) / 60)
+    }
+
+    /// The desktop's `stepsToString`: each step in the largest unit it is a
+    /// whole number of, so 30s and 90s survive a round trip.
     func formatSteps(_ values: [Float]) -> String {
-        guard !values.isEmpty else { return "" }
-        return values.map { "\(Int($0))m" }.joined(separator: " ")
+        values.map(Self.stepString).joined(separator: " ")
+    }
+
+    /// `minutesToString` / `naturalWholeUnit`, capped at days.
+    nonisolated static func stepString(_ minutes: Float) -> String {
+        let seconds = Double(minutes) * 60
+        let units: [(Double, String)] = [(86_400, "d"), (3600, "h"), (60, "m"), (1, "s")]
+        let natural = units.firstIndex { abs(seconds) >= $0.0 } ?? units.count - 1
+        for (unitSeconds, suffix) in units[natural...] {
+            let amount = (seconds / unitSeconds).rounded()
+            if abs(seconds - amount * unitSeconds) < .ulpOfOne || suffix == "s" {
+                return "\(Int(amount))\(suffix)"
+            }
+        }
+        return "\(Int(seconds.rounded()))s"
     }
 
     func parseFloats(_ text: String) -> [Float] {

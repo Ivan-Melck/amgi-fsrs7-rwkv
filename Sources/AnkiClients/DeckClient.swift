@@ -25,7 +25,8 @@ public struct DeckClient: Sendable {
     public var fetchDeckConfigContext: @Sendable (_ deckId: DeckID) async throws -> DeckConfigsForUpdate
     public var getDeckConfig: @Sendable (_ deckId: DeckID) async throws -> DeckConfig
     /// `schedulingSettings` carries the edited collection-wide scheduler
-    /// settings; `nil` echoes the values currently stored.
+    /// settings and `limits` the deck's edited own limits (its desired
+    /// retention override); `nil` echoes the values currently stored.
     public var updateDeckConfig: @Sendable (
         _ deckId: DeckID,
         _ config: DeckConfig,
@@ -34,7 +35,8 @@ public struct DeckClient: Sendable {
         _ newCardsIgnoreReviewLimit: Bool,
         _ applyAllParentLimits: Bool,
         _ fsrsHealthCheck: Bool,
-        _ schedulingSettings: CollectionSchedulingSettings?
+        _ schedulingSettings: CollectionSchedulingSettings?,
+        _ limits: DeckConfigsForUpdate.CurrentDeck.Limits?
     ) async throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) async throws -> FsrsOptimizeResult
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsReviewSimulation

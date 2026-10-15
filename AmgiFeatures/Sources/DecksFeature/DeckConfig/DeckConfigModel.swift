@@ -53,7 +53,14 @@ final class DeckConfigModel {
     var schedulerSelection = SchedulerSelection()
 
     var fsrsEnabled = false
+    /// The shared preset's desired retention.
     var desiredRetentionPercent: Double = 90
+    /// This deck's own desired retention ("This deck" on the desktop), which
+    /// wins over the preset's; nil when the deck uses the preset's.
+    var deckDesiredRetentionPercent: Double?
+    /// The deck options context couldn't be loaded, so the collection-wide
+    /// values on screen are guesses: saving would overwrite the real ones.
+    var isFallbackContext = false
     var historicalRetentionPercent: Double = 90
     var fsrsHealthCheck = false
     var fsrsWeightsText: String = ""
@@ -218,8 +225,9 @@ final class DeckConfigModel {
         loadError = nil
         do {
             let config = try await deckClient.getDeckConfig(deckId)
-            let context = (try? await deckClient.fetchDeckConfigContext(deckId)) ?? fallbackContext(from: config)
-            apply(config: config, context: context)
+            let fetched = try? await deckClient.fetchDeckConfigContext(deckId)
+            isFallbackContext = fetched == nil
+            apply(config: config, context: fetched ?? fallbackContext(from: config))
             isLoading = false
         } catch {
             loadError = "Failed to load deck options: \(error.localizedDescription)"
@@ -257,11 +265,8 @@ final class DeckConfigModel {
             reviewFuzzFactorLong = Double(settings.reviewFuzzFactorLong)
         }
 
-        if let override = context.currentDeck?.limits?.desiredRetention {
-            desiredRetentionPercent = Double(override * 100)
-        } else {
-            desiredRetentionPercent = cfg.desiredRetention > 0 ? Double(cfg.desiredRetention * 100) : 90
-        }
+        desiredRetentionPercent = cfg.desiredRetention > 0 ? Double(cfg.desiredRetention * 100) : 90
+        deckDesiredRetentionPercent = context.currentDeck?.limits?.desiredRetention.map { Double($0 * 100) }
         historicalRetentionPercent = cfg.historicalRetention > 0 ? Double(cfg.historicalRetention * 100) : 90
 
         parkedFsrsParams = [:]
@@ -328,6 +333,20 @@ final class DeckConfigModel {
             || fsrsHealthCheck != loaded.context.fsrsHealthCheck
             || fsrsEnabled != loaded.context.fsrs
             || editedSchedulingSettings != loaded.context.schedulingSettings
+            || editedLimits != loaded.context.currentDeck?.limits
+    }
+
+    /// The deck's own limits with the edited desired retention override;
+    /// its other per-deck limits are kept as stored.
+    var editedLimits: DeckConfigsForUpdate.CurrentDeck.Limits? {
+        guard let loaded else { return nil }
+        let stored = loaded.context.currentDeck?.limits
+        if stored == nil && deckDesiredRetentionPercent == nil {
+            return nil
+        }
+        var limits = stored ?? DeckConfigsForUpdate.CurrentDeck.Limits()
+        limits.desiredRetention = deckDesiredRetentionPercent.map { Float($0 / 100) }
+        return limits
     }
 
     func editedConfig(from base: DeckConfig) -> DeckConfig {
@@ -337,8 +356,8 @@ final class DeckConfigModel {
         cfg.reviewsPerDay = Int(max(0, reviewsPerDay))
         cfg.learnSteps = parseSteps(learningStepsText)
         cfg.relearnSteps = parseSteps(relearningStepsText)
-        cfg.graduatingIntervalGood = Int(max(0, graduatingGoodDays))
-        cfg.graduatingIntervalEasy = Int(max(0, graduatingEasyDays))
+        cfg.graduatingIntervalGood = Int(max(1, graduatingGoodDays))
+        cfg.graduatingIntervalEasy = Int(max(1, graduatingEasyDays))
         cfg.leechThreshold = Int(max(1, leechThreshold))
         cfg.leechAction = leechAction
         cfg.leechOnlyIfYoung = leechOnlyIfYoung
@@ -399,7 +418,9 @@ final class DeckConfigModel {
         cfg.disableAutoplay = disableAutoplay
         cfg.waitForAudio = waitForAudio
 
-        cfg.easyDaysPercentages = easyDayPercentages.map { Float(max(50, min(150, $0)) / 100) }
+        // Stored as is: the scheduler treats 1.0 as Normal, 0.0 as Minimum and
+        // anything else as Reduced (the desktop's 0.5).
+        cfg.easyDaysPercentages = easyDayPercentages.map { Float($0 / 100) }
 
         updated.config = cfg
         return updated
@@ -419,7 +440,8 @@ final class DeckConfigModel {
                 newCardsIgnoreReviewLimit,
                 applyAllParentLimits,
                 fsrsHealthCheck,
-                editedSchedulingSettings
+                editedSchedulingSettings,
+                editedLimits
             )
             return true
         } catch {
