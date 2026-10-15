@@ -26,6 +26,9 @@ public enum NewCardGatherPriority: Int, Sendable, Hashable, Codable, CaseIterabl
     case randomNotes = 3
     case randomCards = 4
     case deckThenRandomNotes = 5
+    // RWKV retrievability orders from the JSChoreels/anki fork.
+    case descendingRetrievability = 6
+    case ascendingRetrievability = 7
 }
 
 public enum NewCardSortOrder: Int, Sendable, Hashable, Codable, CaseIterable {

@@ -167,6 +167,8 @@ struct OrderSection: View {
                 Text("Position — highest first").tag(NewCardGatherPriority.highestPosition)
                 Text("Random notes").tag(NewCardGatherPriority.randomNotes)
                 Text("Random cards").tag(NewCardGatherPriority.randomCards)
+                Text("Descending retrievability (RWKV)").tag(NewCardGatherPriority.descendingRetrievability)
+                Text("Ascending retrievability (RWKV)").tag(NewCardGatherPriority.ascendingRetrievability)
             }
             Picker("New card sort order", selection: $newCardSortOrder) {
                 Text("Card template, then gather order").tag(NewCardSortOrder.template)

@@ -42,6 +42,8 @@ package extension Anki_DeckConfig_DeckConfig.Config.NewCardGatherPriority {
         case .randomNotes: self = .randomNotes
         case .randomCards: self = .randomCards
         case .deckThenRandomNotes: self = .deckThenRandomNotes
+        case .descendingRetrievability: self = .descendingRetrievability
+        case .ascendingRetrievability: self = .ascendingRetrievability
         }
     }
 }
@@ -55,6 +57,8 @@ package extension NewCardGatherPriority {
         case .randomNotes: self = .randomNotes
         case .randomCards: self = .randomCards
         case .deckThenRandomNotes: self = .deckThenRandomNotes
+        case .descendingRetrievability: self = .descendingRetrievability
+        case .ascendingRetrievability: self = .ascendingRetrievability
         case .UNRECOGNIZED: self = .deck
         }
     }

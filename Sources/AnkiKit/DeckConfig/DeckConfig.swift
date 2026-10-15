@@ -97,6 +97,12 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
         /// through unchanged.
         public var other: Data
 
+        /// The serialized `Anki_DeckConfig_DeckConfig.Config` this mirror was
+        /// read from. `toProto()` starts from it, so preset fields the mirror
+        /// doesn't name (e.g. FSRS-7 params and RWKV settings added by the
+        /// JSChoreels/anki fork) survive a save instead of being reset.
+        public var unmirrored: Data
+
         public init(
             learnSteps: [Float] = [],
             relearnSteps: [Float] = [],
@@ -141,7 +147,8 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             easyDaysPercentages: [Float] = [],
             historicalRetention: Float = 0,
             paramSearch: String = "",
-            other: Data = Data()
+            other: Data = Data(),
+            unmirrored: Data = Data()
         ) {
             self.learnSteps = learnSteps
             self.relearnSteps = relearnSteps
@@ -187,6 +194,7 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             self.historicalRetention = historicalRetention
             self.paramSearch = paramSearch
             self.other = other
+            self.unmirrored = unmirrored
         }
     }
 }

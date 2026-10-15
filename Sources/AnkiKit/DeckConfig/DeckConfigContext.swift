@@ -20,6 +20,9 @@ public struct DeckConfigsForUpdate: Sendable, Hashable {
     public var fsrsLegacyEvaluate: Bool
     public var applyAllParentLimits: Bool
     public var daysSinceLastFsrsOptimize: Int
+    /// Collection-wide settings the backend rewrites on every
+    /// `updateDeckConfigs`; `nil` when not read from the backend.
+    public var schedulingSettings: CollectionSchedulingSettings?
 
     public init(
         allConfig: [ConfigWithExtra] = [],
@@ -32,7 +35,8 @@ public struct DeckConfigsForUpdate: Sendable, Hashable {
         fsrsHealthCheck: Bool = false,
         fsrsLegacyEvaluate: Bool = false,
         applyAllParentLimits: Bool = false,
-        daysSinceLastFsrsOptimize: Int = 0
+        daysSinceLastFsrsOptimize: Int = 0,
+        schedulingSettings: CollectionSchedulingSettings? = nil
     ) {
         self.allConfig = allConfig
         self.currentDeck = currentDeck
@@ -45,6 +49,7 @@ public struct DeckConfigsForUpdate: Sendable, Hashable {
         self.fsrsLegacyEvaluate = fsrsLegacyEvaluate
         self.applyAllParentLimits = applyAllParentLimits
         self.daysSinceLastFsrsOptimize = daysSinceLastFsrsOptimize
+        self.schedulingSettings = schedulingSettings
     }
 
     public struct ConfigWithExtra: Sendable, Hashable {
@@ -124,6 +129,9 @@ public struct UpdateDeckConfigsRequest: Sendable, Hashable {
     public var applyAllParentLimits: Bool
     public var fsrsReschedule: Bool
     public var fsrsHealthCheck: Bool
+    /// Sent back unchanged so a save doesn't reset them; `nil` leaves the
+    /// proto defaults (which turn them off).
+    public var schedulingSettings: CollectionSchedulingSettings?
 
     public init(
         targetDeckID: DeckID,
@@ -136,7 +144,8 @@ public struct UpdateDeckConfigsRequest: Sendable, Hashable {
         fsrs: Bool = false,
         applyAllParentLimits: Bool = false,
         fsrsReschedule: Bool = false,
-        fsrsHealthCheck: Bool = false
+        fsrsHealthCheck: Bool = false,
+        schedulingSettings: CollectionSchedulingSettings? = nil
     ) {
         self.targetDeckID = targetDeckID
         self.configs = configs
@@ -149,5 +158,41 @@ public struct UpdateDeckConfigsRequest: Sendable, Hashable {
         self.applyAllParentLimits = applyAllParentLimits
         self.fsrsReschedule = fsrsReschedule
         self.fsrsHealthCheck = fsrsHealthCheck
+        self.schedulingSettings = schedulingSettings
+    }
+}
+
+/// Collection-wide scheduler settings that the JSChoreels/anki fork reads
+/// through `DeckConfigsForUpdate` and writes through
+/// `UpdateDeckConfigsRequest`. The backend stores whatever the request
+/// carries, so every update must echo the values it read.
+public struct CollectionSchedulingSettings: Sendable, Hashable {
+    public var loadBalancerEnabled: Bool
+    public var fsrsShortTermWithStepsEnabled: Bool
+    public var fsrsLearningQueuesDisabled: Bool
+    public var reviewFuzzEnabled: Bool
+    public var reviewFuzzBase: Float
+    public var reviewFuzzFactorShort: Float
+    public var reviewFuzzFactorMid: Float
+    public var reviewFuzzFactorLong: Float
+
+    public init(
+        loadBalancerEnabled: Bool,
+        fsrsShortTermWithStepsEnabled: Bool,
+        fsrsLearningQueuesDisabled: Bool,
+        reviewFuzzEnabled: Bool,
+        reviewFuzzBase: Float,
+        reviewFuzzFactorShort: Float,
+        reviewFuzzFactorMid: Float,
+        reviewFuzzFactorLong: Float
+    ) {
+        self.loadBalancerEnabled = loadBalancerEnabled
+        self.fsrsShortTermWithStepsEnabled = fsrsShortTermWithStepsEnabled
+        self.fsrsLearningQueuesDisabled = fsrsLearningQueuesDisabled
+        self.reviewFuzzEnabled = reviewFuzzEnabled
+        self.reviewFuzzBase = reviewFuzzBase
+        self.reviewFuzzFactorShort = reviewFuzzFactorShort
+        self.reviewFuzzFactorMid = reviewFuzzFactorMid
+        self.reviewFuzzFactorLong = reviewFuzzFactorLong
     }
 }

@@ -8,6 +8,23 @@
   An open-source, offline-first Anki-compatible iOS flashcard client with sync server support.
 </p>
 
+> [!NOTE]
+> **This fork builds Amgi against the [FSRS7/RWKV Anki fork](https://github.com/Ivan-Melck/anki)**
+> (JSchoreels/anki) instead of official Anki. The `anki-upstream` submodule
+> points at that fork, so the app runs its Rust scheduler (FSRS-7, same-day
+> learning options, review fuzz settings).
+>
+> - RWKV inference and queue scoring are driven by the desktop app's Python
+>   layer, which is not available on iOS. RWKV presets therefore schedule with
+>   their stored due dates (the preset's FSRS/Curve fallback), as on other
+>   mobile clients.
+> - `scripts/sync-dispatch-constants.py` regenerates the backend RPC indices
+>   after a submodule bump; CI runs it automatically.
+> - Deck option saves keep fork-only preset fields and collection-wide
+>   settings (load balancer, learning-queue and fuzz options) intact.
+> - Unsigned IPAs are built by the "Build Unsigned IPA" workflow on every push
+>   to `main`; download one from the run's artifacts and sideload it.
+
 <p align="center">
   <img src="https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white" alt="Swift 6.2">
   <img src="https://img.shields.io/badge/iOS-18%2B-000000?logo=apple&logoColor=white" alt="iOS 18+">

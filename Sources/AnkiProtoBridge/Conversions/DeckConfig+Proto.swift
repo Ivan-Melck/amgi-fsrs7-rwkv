@@ -56,12 +56,14 @@ package extension DeckConfig.Config {
             easyDaysPercentages: proto.easyDaysPercentages,
             historicalRetention: proto.historicalRetention,
             paramSearch: proto.paramSearch,
-            other: proto.other
+            other: proto.other,
+            unmirrored: (try? proto.serializedBytes() as Data) ?? Data()
         )
     }
 
     func toProto() -> Anki_DeckConfig_DeckConfig.Config {
-        var proto = Anki_DeckConfig_DeckConfig.Config()
+        var proto = (try? Anki_DeckConfig_DeckConfig.Config(serializedBytes: unmirrored))
+            ?? Anki_DeckConfig_DeckConfig.Config()
         proto.learnSteps = learnSteps
         proto.relearnSteps = relearnSteps
         proto.fsrsParams4 = fsrsParams4
@@ -219,7 +221,17 @@ package extension DeckConfigsForUpdate {
             fsrsHealthCheck: proto.fsrsHealthCheck,
             fsrsLegacyEvaluate: proto.fsrsLegacyEvaluate,
             applyAllParentLimits: proto.applyAllParentLimits,
-            daysSinceLastFsrsOptimize: Int(proto.daysSinceLastFsrsOptimize)
+            daysSinceLastFsrsOptimize: Int(proto.daysSinceLastFsrsOptimize),
+            schedulingSettings: CollectionSchedulingSettings(
+                loadBalancerEnabled: proto.loadBalancerEnabled,
+                fsrsShortTermWithStepsEnabled: proto.fsrsShortTermWithStepsEnabled,
+                fsrsLearningQueuesDisabled: proto.fsrsLearningQueuesDisabled,
+                reviewFuzzEnabled: proto.reviewFuzzEnabled,
+                reviewFuzzBase: proto.reviewFuzzBase,
+                reviewFuzzFactorShort: proto.reviewFuzzFactorShort,
+                reviewFuzzFactorMid: proto.reviewFuzzFactorMid,
+                reviewFuzzFactorLong: proto.reviewFuzzFactorLong
+            )
         )
     }
 }
@@ -244,6 +256,16 @@ package extension UpdateDeckConfigsRequest {
         proto.applyAllParentLimits = applyAllParentLimits
         proto.fsrsReschedule = fsrsReschedule
         proto.fsrsHealthCheck = fsrsHealthCheck
+        if let schedulingSettings {
+            proto.loadBalancerEnabled = schedulingSettings.loadBalancerEnabled
+            proto.fsrsShortTermWithStepsEnabled = schedulingSettings.fsrsShortTermWithStepsEnabled
+            proto.fsrsLearningQueuesDisabled = schedulingSettings.fsrsLearningQueuesDisabled
+            proto.reviewFuzzEnabled = schedulingSettings.reviewFuzzEnabled
+            proto.reviewFuzzBase = schedulingSettings.reviewFuzzBase
+            proto.reviewFuzzFactorShort = schedulingSettings.reviewFuzzFactorShort
+            proto.reviewFuzzFactorMid = schedulingSettings.reviewFuzzFactorMid
+            proto.reviewFuzzFactorLong = schedulingSettings.reviewFuzzFactorLong
+        }
         return proto
     }
 }

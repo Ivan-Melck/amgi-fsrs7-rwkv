@@ -64,17 +64,17 @@ enum DecksMethod {
 /// `AnkiBackend.SchedulerMethod` but are kept here so service code
 /// never names the raw `UInt32` constants directly.
 enum SchedulerMethod {
-    static let getQueuedCards: UInt32 = 3
-    static let answerCard: UInt32 = 4
-    static let extendLimits: UInt32 = 9
-    static let buryOrSuspendCards: UInt32 = 14
-    static let emptyFilteredDeck: UInt32 = 15
-    static let rebuildFilteredDeck: UInt32 = 16
-    static let scheduleCardsAsNew: UInt32 = 17
-    static let setDueDate: UInt32 = 19
-    static let computeFsrsParams: UInt32 = 30
-    static let simulateFsrsReview: UInt32 = 33
-    static let simulateFsrsWorkload: UInt32 = 34
+    static let getQueuedCards: UInt32 = 5
+    static let answerCard: UInt32 = 7
+    static let extendLimits: UInt32 = 12
+    static let buryOrSuspendCards: UInt32 = 17
+    static let emptyFilteredDeck: UInt32 = 18
+    static let rebuildFilteredDeck: UInt32 = 19
+    static let scheduleCardsAsNew: UInt32 = 20
+    static let setDueDate: UInt32 = 22
+    static let computeFsrsParams: UInt32 = 34
+    static let simulateFsrsReview: UInt32 = 38
+    static let simulateFsrsWorkload: UInt32 = 39
 }
 
 enum DeckConfigMethod {
@@ -156,11 +156,11 @@ enum ImageOcclusionMethod {
 
 /// BackendMediaService (41).
 enum MediaMethod {
-    static let checkMedia: UInt32 = 0
-    static let addMediaFile: UInt32 = 1
-    static let trashMediaFiles: UInt32 = 2
-    static let emptyTrash: UInt32 = 3
-    static let restoreTrash: UInt32 = 4
+    static let checkMedia: UInt32 = 1
+    static let addMediaFile: UInt32 = 2
+    static let trashMediaFiles: UInt32 = 4
+    static let emptyTrash: UInt32 = 5
+    static let restoreTrash: UInt32 = 6
 }
 
 /// BackendCardRenderingService (27). The collection-level service

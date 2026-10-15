@@ -155,6 +155,46 @@ import AnkiProto
         #expect(mirror.defaults == nil)
     }
 
+    // MARK: - Fields the mirror doesn't name
+
+    @Test func Config_round_trip_keeps_unmirrored_fork_fields() {
+        var proto = Anki_DeckConfig_DeckConfig.Config()
+        proto.newPerDay = 20
+        proto.fsrsParams7 = [0.1, 0.2, 0.3]
+        proto.fsrsVersion = .six
+        proto.rwkvReviewEnabled = true
+        proto.reviewFuzzBase = 1.5
+
+        var mirror = DeckConfig.Config(proto)
+        mirror.newPerDay = 30
+        let reproto = mirror.toProto()
+
+        #expect(reproto.newPerDay == 30)
+        #expect(reproto.fsrsParams7 == [0.1, 0.2, 0.3])
+        #expect(reproto.fsrsVersion == .six)
+        #expect(reproto.rwkvReviewEnabled)
+        #expect(reproto.reviewFuzzBase == 1.5)
+    }
+
+    @Test func UpdateDeckConfigsRequest_echoes_collection_scheduling_settings() {
+        var contextProto = Anki_DeckConfig_DeckConfigsForUpdate()
+        contextProto.loadBalancerEnabled = true
+        contextProto.fsrsLearningQueuesDisabled = true
+        contextProto.reviewFuzzFactorMid = 0.2
+        let context = DeckConfigsForUpdate(contextProto)
+
+        let proto = UpdateDeckConfigsRequest(
+            targetDeckID: DeckID(1),
+            configs: [],
+            schedulingSettings: context.schedulingSettings
+        ).toProto()
+
+        #expect(proto.loadBalancerEnabled)
+        #expect(proto.fsrsLearningQueuesDisabled)
+        #expect(!proto.fsrsShortTermWithStepsEnabled)
+        #expect(proto.reviewFuzzFactorMid == 0.2)
+    }
+
     // MARK: - UpdateDeckConfigsRequest
 
     @Test func UpdateDeckConfigsRequest_encodes_mode_and_passes_through_limits() throws {

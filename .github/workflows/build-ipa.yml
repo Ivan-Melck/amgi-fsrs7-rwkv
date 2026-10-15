@@ -3,6 +3,8 @@ name: Build Unsigned IPA
 on:
   workflow_dispatch:        # manual trigger from Actions UI
   push:
+    branches:
+      - main                # every push builds an IPA artifact
     tags:
       - 'v*'                # any version tag triggers release publish
 
@@ -55,7 +57,8 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.95"
+          # Matches anki-upstream's rust-toolchain.toml (JSchoreels/anki fork).
+          toolchain: "1.97.1"
           targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
 
       # ── 4.5. Install nightly + rust-src (watchOS build-std) ───────
@@ -77,10 +80,9 @@ jobs:
             anki-upstream/out
           # Toolchain version is part of the key so a Rust upgrade (1.95 → ...)
           # forces a clean rebuild rather than reusing artifacts from the prior compiler.
-          key: ${{ runner.os }}-rust-1.95-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-rust-1.97.1-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-rust-1.95-
-            ${{ runner.os }}-rust-
+            ${{ runner.os }}-rust-1.97.1-
 
       # ── 6. Install Homebrew dependencies ──────────────────────────
       - name: Install Homebrew dependencies
@@ -92,6 +94,20 @@ jobs:
         run: |
           chmod +x ./scripts/build-xcframework.sh
           ./scripts/build-xcframework.sh
+
+      # ── 7.5. Sync backend RPC dispatch constants ──────────────────
+      # Method indices are positional in anki-upstream's .proto services, so
+      # the fork's extra RPCs shift them. Re-derive the Swift constants from
+      # the backend.rs the build just generated; unknown names fail the build.
+      - name: Sync backend dispatch constants
+        run: |
+          BACKEND_RS=$(ls -t anki-bridge-rs/target/aarch64-apple-ios/release/build/anki-*/out/backend.rs | head -1)
+          echo "Using $BACKEND_RS"
+          python3 scripts/sync-dispatch-constants.py "$BACKEND_RS"
+          if ! git diff --quiet -- Sources; then
+            echo "::warning::Committed dispatch constants were stale; run scripts/sync-dispatch-constants.py and commit the result."
+            git diff -- Sources
+          fi
 
       # ── 8. Generate Swift protobuf types ──────────────────────────
       - name: Generate Swift protobuf types
