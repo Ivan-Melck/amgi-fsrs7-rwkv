@@ -557,6 +557,22 @@ impl Engine {
                 response.fsrs_predictions.push(prediction);
             }
         }
+        // `fsrsCalibrationStats`: without cached rows, the predictions of
+        // `getMemorisedDays`' own ts-fsrs replay.
+        if response.fsrs_revlog_ids.is_empty() {
+            let replay = super::fsrs_memorised::replay(backend, &card_ids.ids, req.day_range)?;
+            let predictions: HashMap<i64, f64> = replay
+                .memorised
+                .calibration_predictions
+                .into_iter()
+                .collect();
+            for sample in &samples {
+                if let Some(prediction) = predictions.get(&sample.revlog_id) {
+                    response.fsrs_revlog_ids.push(sample.revlog_id);
+                    response.fsrs_predictions.push(*prediction);
+                }
+            }
+        }
 
         // `rwkv_review_retrievability`.
         let mut rows = read_rwkv(backend, &target, &sample_ids);
@@ -1079,7 +1095,7 @@ pub(super) fn local_review_day(
 
 /// The device's offset, cached per quarter hour (offsets change on quarter
 /// hours at the finest).
-fn cached_minutes_west() -> impl FnMut(i64) -> i32 {
+pub(super) fn cached_minutes_west() -> impl FnMut(i64) -> i32 {
     let mut cache: HashMap<i64, i32> = HashMap::new();
     move |ms| {
         let bucket = ms.div_euclid(15 * 60_000);

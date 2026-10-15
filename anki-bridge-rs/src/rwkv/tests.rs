@@ -2289,11 +2289,16 @@ fn calibration_follows_fsrs_validation_folds_and_relabels() {
         )
         .unwrap();
     assert!(!response.sample_revlog_ids.is_empty());
-    for ids in [&response.rwkv_revlog_ids, &response.fsrs_revlog_ids] {
-        assert!(ids.iter().all(|id| expected.iter().any(|(t, _)| t == id)));
-        assert!(ids.iter().all(|id| response.sample_revlog_ids.contains(id)));
-    }
-    assert_eq!(response.rwkv_revlog_ids, response.fsrs_revlog_ids);
+    let ids = &response.rwkv_revlog_ids;
+    assert!(ids.iter().all(|id| expected.iter().any(|(t, _)| t == id)));
+    assert!(ids.iter().all(|id| response.sample_revlog_ids.contains(id)));
+    // None of the cached FSRS rows is a sample here, so FSRS falls back to
+    // the add-on's replay predictions, one per sample.
+    assert!(response
+        .sample_revlog_ids
+        .iter()
+        .all(|id| !expected.iter().any(|(t, _)| t == id)));
+    assert_eq!(response.fsrs_revlog_ids, response.sample_revlog_ids);
 }
 
 #[test]
@@ -2319,7 +2324,20 @@ fn calibration_data_reads_samples_and_generates_missing_rwkv_rows() {
     assert!(!empty.sample_revlog_ids.is_empty());
     assert_eq!(empty.sample_revlog_ids.len(), empty.sample_card_ids.len());
     assert!(empty.rwkv_revlog_ids.is_empty());
-    assert!(empty.fsrs_revlog_ids.is_empty());
+    // No FSRS cache rows: the add-on falls back to its ts-fsrs replay's
+    // predictions, one per sample.
+    assert_eq!(empty.fsrs_revlog_ids, empty.sample_revlog_ids);
+    let card_ids = fsrs_memorised::search_card_ids(&fx.backend, "deck:current").unwrap();
+    let replayed: HashMap<i64, f64> = fsrs_memorised::replay(&fx.backend, &card_ids, 0)
+        .unwrap()
+        .memorised
+        .calibration_predictions
+        .into_iter()
+        .collect();
+    for (id, p) in empty.fsrs_revlog_ids.iter().zip(&empty.fsrs_predictions) {
+        assert_eq!(replayed[id], *p);
+        assert!((0.0..=1.0).contains(p));
+    }
     assert!(engine.model.is_none());
 
     // Ensuring loads the model and recomputes, without a resident state.
@@ -2558,10 +2576,10 @@ fn fsrs_memorised_replays_the_searched_history() {
     assert_eq!(all.burden_first_day, today - 30);
     assert!((all.burden.last().unwrap() - 0.8).abs() < 1e-9);
 
-    // Card 4, last reviewed 15 days ago, ends where FSRS's own batch replay
-    // of its whole-day review history ends. (The scheduler's stored state
-    // can differ: with short-term steps on, the fork replays FSRS-7 with
-    // fractional days; the add-on, and so this port, with whole days.)
+    // Card 4, last reviewed 15 days ago, ends where ts-fsrs stepping
+    // through its whole-day review history ends. (The scheduler's stored
+    // state differs: the fork schedules with the fsrs crate's FSRS-7, with
+    // fractional days when short-term steps are on.)
     let card_id = fx.card_ids[4];
     let one = fsrs_memorised::fsrs_memorised(
         &fx.backend,
@@ -2580,6 +2598,9 @@ fn fsrs_memorised_replays_the_searched_history() {
         today,
         next_day_at: timing.next_day_at,
     };
+    // Days apart as the add-on's `dateDiffInDays` counts them.
+    let rollover_ms = i64::from(one.rollover) * 3_600_000;
+    let mut minutes_west = calibration::cached_minutes_west();
     let review_days: Vec<(i64, u32)> = sql(
         &fx.backend,
         "select id, ease from revlog where cid = ? order by id",
@@ -2588,25 +2609,11 @@ fn fsrs_memorised_replays_the_searched_history() {
     .iter()
     .map(|row| {
         (
-            days.of(row[0].as_i64().unwrap()),
+            calibration::local_review_day(row[0].as_i64().unwrap(), rollover_ms, &mut minutes_west),
             row[1].as_u64().unwrap() as u32,
         )
     })
     .collect();
-    let item = fsrs::FSRSItem {
-        reviews: review_days
-            .iter()
-            .enumerate()
-            .map(|(i, (day, rating))| fsrs::FSRSReview {
-                rating: *rating,
-                delta_t: if i == 0 {
-                    0.0
-                } else {
-                    (day - review_days[i - 1].0) as f32
-                },
-            })
-            .collect(),
-    };
     let params = fx
         .backend
         .with_col(|col| {
@@ -2617,16 +2624,29 @@ fn fsrs_memorised_replays_the_searched_history() {
         })
         .unwrap()
         .params;
-    let model = fsrs::FSRS::new(&params).unwrap();
-    let state = model.memory_state(item, None).unwrap();
-    let last_day = review_days.last().unwrap().0;
-    assert_eq!(last_day, today - 15);
-    let expected = model.current_retrievability(state, (today - last_day) as f32);
+    let model = ts_fsrs::TsFsrs::new(&params).unwrap();
+    let mut state = None;
+    for (i, (day, rating)) in review_days.iter().enumerate() {
+        let elapsed = if i == 0 {
+            0
+        } else {
+            day - review_days[i - 1].0
+        };
+        state = Some(model.next_state(state, elapsed as f64, *rating).unwrap());
+    }
+    let last_review = sql(
+        &fx.backend,
+        "select max(id) from revlog where cid = ?",
+        vec![card_id.into()],
+    )[0][0]
+        .as_i64()
+        .unwrap();
+    assert_eq!(days.of(last_review), today - 15);
+    let expected = model.forgetting_curve(15.0, state.unwrap().stability);
     let got = *one.retrievability.last().unwrap();
-    assert!(
-        (got - f64::from(expected)).abs() < 1e-6,
-        "replayed R {got}, FSRS {expected}"
-    );
+    assert_eq!(got, expected, "replayed R {got}, ts-fsrs {expected}");
+    // Its reviews from a day apart are in the B-W matrix.
+    assert!(!all.bw_matrix.is_empty());
 
     // The stats period limits the replayed reviews.
     let recent = fsrs_memorised::fsrs_memorised(

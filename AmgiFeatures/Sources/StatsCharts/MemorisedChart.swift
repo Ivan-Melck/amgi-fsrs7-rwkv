@@ -61,6 +61,9 @@ public struct MemorisedCard: View {
     }
 
     @Environment(\.palette) private var palette
+    /// `binSize` and `scroll`, shared by the trend views and their text.
+    @State private var binSize = 1
+    @State private var scroll = 0
 
     public var body: some View {
         AmgiCard(
@@ -162,7 +165,14 @@ public struct MemorisedCard: View {
             source: source
         )
         if let chart {
-            MemorisedLineChart(chart: chart, dates: MemorisedDates(today: fsrs.today, rollover: fsrs.rollover))
+            MemorisedTrendGraph(
+                chart: chart,
+                dates: MemorisedDates(today: fsrs.today, rollover: fsrs.rollover),
+                binSize: $binSize,
+                scroll: $scroll
+            )
+            // A new series starts a new trend session.
+            .id("\(kind)-\(source)")
         } else {
             Text("No memorised data")
                 .amgiFont(.body)
@@ -176,6 +186,11 @@ public struct MemorisedCard: View {
             }
         }
         .pickerStyle(.menu)
+
+        DisclosureGroup("B-W Matrix") {
+            MemorisedBwMatrixView(matrix: MemorisedBwMatrix(rows: fsrs.bwMatrix))
+        }
+        .amgiFont(.caption)
     }
 
     private func rwkvProgress(_ rwkv: RwkvMemorisedProgress) -> some View {
@@ -200,13 +215,34 @@ public struct MemorisedCard: View {
     }
 }
 
-/// `renderLineChart`: one line per series, a tooltip for the touched day.
+/// `renderLineChart`: one line per series, a tooltip for the touched day,
+/// and the trends drawn on it.
 struct MemorisedLineChart: View {
     let chart: MemorisedChart
     let dates: MemorisedDates
+    var trends: [(Color, MemorisedTrend.Drawn)] = []
+    var preview: (Color, MemorisedTrend.Drawn)?
+    var onHover: (Int) -> Void = { _ in }
+    var onTap: (Int) -> Void = { _ in }
+
+    init(
+        chart: MemorisedChart,
+        dates: MemorisedDates,
+        trends: [(Color, MemorisedTrend.Drawn)] = [],
+        preview: (Color, MemorisedTrend.Drawn)? = nil,
+        onHover: @escaping (Int) -> Void = { _ in },
+        onTap: @escaping (Int) -> Void = { _ in }
+    ) {
+        self.chart = chart
+        self.dates = dates
+        self.trends = trends
+        self.preview = preview
+        self.onHover = onHover
+        self.onTap = onTap
+    }
 
     @Environment(\.palette) private var palette
-    @State private var selectedDate: Date?
+    @State private var selectedDay: Int?
 
     private struct Point: Identifiable {
         let line: String
@@ -247,10 +283,9 @@ struct MemorisedLineChart: View {
 
     private var yAxisMax: Double { StatsDualAxisSupport.niceUpperBound(chart.maxValue) }
 
-    private var selectedDay: Int? {
-        guard let selectedDate else { return nil }
-        let day = dates.day(for: selectedDate)
-        return (chart.startDay...max(chart.startDay, chart.endDay)).contains(day) ? day : nil
+    /// A trend's y, clamped to the plot like `drawTrendLine`.
+    private func trendY(_ drawn: MemorisedTrend.Drawn, _ x: Double) -> Double {
+        min(max(drawn.model.calcY(x), 0), yAxisMax)
     }
 
     var body: some View {
@@ -264,6 +299,22 @@ struct MemorisedLineChart: View {
                 .foregroundStyle(by: .value("Source", point.line))
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
                 .interpolationMethod(.linear)
+            }
+            ForEach(Array((trends + (preview.map { [$0] } ?? [])).enumerated()), id: \.offset) { index, item in
+                LineMark(
+                    x: .value("Date", dates.date(for: Int(item.1.drawStartX)), unit: .day),
+                    y: .value("Trend", trendY(item.1, item.1.drawStartX)),
+                    series: .value("Series", "trend-\(index)")
+                )
+                .foregroundStyle(item.0)
+                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: index >= trends.count ? [4, 2] : []))
+                LineMark(
+                    x: .value("Date", dates.date(for: Int(item.1.drawEndX)), unit: .day),
+                    y: .value("Trend", trendY(item.1, item.1.drawEndX)),
+                    series: .value("Series", "trend-\(index)")
+                )
+                .foregroundStyle(item.0)
+                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: index >= trends.count ? [4, 2] : []))
             }
             if let selectedDay {
                 RuleMark(x: .value("Selected", dates.date(for: selectedDay), unit: .day))
@@ -282,7 +333,6 @@ struct MemorisedLineChart: View {
             range: chart.lines.map { color($0.color) }
         )
         .chartLegend(chart.lines.count > 1 ? .visible : .hidden)
-        .chartXSelection(value: $selectedDate)
         .chartYScale(domain: 0...yAxisMax)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 5)) { _ in
@@ -300,10 +350,39 @@ struct MemorisedLineChart: View {
                     .foregroundStyle(palette.textSecondary)
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                guard let day = day(at: value.location, proxy: proxy, geometry: geometry) else { return }
+                                selectedDay = day
+                                onHover(day)
+                            }
+                            .onEnded { value in
+                                guard abs(value.translation.width) < 8, abs(value.translation.height) < 8,
+                                      let day = day(at: value.location, proxy: proxy, geometry: geometry) else { return }
+                                onTap(day)
+                            }
+                    )
+            }
+        }
         .frame(height: 200)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Memorised")
         .accessibilityValue(chart.tooltip(day: chart.endDay).joined(separator: ", "))
+    }
+
+    /// The hovered day (`hoverData`), within the drawn days.
+    private func day(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) -> Int? {
+        guard let frame = proxy.plotFrame else { return nil }
+        let x = location.x - geometry[frame].origin.x
+        guard let date = proxy.value(atX: x, as: Date.self) else { return nil }
+        let day = dates.day(for: date)
+        return min(max(day, chart.startDay), max(chart.startDay, chart.endDay))
     }
 }
 
