@@ -5,8 +5,10 @@
 //  Created by Vladimir Gusev on 08.05.2026.
 //
 
+import Foundation
 package import AnkiKit
 package import AnkiProto
+import SwiftProtobuf
 
 // MARK: - DeckConfig.Config <-> Anki_DeckConfig_DeckConfig.Config
 
