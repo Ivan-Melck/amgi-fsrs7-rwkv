@@ -237,59 +237,93 @@ private struct CalibrationPlot: View {
         }
     }
 
+    @ChartContentBuilder
+    private var barMarks: some ChartContent {
+        ForEach(bars) { bar in
+            RectangleMark(
+                xStart: .value("Predicted", bar.bounds.lowerBound),
+                xEnd: .value("Predicted", bar.bounds.upperBound),
+                yStart: .value("Actual", 0.0),
+                yEnd: .value("Actual", bar.height)
+            )
+            .foregroundStyle(CalibrationColors.color(bar.model).opacity(series.count > 1 ? 0.3 : 0.5))
+        }
+    }
+
+    @ChartContentBuilder
+    private var perfectLine: some ChartContent {
+        ForEach([0.0, 1.0], id: \.self) { (value: Double) in
+            LineMark(x: .value("Predicted", value), y: .value("Actual", value), series: .value("Line", "perfect"))
+                .foregroundStyle(CalibrationColors.perfect)
+                .lineStyle(StrokeStyle(lineWidth: 1.5))
+        }
+    }
+
+    @ChartContentBuilder
+    private func seriesMarks(_ item: CalibrationSeries) -> some ChartContent {
+        ForEach(Array(item.segments.enumerated()), id: \.offset) { segment, points in
+            segmentLine(item, segment: segment, points: points)
+        }
+        ForEach(item.points) { point in
+            intervalMarks(item, point: point)
+        }
+    }
+
+    @ChartContentBuilder
+    private func segmentLine(_ item: CalibrationSeries, segment: Int, points: [CalibrationPoint]) -> some ChartContent {
+        let seriesName = "\(item.model.rawValue)-\(segment)"
+        let color = CalibrationColors.color(item.model)
+        ForEach(points) { point in
+            LineMark(
+                x: .value("Predicted", point.predicted),
+                y: .value("Actual", point.real),
+                series: .value("Line", seriesName)
+            )
+            .foregroundStyle(color)
+            .lineStyle(StrokeStyle(lineWidth: 1.5))
+        }
+    }
+
+    @ChartContentBuilder
+    private func intervalMarks(_ item: CalibrationSeries, point: CalibrationPoint) -> some ChartContent {
+        if let interval = point.confidenceInterval {
+            let color = CalibrationColors.color(item.model)
+            RuleMark(
+                x: .value("Predicted", point.predicted),
+                yStart: .value("Actual", interval.lower),
+                yEnd: .value("Actual", interval.upper)
+            )
+            .foregroundStyle(color)
+            .lineStyle(StrokeStyle(lineWidth: 1.25))
+            PointMark(x: .value("Predicted", point.predicted), y: .value("Actual", point.real))
+                .foregroundStyle(color)
+                .symbolSize(20)
+        }
+    }
+
+    @ChartContentBuilder
+    private var selectionMark: some ChartContent {
+        if let selectedIndex {
+            let bounds = Calibration.binBounds(index: selectedIndex, binCount: binCount)
+            let lines = CalibrationReport.tooltip(series: series, index: selectedIndex)
+            RuleMark(x: .value("Selected", (bounds.lowerBound + bounds.upperBound) / 2))
+                .foregroundStyle(palette.accent.opacity(0.35))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit, y: .fit)) {
+                    StatsChartTooltip(title: lines.first ?? "", lines: Array(lines.dropFirst()))
+                }
+        }
+    }
+
     private var chart: some View {
+        // Split into builders: one expression is too much for the type checker.
         Chart {
-            ForEach(bars) { bar in
-                RectangleMark(
-                    xStart: .value("Predicted", bar.bounds.lowerBound),
-                    xEnd: .value("Predicted", bar.bounds.upperBound),
-                    yStart: .value("Actual", 0),
-                    yEnd: .value("Actual", bar.height)
-                )
-                .foregroundStyle(CalibrationColors.color(bar.model).opacity(series.count > 1 ? 0.3 : 0.5))
-            }
-            ForEach([0.0, 1.0], id: \.self) { value in
-                LineMark(x: .value("Predicted", value), y: .value("Actual", value), series: .value("Line", "perfect"))
-                    .foregroundStyle(CalibrationColors.perfect)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
-            }
+            barMarks
+            perfectLine
             ForEach(series) { item in
-                ForEach(Array(item.segments.enumerated()), id: \.offset) { segment, points in
-                    ForEach(points) { point in
-                        LineMark(
-                            x: .value("Predicted", point.predicted),
-                            y: .value("Actual", point.real),
-                            series: .value("Line", "\(item.model.rawValue)-\(segment)")
-                        )
-                        .foregroundStyle(CalibrationColors.color(item.model))
-                        .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    }
-                }
-                ForEach(item.points) { point in
-                    if let interval = point.confidenceInterval {
-                        RuleMark(
-                            x: .value("Predicted", point.predicted),
-                            yStart: .value("Actual", interval.lower),
-                            yEnd: .value("Actual", interval.upper)
-                        )
-                        .foregroundStyle(CalibrationColors.color(item.model))
-                        .lineStyle(StrokeStyle(lineWidth: 1.25))
-                        PointMark(x: .value("Predicted", point.predicted), y: .value("Actual", point.real))
-                            .foregroundStyle(CalibrationColors.color(item.model))
-                            .symbolSize(20)
-                    }
-                }
+                seriesMarks(item)
             }
-            if let selectedIndex {
-                let bounds = Calibration.binBounds(index: selectedIndex, binCount: binCount)
-                let lines = CalibrationReport.tooltip(series: series, index: selectedIndex)
-                RuleMark(x: .value("Selected", (bounds.lowerBound + bounds.upperBound) / 2))
-                    .foregroundStyle(palette.accent.opacity(0.35))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit, y: .fit)) {
-                        StatsChartTooltip(title: lines.first ?? "", lines: Array(lines.dropFirst()))
-                    }
-            }
+            selectionMark
         }
         .chartXScale(domain: 0...1)
         .chartYScale(domain: 0...1)
