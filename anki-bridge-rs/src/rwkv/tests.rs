@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use anki::backend::init_backend;
 use anki::backend::Backend;
 use anki::services::BackendCollectionService;
+use anki::services::CardsService;
 use anki::services::CollectionService;
 use anki::services::DeckConfigService;
 use anki::services::DecksService;
@@ -311,6 +312,63 @@ fn answer_next(engine: &mut Engine, fx: &Fixture, rating: u8) -> Option<i64> {
     Some(card_id)
 }
 
+/// The app's undo: the collection's, then `undo_answer` with its counters.
+fn undo(engine: &mut Engine, fx: &Fixture) -> UndoResponse {
+    let out = fx.backend.with_col(CollectionService::undo).unwrap();
+    engine
+        .undo_answer(
+            &fx.backend,
+            UndoRequest {
+                counter: Some(out.counter),
+                next_counter: out.new_status.map(|s| s.last_step),
+            },
+        )
+        .unwrap()
+}
+
+/// The app's redo: the collection's, then `redo_answer` with its counters.
+fn redo(engine: &mut Engine, fx: &Fixture) -> UndoResponse {
+    let out = fx.backend.with_col(CollectionService::redo).unwrap();
+    engine
+        .redo_answer(
+            &fx.backend,
+            UndoRequest {
+                counter: Some(out.counter),
+                next_counter: out.new_status.map(|s| s.last_step),
+            },
+        )
+        .unwrap()
+}
+
+fn queue_head(fx: &Fixture) -> Option<i64> {
+    fx.backend
+        .with_col(|col| {
+            SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap()
+        .cards
+        .first()
+        .and_then(|c| c.card.as_ref())
+        .map(|c| c.id)
+}
+
+fn assert_matches_a_fresh_replay(live: &mut Engine, fx: &Fixture, queries: &[ReviewInput]) {
+    let mut fresh = Engine::default();
+    assert_eq!(prepare(&mut fresh, fx, None).source, "replayed");
+    assert_same_predictions(
+        &live.predict_many(queries).unwrap(),
+        &fresh.predict_many(queries).unwrap(),
+    );
+    live.trusted = false;
+    assert_eq!(live.ensure_ready(&fx.backend).unwrap().0, "revalidated");
+}
+
 #[test]
 fn live_answers_match_a_fresh_canonical_replay() {
     let Some(fx) = fixture_with_new("parity", 15, 4) else {
@@ -501,11 +559,132 @@ fn undo_restores_the_state_before_the_answer() {
     let after = engine.predict_many(&queries).unwrap();
     assert!(before.iter().zip(&after).any(|(a, b)| a != b));
 
-    let _ = fx.backend.with_col(CollectionService::undo).unwrap();
-    assert!(engine.undo_answer(&fx.backend).unwrap().restored);
+    assert!(undo(&mut engine, &fx).restored);
     assert_same_predictions(&before, &engine.predict_many(&queries).unwrap());
     engine.trusted = false;
     assert_eq!(engine.ensure_ready(&fx.backend).unwrap().0, "revalidated");
+}
+
+#[test]
+fn undo_and_redo_several_answers_match_a_fresh_canonical_replay() {
+    let Some(fx) = fixture("undoredo", 10) else {
+        return;
+    };
+    let mut live = Engine::default();
+    prepare(&mut live, &fx, None);
+    live.score_deck_request(
+        &fx.backend,
+        ScoreDeckRequest {
+            deck_id: 1,
+            new_session: true,
+        },
+    )
+    .unwrap();
+    let queries = all_queries(&fx);
+    // predictions[k]: the state after the first k answers.
+    let mut predictions = vec![live.predict_many(&queries).unwrap()];
+    let mut answered = vec![];
+    for rating in [3, 1, 4, 2, 3, 1] {
+        answered.push(answer_next(&mut live, &fx, rating).unwrap());
+        predictions.push(live.predict_many(&queries).unwrap());
+    }
+    // Each answer is recorded under its own undo step.
+    let status = fx
+        .backend
+        .with_col(CollectionService::get_undo_status)
+        .unwrap();
+    assert_eq!(live.undo.len(), 6);
+    assert_eq!(live.undo.last().unwrap().counter, status.last_step);
+
+    // Undo four answers, newest first: the state is what it was before that
+    // answer, and a review card comes back in front. (A learning card that
+    // isn't due yet waits behind the main queue, on the desktop too.)
+    let mut review_cards_undone = 0;
+    for step in (2..6).rev() {
+        let undone = undo(&mut live, &fx);
+        assert!(undone.restored);
+        assert_eq!(undone.card_id, Some(answered[step]));
+        if get_card(&fx.backend, answered[step]).unwrap().queue == 2 {
+            assert_eq!(queue_head(&fx), Some(answered[step]));
+            review_cards_undone += 1;
+        }
+        assert_same_predictions(&predictions[step], &live.predict_many(&queries).unwrap());
+    }
+    assert!(review_cards_undone > 0);
+    // Redo two: the state advances exactly as the answers did.
+    for step in 2..4 {
+        let redone = redo(&mut live, &fx);
+        assert!(redone.restored);
+        assert_eq!(redone.card_id, Some(answered[step]));
+        assert_same_predictions(
+            &predictions[step + 1],
+            &live.predict_many(&queries).unwrap(),
+        );
+    }
+    // Undo and redo again: the frames follow the renumbered steps.
+    assert_eq!(undo(&mut live, &fx).card_id, Some(answered[3]));
+    assert_same_predictions(&predictions[3], &live.predict_many(&queries).unwrap());
+    assert_eq!(redo(&mut live, &fx).card_id, Some(answered[3]));
+    assert_same_predictions(&predictions[4], &live.predict_many(&queries).unwrap());
+    assert_eq!(live.own_review_ids.len(), 4);
+    assert_eq!(live.redo.len(), 2);
+    assert_matches_a_fresh_replay(&mut live, &fx, &queries);
+
+    // A new answer drops the redo frames, as it does the collection's redo.
+    answer_next(&mut live, &fx, 3).unwrap();
+    assert!(live.redo.is_empty());
+    let status = fx
+        .backend
+        .with_col(CollectionService::get_undo_status)
+        .unwrap();
+    assert!(status.redo.is_empty());
+    assert_eq!(live.own_review_ids.len(), 5);
+    assert_matches_a_fresh_replay(&mut live, &fx, &queries);
+}
+
+#[test]
+fn undoing_other_operations_keeps_the_answer_frames() {
+    let Some(fx) = fixture("undoflag", 6) else {
+        return;
+    };
+    let mut live = Engine::default();
+    prepare(&mut live, &fx, None);
+    let queries = all_queries(&fx);
+    let before = live.predict_many(&queries).unwrap();
+    let first = answer_next(&mut live, &fx, 3).unwrap();
+    let middle = live.predict_many(&queries).unwrap();
+    let second = answer_next(&mut live, &fx, 1).unwrap();
+    let after = live.predict_many(&queries).unwrap();
+    // An undoable step that isn't an answer.
+    let _ = fx
+        .backend
+        .with_col(|col| {
+            CardsService::set_flag(
+                col,
+                anki_proto::cards::SetFlagRequest {
+                    card_ids: vec![first],
+                    flag: 1,
+                },
+            )
+        })
+        .unwrap();
+
+    let undone = undo(&mut live, &fx);
+    assert!(!undone.restored);
+    assert_eq!(live.undo.len(), 2);
+    assert!(live.current(&fx.backend).unwrap());
+    assert_same_predictions(&after, &live.predict_many(&queries).unwrap());
+    assert_eq!(undo(&mut live, &fx).card_id, Some(second));
+    assert_same_predictions(&middle, &live.predict_many(&queries).unwrap());
+    assert_eq!(undo(&mut live, &fx).card_id, Some(first));
+    assert_same_predictions(&before, &live.predict_many(&queries).unwrap());
+
+    assert_eq!(redo(&mut live, &fx).card_id, Some(first));
+    assert_eq!(redo(&mut live, &fx).card_id, Some(second));
+    assert_same_predictions(&after, &live.predict_many(&queries).unwrap());
+    assert!(!redo(&mut live, &fx).restored);
+    assert!(live.current(&fx.backend).unwrap());
+    assert_matches_a_fresh_replay(&mut live, &fx, &queries);
 }
 
 #[test]
@@ -1124,8 +1303,7 @@ fn undo_still_works_after_a_save() {
     answer_next(&mut engine, &fx, 3).unwrap();
     assert!(engine.save(&fx.backend).unwrap().saved);
 
-    let _ = fx.backend.with_col(CollectionService::undo).unwrap();
-    assert!(engine.undo_answer(&fx.backend).unwrap().restored);
+    assert!(undo(&mut engine, &fx).restored);
     assert!(
         engine.current(&fx.backend).unwrap(),
         "undo should revalidate, not replay"
