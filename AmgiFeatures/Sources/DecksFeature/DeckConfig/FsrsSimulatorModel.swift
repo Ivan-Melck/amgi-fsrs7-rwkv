@@ -20,6 +20,9 @@ final class FsrsSimulatorModel {
     var isRunning = false
     var summary: [(label: String, value: String)] = []
     var workloadRows: [(label: String, value: String)] = []
+    /// The FSRS workload's answer-time model; the desktop shows it for a
+    /// plain workload run only, not in review mode or the RWKV comparison.
+    var reviewTime: FsrsReviewTime?
     var errorMessage: String?
 
     @ObservationIgnored @Dependency(\.deckClient) private var deckClient
@@ -77,6 +80,7 @@ final class FsrsSimulatorModel {
                     ("Memorized (end)", String(format: "%.1f", Double(memorized)))
                 ]
                 workloadRows = []
+                reviewTime = nil
             case .workload:
                 let result = try await deckClient.simulateFsrsWorkload(request)
                 guard generation == self.generation else { return }
@@ -85,6 +89,7 @@ final class FsrsSimulatorModel {
                         ("\(retention)%", Self.workloadText(result, retention))
                     }
                     summary = [("Points", "\(workloadRows.count)")]
+                    reviewTime = result.reviewTime
                     return
                 }
                 var rwkvRequest = RwkvWorkloadRequest(
@@ -110,6 +115,7 @@ final class FsrsSimulatorModel {
                     )
                 }
                 summary = [("Points", "\(workloadRows.count)")]
+                reviewTime = nil
             }
         } catch {
             guard generation == self.generation else { return }

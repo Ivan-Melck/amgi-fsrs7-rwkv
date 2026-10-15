@@ -95,6 +95,10 @@ struct FsrsSimulatorView: View {
                 workloadRows: model.workloadRows,
                 errorMessage: model.errorMessage
             )
+            // `{#if workload && reviewTimeMatrix && !compareWorkloads}`.
+            if context.mode == .workload, !context.compareWithRwkv, let reviewTime = model.reviewTime {
+                FsrsSimulatorReviewTimeSection(reviewTime: reviewTime)
+            }
         }
     }
 

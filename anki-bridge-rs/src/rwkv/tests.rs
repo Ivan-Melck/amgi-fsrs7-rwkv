@@ -1380,7 +1380,8 @@ fn fallback_grade_probabilities_match_the_desktop() {
 fn review_model_smooths_grades_per_bucket() {
     // Two Good answers at r = 0.92 (bucket 18) taking 4s and 6s, one Again
     // with an implausible time.
-    let model = workload::review_model(&[(0.92, 3, 4_000), (0.93, 3, 6_000), (0.5, 1, 700_000)]);
+    let (model, _) =
+        workload::review_model(&[(0.92, 3, 4_000), (0.93, 3, 6_000), (0.5, 1, 700_000)]);
     assert_eq!(model.grade_seconds, [8.0, 8.0, 5.0, 8.0]);
     let buckets: Vec<u32> = model.bucket_probabilities.iter().map(|(b, _)| *b).collect();
     assert_eq!(buckets, vec![10, 18]);
@@ -1396,6 +1397,263 @@ fn review_model_smooths_grades_per_bucket() {
     for (got, want) in p.iter().zip(expected) {
         assert!((f64::from(*got) - want).abs() < 1e-6);
     }
+}
+
+#[test]
+fn review_time_fields_match_the_desktop() {
+    // Expected values from `_rwkv_simulator_review_model` /
+    // `_rwkv_simulator_review_time_fields` run in Python on the same rows.
+    // Again: positive slope, so the top buckets fall back to the grade mean;
+    // Hard: R 1e-7 apart, so the mean; Good: a regression; Easy: one timed sample;
+    // then untimed and invalid rows.
+    let rows = [
+        (0.9, 1, 1000),
+        (0.1, 1, 30000),
+        (0.62, 2, 7500),
+        (0.6200001, 2, 12500),
+        (0.97, 3, 4200),
+        (0.88, 3, 5100),
+        (0.75, 3, 6900),
+        (0.51, 3, 9300),
+        (1.0, 3, 3000),
+        (0.0, 3, 15000),
+        (0.99, 4, 2500),
+        (0.95, 4, 0),
+        (0.95, 4, 600000),
+        (0.5, 0, 5000),
+        (0.5, 5, 5000),
+        (1.5, 3, 5000),
+        (-0.1, 3, 5000),
+        (0.4, 1, -3),
+    ];
+    let (model, fields) = workload::review_model(&rows);
+    assert_eq!(model.grade_seconds, [15.5, 10.0, 7.25, 2.5]);
+    assert_eq!(fields.r_bucket_count, 20);
+    assert_eq!(fields.s_bucket_count, 1);
+    assert_eq!(
+        fields.seconds[0],
+        vec![
+            15.5,
+            0.09374999999999822,
+            1.90625,
+            3.7187500000000018,
+            5.53125,
+            7.34375,
+            9.156249999999998,
+            10.96875,
+            12.781250000000002,
+            14.593750000000004,
+            16.40625,
+            18.218750000000004,
+            20.03125,
+            21.84375,
+            23.656250000000004,
+            25.46875,
+            27.281250000000004,
+            29.09375,
+            30.90625,
+            32.71875
+        ]
+    );
+    assert_eq!(fields.seconds[1], vec![10.0; 20]);
+    assert_eq!(
+        fields.seconds[2],
+        vec![
+            3.9117189121860076,
+            4.487284616981523,
+            5.06285032177704,
+            5.638416026572555,
+            6.2139817313680705,
+            6.789547436163588,
+            7.365113140959103,
+            7.9406788457546185,
+            8.516244550550136,
+            9.091810255345653,
+            9.667375960141168,
+            10.242941664936684,
+            10.818507369732199,
+            11.394073074527714,
+            11.969638779323232,
+            12.545204484118747,
+            13.120770188914262,
+            13.696335893709778,
+            14.271901598505295,
+            14.84746730330081
+        ]
+    );
+    assert_eq!(fields.seconds[3], vec![2.5; 20]);
+    assert_eq!(
+        fields.sample_counts,
+        vec![3, 1, 1, 0, 1, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1]
+    );
+    assert_eq!(
+        fields.coeffs,
+        [
+            [-2.625, 36.25, 0.0, 0.0, 0.0],
+            [10.0, 0.0, 0.0, 0.0, 0.0],
+            [3.6239360597882495, 11.511314095910318, 0.0, 0.0, 0.0],
+            [2.5, 0.0, 0.0, 0.0, 0.0]
+        ]
+    );
+    let weights = [
+        0.21428571428571427,
+        0.14285714285714285,
+        0.42857142857142855,
+        0.21428571428571427,
+    ];
+    assert_eq!(fields.grade_weights, weights);
+    assert_eq!(fields.transition_probs, weights.repeat(4));
+    assert_eq!(fields.transition_counts, vec![0; 16]);
+    assert_eq!(
+        fields.success_grade_probs,
+        vec![
+            0.057142857142857155,
+            0.5999999999999999,
+            0.3428571428571429,
+            0.1,
+            0.55,
+            0.35,
+            0.13333333333333325,
+            0.5866666666666667,
+            0.27999999999999997,
+            0.2777777777777778,
+            0.42222222222222244,
+            0.2999999999999998,
+            0.311111111111111,
+            0.6088888888888889,
+            0.08000000000000007,
+            0.45,
+            0.5,
+            0.049999999999999996,
+            0.45,
+            0.5,
+            0.05,
+            0.6333333333333333,
+            0.3333333333333333,
+            0.03333333333333333,
+            0.45,
+            0.5,
+            0.05,
+            0.36,
+            0.6,
+            0.04,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05000000000000001,
+            0.45,
+            0.5,
+            0.049999999999999996,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45000000000000007,
+            0.4999999999999999,
+            0.049999999999999996,
+            0.45000000000000007,
+            0.4999999999999999,
+            0.049999999999999996,
+            0.36000000000000004,
+            0.5999999999999999,
+            0.039999999999999994
+        ]
+    );
+    assert_eq!(
+        fields.success_grade_counts,
+        vec![3, 0, 1, 0, 1, 0, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+    );
+
+    // Without samples: the default seconds and fallback shares.
+    let (_, empty) = workload::review_model(&[]);
+    assert_eq!(empty.seconds, std::array::from_fn(|_| vec![8.0; 20]));
+    assert_eq!(empty.sample_counts, vec![0; 20]);
+    assert_eq!(empty.coeffs, [[8.0, 0.0, 0.0, 0.0, 0.0]; 4]);
+    assert_eq!(empty.grade_weights, [0.25; 4]);
+    assert_eq!(
+        empty.success_grade_probs,
+        vec![
+            0.10000000000000002,
+            0.5499999999999999,
+            0.35000000000000003,
+            0.1,
+            0.55,
+            0.35,
+            0.16666666666666657,
+            0.48333333333333345,
+            0.35,
+            0.2777777777777778,
+            0.42222222222222244,
+            0.2999999999999998,
+            0.38888888888888873,
+            0.5111111111111112,
+            0.10000000000000009,
+            0.45,
+            0.5,
+            0.049999999999999996,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05000000000000001,
+            0.45,
+            0.5,
+            0.049999999999999996,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45,
+            0.5,
+            0.05,
+            0.45000000000000007,
+            0.4999999999999999,
+            0.049999999999999996,
+            0.45000000000000007,
+            0.4999999999999999,
+            0.049999999999999996,
+            0.45000000000000007,
+            0.4999999999999999,
+            0.049999999999999996
+        ]
+    );
+    assert_eq!(empty.success_grade_counts, vec![0; 20]);
+}
+
+#[test]
+fn py_sum_compensates_like_python() {
+    // sum([0.1] * 10) == 1.0 and sum([1e16, 1.0, -1e16]) == 1.0 in Python 3.12+.
+    assert_eq!(workload::py_sum([0.1; 10]), 1.0);
+    assert_eq!(workload::py_sum([1e16, 1.0, -1e16]), 1.0);
+    assert_ne!([0.1f64; 10].iter().sum::<f64>(), 1.0);
 }
 
 #[test]
@@ -1419,6 +1677,15 @@ fn rwkv_workload_runs_on_the_resident_state() {
         ..Default::default()
     };
     let full = engine.simulate_workload(&fx.backend, request(0)).unwrap();
+    // No recorded predictions here, so the desktop's default answer times.
+    assert_eq!(full.review_time_r_bucket_count, 20);
+    assert_eq!(full.review_time_s_bucket_count, 1);
+    assert_eq!(full.review_time_again_seconds, vec![8.0; 20]);
+    assert_eq!(full.review_time_easy_coeffs, vec![8.0, 0.0, 0.0, 0.0, 0.0]);
+    assert_eq!(full.review_time_grade_weights, vec![0.25; 4]);
+    assert_eq!(full.review_time_transition_probs, vec![0.25; 16]);
+    assert_eq!(full.review_time_success_grade_probs.len(), 60);
+    assert_eq!(full.review_time_success_grade_counts, vec![0; 20]);
     let drs: Vec<u32> = full.points.iter().map(|p| p.dr).collect();
     assert_eq!(drs.first(), Some(&30));
     assert!(drs.windows(2).all(|w| w[0] < w[1]));

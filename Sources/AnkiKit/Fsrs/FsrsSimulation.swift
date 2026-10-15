@@ -96,14 +96,18 @@ public struct FsrsWorkloadSimulation: Sendable, Hashable {
     public let cost: [Int: Float]
     public let memorized: [Int: Float]
     public let reviewCount: [Int: Int]
+    /// The answer-time model the sweep used (`review_time_*`).
+    public var reviewTime: FsrsReviewTime
 
     public init(
         cost: [Int: Float],
         memorized: [Int: Float],
-        reviewCount: [Int: Int]
+        reviewCount: [Int: Int],
+        reviewTime: FsrsReviewTime = FsrsReviewTime()
     ) {
         self.cost = cost
         self.memorized = memorized
         self.reviewCount = reviewCount
+        self.reviewTime = reviewTime
     }
 }
