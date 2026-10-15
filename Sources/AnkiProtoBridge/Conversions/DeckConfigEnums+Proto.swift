@@ -214,6 +214,29 @@ package extension QuestionAction {
     }
 }
 
+package extension Anki_DeckConfig_DeckConfig.Config.FsrsVersion {
+    init(_ mirror: FsrsVersion) {
+        switch mirror {
+        case .seven: self = .seven
+        case .six: self = .six
+        case .five: self = .five
+        case .four: self = .four
+        }
+    }
+}
+
+package extension FsrsVersion {
+    init(_ proto: Anki_DeckConfig_DeckConfig.Config.FsrsVersion) {
+        switch proto {
+        case .seven: self = .seven
+        case .six: self = .six
+        case .five: self = .five
+        case .four: self = .four
+        case .UNRECOGNIZED: self = .seven
+        }
+    }
+}
+
 package extension Anki_DeckConfig_UpdateDeckConfigsMode {
     init(_ mirror: UpdateDeckConfigsMode) {
         switch mirror {

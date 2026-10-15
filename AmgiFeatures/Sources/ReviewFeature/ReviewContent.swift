@@ -137,6 +137,11 @@ struct ReviewContent: View {
                     )
                 }
             }
+            .sheet(isPresented: Binding($destination.rwkvCardInfo)) {
+                if case .rwkvCardInfo(let cardId) = destination {
+                    RwkvCardInfoView(cardId: cardId)
+                }
+            }
             .sheet(isPresented: Binding($destination.lookup), onDismiss: { lookupHighlight.clear() }) {
                 if let lookupPopup {
                     lookupPopup.popup(
@@ -294,6 +299,7 @@ private struct CardActionsMenu: View {
     @Binding var confirmDeleteNote: Bool
 
     @Environment(\.palette) private var palette
+    @Dependency(\.rwkvClient) private var rwkv
 
     var body: some View {
         Menu {
@@ -338,6 +344,14 @@ private struct CardActionsMenu: View {
                     )
                 }
                 .disabled(session.currentNote == nil)
+
+                if rwkv.isAvailable(), let cardId = session.currentCardId {
+                    Button {
+                        destination = .rwkvCardInfo(cardId)
+                    } label: {
+                        Label("RWKV Card Info", systemImage: "brain")
+                    }
+                }
             }
 
             if let cardId = session.currentCardId {

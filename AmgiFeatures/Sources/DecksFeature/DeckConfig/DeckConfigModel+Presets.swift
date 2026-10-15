@@ -83,19 +83,25 @@ extension DeckConfigModel {
     }
 
     func optimizeCurrentPreset() async {
-        guard let loaded else { return }
+        guard loaded != nil else { return }
         let generation = optimizeGeneration
         isOptimizingFsrs = true
         defer { if generation == optimizeGeneration { isOptimizingFsrs = false } }
 
         do {
-            let cfg = loaded.config.config
-            let edited = parseFloats(fsrsWeightsText)
+            // Mirrors the fork's desktop request: the FSRS-7-only options
+            // are sent only when the preset is on FSRS-7.
+            let version = schedulerSelection.fsrsVersion
+            let isFsrs7 = version == .seven
             let request = FsrsOptimizeRequest(
                 search: effectiveParamSearch(),
-                currentWeights: FsrsWeights(edited.isEmpty ? currentWeights(from: cfg) : edited),
+                currentWeights: FsrsWeights(activeFsrsParams()),
                 relearningStepsPerDay: Int(relearningStepsInDay(parseSteps(relearningStepsText))),
-                runHealthCheck: fsrsHealthCheck
+                runHealthCheck: fsrsHealthCheck,
+                fsrsVersion: version,
+                includeSameDayReviews: isFsrs7 ? fsrs7IncludeSameDayReviews : nil,
+                enableSchedulingPenalties: isFsrs7 ? fsrs7SchedulingPenaltiesEnabled : nil,
+                dynamicDesiredRetentionEnabled: isFsrs7 && dynamicDesiredRetentionEnabled
             )
 
             let result = try await deckClient.computeFsrsParams(request)
@@ -107,7 +113,12 @@ extension DeckConfigModel {
                 ))
                 return
             }
+            // The text field edits the active version's params, so the
+            // optimized values land in that version's slot on save.
             fsrsWeightsText = formatWeights(result.weights.values)
+            if let dynamicDesiredRetention = result.dynamicDesiredRetention {
+                optimizedDynamicDesiredRetention = dynamicDesiredRetention
+            }
             if result.healthCheck == .failed {
                 destination = .alert(.fsrsError(
                     title: "FSRS health check failed",
@@ -142,10 +153,8 @@ extension DeckConfigModel {
     // MARK: - FSRS simulator entry
 
     func openSimulator(mode: FsrsSimulatorMode) {
-        guard let loaded else { return }
-        let cfg = loaded.config.config
-        let editedWeights = parseFloats(fsrsWeightsText)
-        let weights = editedWeights.isEmpty ? currentWeights(from: cfg) : editedWeights
+        guard loaded != nil else { return }
+        let weights = activeFsrsParams()
         guard !weights.isEmpty else {
             destination = .alert(.fsrsError(
                 title: "Simulator needs FSRS weights",

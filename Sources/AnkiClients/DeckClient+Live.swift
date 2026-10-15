@@ -70,9 +70,9 @@ extension DeckClient: DependencyKey {
             getDeckConfig: { deckId in
                 try await backendOffload { try decks.getDeckConfig(deckId) }
             },
-            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, ignoreReviewLimit, applyAllParentLimits, fsrsHealthCheck in
+            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, ignoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings in
                 try await backendOffload {
-                    try decks.updateDeckConfig(deckId, config, applyToChildren, fsrsEnabled, ignoreReviewLimit, applyAllParentLimits, fsrsHealthCheck)
+                    try decks.updateDeckConfig(deckId, config, applyToChildren, fsrsEnabled, ignoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings)
                     logger.info("Updated deck config for deck=\(deckId), config=\(config.name), fsrs=\(fsrsEnabled)")
                 }
             },

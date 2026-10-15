@@ -79,6 +79,16 @@ public enum QuestionAction: Int, Sendable, Hashable, Codable, CaseIterable {
     case showReminder = 1
 }
 
+/// FSRS model generation a preset schedules with (JSChoreels/anki fork).
+/// The proto default (0) is FSRS-7; each version keeps its own parameter
+/// array on `DeckConfig.Config`.
+public enum FsrsVersion: Int, Sendable, Hashable, Codable, CaseIterable {
+    case seven = 0
+    case six = 1
+    case five = 2
+    case four = 3
+}
+
 /// Mirror for the top-level `Anki_DeckConfig_UpdateDeckConfigsMode`.
 public enum UpdateDeckConfigsMode: Int, Sendable, Hashable, Codable, CaseIterable {
     case normal = 0

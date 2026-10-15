@@ -7,6 +7,7 @@
 
 import AnkiBackend
 import AnkiProtoBridge
+import AnkiServices
 public import Dependencies
 
 extension StatsClient: DependencyKey {
@@ -15,7 +16,15 @@ extension StatsClient: DependencyKey {
 
         return Self(
             fetchGraphs: { search, days in
-                try await backendOffload { try backend.invoke(.graphs(search: search, days: days)) }
+                try await backendOffload {
+                    // RWKV presets' retrievability comes from RWKV, scored for
+                    // exactly this search. Like the desktop, graphs don't wait
+                    // for the model; they show FSRS values until it is ready.
+                    if RwkvEnvironment.modelPath != nil {
+                        _ = try? backend.invoke(Request<Void>.rwkvSearchScores(search: search, wait: false))
+                    }
+                    return try backend.invoke(.graphs(search: search, days: days))
+                }
             }
         )
     }()

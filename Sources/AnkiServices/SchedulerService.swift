@@ -36,28 +36,30 @@ public struct SchedulerService: Sendable {
 extension SchedulerService: DependencyKey {
     public static let liveValue: Self = {
         @Dependency(\.ankiBackend) var backend
-        let modelPath = Bundle.main.path(forResource: "RWKV_trained_on_5000_10000", ofType: "bin")
-        /// The persisted model state lives beside the collection it describes.
-        let cacheDir: @Sendable () -> String? = {
-            backend.currentCollectionPath.map {
-                URL(fileURLWithPath: $0)
-                    .deletingLastPathComponent()
-                    .appendingPathComponent("rwkv-state-cache", isDirectory: true)
-                    .path
-            }
-        }
+        let modelPath = RwkvEnvironment.modelPath
         let prepare: @Sendable () throws -> RwkvPrepareResult? = {
             guard let modelPath else { return nil }
-            return try backend.invoke(.rwkvPrepare(modelPath: modelPath, cacheDir: cacheDir()))
+            return try backend.invoke(.rwkvPrepare(
+                modelPath: modelPath,
+                cacheDir: RwkvEnvironment.cacheDir(backend),
+                precision: RwkvEnvironment.precision
+            ))
         }
         return Self(
             getQueuedCards: { fetchLimit in
-                let result = try backend.invoke(.getQueuedCards(fetchLimit: UInt32(max(0, fetchLimit))))
+                // The fork's synced "Show fuzz delta next to answer button
+                // intervals" (BoolKey SHOW_FUZZ_DELTA_ABOVE_ANSWER_BUTTONS).
+                let fuzzDeltaSetting: Bool? = try? backend.getConfigJSONValue(for: fuzzDeltaConfigKey)
+                let showFuzzDelta = fuzzDeltaSetting ?? false
+                let result = try backend.invoke(.getQueuedCards(
+                    fetchLimit: UInt32(max(0, fetchLimit)),
+                    showFuzzDelta: showFuzzDelta
+                ))
                 guard modelPath != nil, let head = result.cards.first else { return result }
                 // The head is the card about to be shown: give RWKV-Curve the
                 // chance to supply its states and button intervals. Like the
                 // desktop, a failed prediction leaves the upstream states.
-                let shown = (try? backend.invoke(.rwkvShownCard(head))) ?? head
+                let shown = (try? backend.invoke(.rwkvShownCard(head, showFuzzDelta: showFuzzDelta))) ?? head
                 return QueuedCardsResult(
                     cards: [shown] + result.cards.dropFirst(),
                     newCount: result.newCount,
@@ -96,6 +98,9 @@ extension SchedulerService: DependencyKey {
         )
     }()
 }
+
+/// Collection config key of the fork's fuzz-delta label setting.
+public let fuzzDeltaConfigKey = "showFuzzDeltaAboveAnswerButtons"
 
 extension SchedulerService: TestDependencyKey {
     public static let testValue = SchedulerService()

@@ -38,10 +38,29 @@ extension DeckConfigModel {
         values.map { String(format: "%.4f", $0) }.joined(separator: ", ")
     }
 
-    func currentWeights(from cfg: DeckConfig.Config) -> [Float] {
-        if !cfg.fsrsParams6.isEmpty { return cfg.fsrsParams6 }
-        if !cfg.fsrsParams5.isEmpty { return cfg.fsrsParams5 }
-        return cfg.fsrsParams4
+    /// Working params for `version`: edits parked by a scheduler switch,
+    /// else the loaded preset's stored array.
+    func fsrsParams(for version: FsrsVersion) -> [Float] {
+        parkedFsrsParams[version] ?? loaded?.config.config.fsrsParams(for: version) ?? []
+    }
+
+    /// Params of the active FSRS version as edited: the stored array while
+    /// the text field still shows it unchanged (so a save doesn't round it
+    /// to the displayed precision), else the parsed text. Empty means the
+    /// backend's defaults.
+    func activeFsrsParams() -> [Float] {
+        let stored = fsrsParams(for: schedulerSelection.fsrsVersion)
+        return fsrsWeightsText == formatWeights(stored) ? stored : parseFloats(fsrsWeightsText)
+    }
+
+    /// "FSRS-7 parameters" etc. for the active version.
+    var fsrsParamsLabel: String {
+        switch schedulerSelection.fsrsVersion {
+        case .seven: "FSRS-7 parameters"
+        case .six: "FSRS-6 parameters"
+        case .five: "FSRS-5 parameters"
+        case .four: "FSRS-4 parameters"
+        }
     }
 
     func effectiveParamSearch() -> String {

@@ -20,9 +20,11 @@ package extension DeckConfig.Config {
             fsrsParams4: proto.fsrsParams4,
             fsrsParams5: proto.fsrsParams5,
             fsrsParams6: proto.fsrsParams6,
+            fsrsParams7: proto.fsrsParams7,
             newPerDay: Int(proto.newPerDay),
             reviewsPerDay: Int(proto.reviewsPerDay),
             newPerDayMinimum: Int(proto.newPerDayMinimum),
+            sameDayReviewsIgnoreReviewLimit: proto.sameDayReviewsIgnoreReviewLimit,
             initialEase: proto.initialEase,
             easyMultiplier: proto.easyMultiplier,
             hardMultiplier: proto.hardMultiplier,
@@ -40,6 +42,7 @@ package extension DeckConfig.Config {
             interdayLearningMix: ReviewMix(proto.interdayLearningMix),
             leechAction: LeechAction(proto.leechAction),
             leechThreshold: Int(proto.leechThreshold),
+            leechOnlyIfYoung: proto.leechOnlyIfYoung,
             disableAutoplay: proto.disableAutoplay,
             capAnswerTimeToSecs: Int(proto.capAnswerTimeToSecs),
             showTimer: proto.showTimer,
@@ -58,6 +61,29 @@ package extension DeckConfig.Config {
             easyDaysPercentages: proto.easyDaysPercentages,
             historicalRetention: proto.historicalRetention,
             paramSearch: proto.paramSearch,
+            fsrsVersion: FsrsVersion(proto.fsrsVersion),
+            fsrsMinimumIntervalSecs: Int(proto.fsrsMinimumIntervalSecs),
+            fsrsDynamicDesiredRetentionEnabled: proto.fsrsDynamicDesiredRetentionEnabled,
+            fsrsDynamicDesiredRetentionClamp: proto.fsrsDynamicDesiredRetentionClamp,
+            fsrsDynamicDesiredRetention: FsrsDynamicDesiredRetention(
+                params: proto.fsrsDynamicDesiredRetentionParams,
+                weights: proto.fsrsDynamicDesiredRetentionWeights,
+                avgDrs: proto.fsrsDynamicDesiredRetentionAvgDrs,
+                minimum: proto.fsrsDynamicDesiredRetentionMin,
+                maximum: proto.fsrsDynamicDesiredRetentionMax,
+                fsrsEqWeights: proto.fsrsDynamicDesiredRetentionFsrsEqWeights,
+                fsrsEqDrs: proto.fsrsDynamicDesiredRetentionFsrsEqDrs,
+                fixedTargetWeights: proto.fsrsDynamicDesiredRetentionFixedTargetWeights,
+                fixedTargetDrs: proto.fsrsDynamicDesiredRetentionFixedTargetDrs
+            ),
+            rwkvReviewEnabled: proto.rwkvReviewEnabled,
+            rwkvReviewInstantOrderEnabled: proto.rwkvReviewInstantOrderEnabled,
+            rwkvReviewRefreshInterval: Int(proto.rwkvReviewRefreshInterval),
+            rwkvReviewCandidateRefreshEnabled: proto.rwkvReviewCandidateRefreshEnabled,
+            rwkvReviewMinInterveningReviews: Int(proto.rwkvReviewMinInterveningReviews),
+            rwkvReviewMinElapsedSecs: Int(proto.rwkvReviewMinElapsedSecs),
+            rwkvReviewEnforceGradeOrder: proto.rwkvReviewEnforceGradeOrder,
+            rwkvReviewMinimumReviewsPerDay: Int(proto.rwkvReviewMinimumReviewsPerDay),
             other: proto.other,
             unmirrored: (try? proto.serializedBytes() as Data) ?? Data()
         )
@@ -71,9 +97,11 @@ package extension DeckConfig.Config {
         proto.fsrsParams4 = fsrsParams4
         proto.fsrsParams5 = fsrsParams5
         proto.fsrsParams6 = fsrsParams6
+        proto.fsrsParams7 = fsrsParams7
         proto.newPerDay = UInt32(max(0, newPerDay))
         proto.reviewsPerDay = UInt32(max(0, reviewsPerDay))
         proto.newPerDayMinimum = UInt32(max(0, newPerDayMinimum))
+        proto.sameDayReviewsIgnoreReviewLimit = sameDayReviewsIgnoreReviewLimit
         proto.initialEase = initialEase
         proto.easyMultiplier = easyMultiplier
         proto.hardMultiplier = hardMultiplier
@@ -91,6 +119,7 @@ package extension DeckConfig.Config {
         proto.interdayLearningMix = .init(interdayLearningMix)
         proto.leechAction = .init(leechAction)
         proto.leechThreshold = UInt32(max(0, leechThreshold))
+        proto.leechOnlyIfYoung = leechOnlyIfYoung
         proto.disableAutoplay = disableAutoplay
         proto.capAnswerTimeToSecs = UInt32(max(0, capAnswerTimeToSecs))
         proto.showTimer = showTimer
@@ -109,6 +138,27 @@ package extension DeckConfig.Config {
         proto.easyDaysPercentages = easyDaysPercentages
         proto.historicalRetention = historicalRetention
         proto.paramSearch = paramSearch
+        proto.fsrsVersion = .init(fsrsVersion)
+        proto.fsrsMinimumIntervalSecs = UInt32(clamping: max(0, fsrsMinimumIntervalSecs))
+        proto.fsrsDynamicDesiredRetentionEnabled = fsrsDynamicDesiredRetentionEnabled
+        proto.fsrsDynamicDesiredRetentionClamp = fsrsDynamicDesiredRetentionClamp
+        proto.fsrsDynamicDesiredRetentionParams = fsrsDynamicDesiredRetention.params
+        proto.fsrsDynamicDesiredRetentionWeights = fsrsDynamicDesiredRetention.weights
+        proto.fsrsDynamicDesiredRetentionAvgDrs = fsrsDynamicDesiredRetention.avgDrs
+        proto.fsrsDynamicDesiredRetentionMin = fsrsDynamicDesiredRetention.minimum
+        proto.fsrsDynamicDesiredRetentionMax = fsrsDynamicDesiredRetention.maximum
+        proto.fsrsDynamicDesiredRetentionFsrsEqWeights = fsrsDynamicDesiredRetention.fsrsEqWeights
+        proto.fsrsDynamicDesiredRetentionFsrsEqDrs = fsrsDynamicDesiredRetention.fsrsEqDrs
+        proto.fsrsDynamicDesiredRetentionFixedTargetWeights = fsrsDynamicDesiredRetention.fixedTargetWeights
+        proto.fsrsDynamicDesiredRetentionFixedTargetDrs = fsrsDynamicDesiredRetention.fixedTargetDrs
+        proto.rwkvReviewEnabled = rwkvReviewEnabled
+        proto.rwkvReviewInstantOrderEnabled = rwkvReviewInstantOrderEnabled
+        proto.rwkvReviewRefreshInterval = UInt32(max(0, rwkvReviewRefreshInterval))
+        proto.rwkvReviewCandidateRefreshEnabled = rwkvReviewCandidateRefreshEnabled
+        proto.rwkvReviewMinInterveningReviews = UInt32(max(0, rwkvReviewMinInterveningReviews))
+        proto.rwkvReviewMinElapsedSecs = UInt32(max(0, rwkvReviewMinElapsedSecs))
+        proto.rwkvReviewEnforceGradeOrder = rwkvReviewEnforceGradeOrder
+        proto.rwkvReviewMinimumReviewsPerDay = UInt32(max(0, rwkvReviewMinimumReviewsPerDay))
         proto.other = other
         return proto
     }

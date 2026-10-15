@@ -18,6 +18,7 @@
 
 mod cache;
 pub mod inputs;
+mod views;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -56,9 +57,14 @@ pub const ANSWER_CARD: u32 = 103;
 pub const UNDO_ANSWER: u32 = 104;
 pub const INVALIDATE: u32 = 105;
 pub const SAVE: u32 = 106;
+pub const DECK_COUNTS: u32 = 107;
+pub const SEARCH_SCORES: u32 = 108;
+pub const FILTERED_DECK_SCORES: u32 = 109;
+pub const CARD_INFO: u32 = 110;
+pub const RESCHEDULE: u32 = 111;
 
 pub fn handles(method: u32) -> bool {
-    (PREPARE..=SAVE).contains(&method)
+    (PREPARE..=RESCHEDULE).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -76,7 +82,18 @@ const OVERLAY_KEY: &str = "fsrsPresetOverlay";
 const DYNAMIC_PRESET_REPLAY_KEY: &str = "rwkvDynamicPresetReplay";
 
 pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
-    let mut engines = engines().lock().unwrap_or_else(|e| e.into_inner());
+    // The deck list and graphs must not wait behind a history replay; like
+    // the desktop, they show due-date values until the model is ready.
+    let mut engines = match method {
+        DECK_COUNTS | SEARCH_SCORES => match engines().try_lock() {
+            Ok(engines) => engines,
+            Err(std::sync::TryLockError::Poisoned(e)) => e.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                return busy(backend, method, input);
+            }
+        },
+        _ => engines().lock().unwrap_or_else(|e| e.into_inner()),
+    };
     let engine = engines.entry(backend_key(backend)).or_default();
     let result = match method {
         PREPARE => call(input, |req| engine.prepare(backend, req)),
@@ -86,6 +103,11 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         UNDO_ANSWER => call(input, |_: Empty| engine.undo_answer(backend)),
         INVALIDATE => call(input, |_: Empty| engine.invalidate()),
         SAVE => call(input, |_: Empty| engine.save(backend)),
+        DECK_COUNTS => call(input, |_: Empty| engine.deck_counts(backend)),
+        SEARCH_SCORES => call(input, |req| engine.search_scores(backend, req)),
+        FILTERED_DECK_SCORES => call(input, |req| engine.filtered_deck_scores(backend, req)),
+        CARD_INFO => call(input, |req| engine.card_info(backend, req)),
+        RESCHEDULE => call(input, |req| engine.reschedule(backend, req)),
         other => Err(Error(format!("unknown rwkv method {other}"))),
     };
     result.map_err(|err| {
@@ -94,6 +116,26 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
             format!("rwkv: {}", err.0),
         )
     })
+}
+
+/// The engine is busy (a replay is running): answer without it.
+fn busy(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+    let to_bytes = |err: Error| {
+        crate::aux::error(
+            crate::aux::ErrorKind::InvalidInput,
+            format!("rwkv: {}", err.0),
+        )
+    };
+    match method {
+        DECK_COUNTS => call(input, |_: Empty| {
+            views::clear_deck_counts_without_engine(backend)
+        })
+        .map_err(to_bytes),
+        _ => call(input, |req: views::SearchScoresRequest| {
+            views::pending_search_scores(backend, &req.search)
+        })
+        .map_err(to_bytes),
+    }
 }
 
 /// Drops the engine of a backend that is being closed.

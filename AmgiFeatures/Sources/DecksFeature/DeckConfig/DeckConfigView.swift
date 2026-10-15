@@ -106,10 +106,30 @@ struct DeckConfigView: View {
             },
             onDelete: { model.destination = .alert(.deletePresetConfirm) }
         )
+        SchedulerSection(
+            fsrsEnabled: $model.fsrsEnabled,
+            scheduler: model.schedulerSelection.scheduler,
+            dueDateScheduler: model.schedulerSelection.dueDateScheduler,
+            onSelectScheduler: { model.selectScheduler($0) },
+            onSelectDueDateScheduler: { model.selectDueDateScheduler($0) }
+        )
+        if model.schedulerSelection.usesRwkv {
+            RwkvSection(
+                instantEnabled: model.schedulerSelection.rwkvReviewInstantOrderEnabled,
+                curveEnabled: model.schedulerSelection.rwkvReviewEnabled,
+                minimumReviewsPerDay: $model.rwkvMinimumReviewsPerDay,
+                candidateRefreshEnabled: $model.rwkvCandidateRefreshEnabled,
+                refreshInterval: $model.rwkvRefreshInterval,
+                minInterveningReviews: $model.rwkvMinInterveningReviews,
+                minElapsedSecs: $model.rwkvMinElapsedSecs,
+                enforceGradeOrder: $model.rwkvEnforceGradeOrder
+            )
+        }
         DailyLimitsSection(
             newCardsPerDay: $model.newCardsPerDay,
             reviewsPerDay: $model.reviewsPerDay,
             newCardsIgnoreReviewLimit: $model.newCardsIgnoreReviewLimit,
+            sameDayReviewsIgnoreReviewLimit: $model.sameDayReviewsIgnoreReviewLimit,
             applyAllParentLimits: $model.applyAllParentLimits
         )
         NewCardsSection(
@@ -120,7 +140,8 @@ struct DeckConfigView: View {
         LapsesSection(
             relearningStepsText: $model.relearningStepsText,
             leechThreshold: $model.leechThreshold,
-            leechAction: $model.leechAction
+            leechAction: $model.leechAction,
+            leechOnlyIfYoung: $model.leechOnlyIfYoung
         )
         OrderSection(
             newCardInsertOrder: $model.newCardInsertOrder,
@@ -128,7 +149,9 @@ struct DeckConfigView: View {
             newCardSortOrder: $model.newCardSortOrder,
             newMix: $model.newMix,
             reviewOrder: $model.reviewOrder,
-            interdayLearningMix: $model.interdayLearningMix
+            interdayLearningMix: $model.interdayLearningMix,
+            intradayLearningMix: $model.intradayLearningMix,
+            fsrsEnabled: model.fsrsEnabled
         )
         BurySection(
             buryNew: $model.buryNew,
@@ -155,11 +178,21 @@ struct DeckConfigView: View {
             waitForAudio: $model.waitForAudio
         )
         FsrsSection(
-            fsrsEnabled: $model.fsrsEnabled,
+            fsrsEnabled: model.fsrsEnabled,
+            fsrsVersion: model.schedulerSelection.fsrsVersion,
+            paramsLabel: model.fsrsParamsLabel,
+            defaultParamSearch: model.defaultParamSearch,
             desiredRetentionPercent: $model.desiredRetentionPercent,
             historicalRetentionPercent: $model.historicalRetentionPercent,
             fsrsHealthCheck: $model.fsrsHealthCheck,
+            fsrsMinimumIntervalSecs: $model.fsrsMinimumIntervalSecs,
             fsrsWeightsText: $model.fsrsWeightsText,
+            fsrsParamSearch: $model.fsrsParamSearch,
+            fsrsEvaluationSearch: $model.fsrsEvaluationSearch,
+            fsrs7IncludeSameDayReviews: $model.fsrs7IncludeSameDayReviews,
+            fsrs7SchedulingPenaltiesEnabled: $model.fsrs7SchedulingPenaltiesEnabled,
+            dynamicDesiredRetentionEnabled: $model.dynamicDesiredRetentionEnabled,
+            dynamicDesiredRetentionClamp: $model.dynamicDesiredRetentionClamp,
             isOptimizingFsrs: model.isOptimizingFsrs,
             onOptimizeCurrent: { Task { await model.optimizeCurrentPreset() } },
             onCancelOptimize: { model.cancelOptimize() },
@@ -171,6 +204,20 @@ struct DeckConfigView: View {
             fsrsEnabled: model.fsrsEnabled,
             easyDayPercentages: $model.easyDayPercentages
         )
+        if model.hasSchedulingSettings {
+            CollectionSchedulingSection(
+                fsrsEnabled: model.fsrsEnabled,
+                instantEnabled: model.schedulerSelection.rwkvReviewInstantOrderEnabled,
+                loadBalancerEnabled: $model.loadBalancerEnabled,
+                fsrsShortTermWithStepsEnabled: $model.fsrsShortTermWithStepsEnabled,
+                fsrsLearningQueuesDisabled: $model.fsrsLearningQueuesDisabled,
+                reviewFuzzEnabled: $model.reviewFuzzEnabled,
+                reviewFuzzBase: $model.reviewFuzzBase,
+                reviewFuzzFactorShort: $model.reviewFuzzFactorShort,
+                reviewFuzzFactorMid: $model.reviewFuzzFactorMid,
+                reviewFuzzFactorLong: $model.reviewFuzzFactorLong
+            )
+        }
         ApplySection(applyToChildren: $model.applyToChildren)
     }
 

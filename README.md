@@ -22,8 +22,16 @@
 >   machine, and undo. The weights are bundled from the submodule. A parity
 >   test checks that live answers leave the model exactly where a fresh replay
 >   of the resulting history does.
-> - Not yet ported: RWKV deck-list counts (the deck list shows due-date
->   counts), stats/card-info RWKV values, and the Curve reschedule action.
+> - Also ported: RWKV-Instant deck-list counts, RWKV retrievability in the
+>   graphs and in `prop:rwkv:r` / `is:rwkv:due` searches and filtered decks,
+>   RWKV Card Info (review screen menu), "Reschedule with RWKV-Curve" (deck
+>   menu, and all decks in Settings → Review), and the RWKV state precision.
+> - Deck options expose the fork's settings: the Review scheduler / Fallback
+>   choice (FSRS-6/7, RWKV-Curve, RWKV-Instant), the active FSRS version's
+>   parameters (FSRS-7 by default) and its optimizer options, Dynamic DR,
+>   minimum interval, RWKV queue and same-day-repeat options, leech "only if
+>   young", same-day reviews vs the review limit, intraday learning order, and
+>   the collection-wide load balancer, review fuzz and same-day step options.
 > - `scripts/sync-dispatch-constants.py` regenerates the backend RPC indices
 >   after a submodule bump; CI runs it automatically.
 > - Deck option saves keep fork-only preset fields and collection-wide

@@ -38,6 +38,7 @@ final class DeckConfigModel {
     var reviewsPerDay: Int32 = 200
     var newCardsIgnoreReviewLimit = false
     var applyAllParentLimits = false
+    var sameDayReviewsIgnoreReviewLimit = false
 
     var learningStepsText: String = "1m 10m"
     var graduatingGoodDays: Int32 = 1
@@ -46,6 +47,10 @@ final class DeckConfigModel {
     var relearningStepsText: String = "10m"
     var leechThreshold: Int32 = 8
     var leechAction: LeechAction = .suspend
+    var leechOnlyIfYoung = false
+
+    // Scheduler — the preset's FSRS version / RWKV-Curve / RWKV-Instant.
+    var schedulerSelection = SchedulerSelection()
 
     var fsrsEnabled = false
     var desiredRetentionPercent: Double = 90
@@ -53,8 +58,37 @@ final class DeckConfigModel {
     var fsrsHealthCheck = false
     var fsrsWeightsText: String = ""
     var fsrsParamSearch: String = ""
+    var fsrsEvaluationSearch: String = ""
+    /// Params of FSRS versions switched away from in this session, keyed by
+    /// version; `fsrsWeightsText` always edits the active version.
+    var parkedFsrsParams: [FsrsVersion: [Float]] = [:]
+    var fsrsMinimumIntervalSecs: Int = 1
+    var fsrs7IncludeSameDayReviews = true
+    var fsrs7SchedulingPenaltiesEnabled = false
+    var dynamicDesiredRetentionEnabled = false
+    var dynamicDesiredRetentionClamp = false
+    /// ADR model from the last optimization; written on save.
+    var optimizedDynamicDesiredRetention: FsrsDynamicDesiredRetention?
     var isOptimizingFsrs = false
     @ObservationIgnored var optimizeGeneration = 0
+
+    // RWKV
+    var rwkvMinimumReviewsPerDay: Int32 = 0
+    var rwkvCandidateRefreshEnabled = false
+    var rwkvRefreshInterval: Int32 = 1
+    var rwkvMinInterveningReviews: Int32 = 5
+    var rwkvMinElapsedSecs: Int32 = 30
+    var rwkvEnforceGradeOrder = true
+
+    // Collection-wide scheduling (all presets)
+    var loadBalancerEnabled = false
+    var fsrsShortTermWithStepsEnabled = true
+    var fsrsLearningQueuesDisabled = false
+    var reviewFuzzEnabled = true
+    var reviewFuzzBase: Double = 1
+    var reviewFuzzFactorShort: Double = 0.15
+    var reviewFuzzFactorMid: Double = 0.1
+    var reviewFuzzFactorLong: Double = 0.05
 
     var applyToChildren = false
 
@@ -76,6 +110,7 @@ final class DeckConfigModel {
     var newMix: ReviewMix = .mixWithReviews
     var reviewOrder: ReviewCardOrder = .day
     var interdayLearningMix: ReviewMix = .mixWithReviews
+    var intradayLearningMix: ReviewMix = .mixWithReviews
 
     // Timer
     var showTimer = false
@@ -152,6 +187,24 @@ final class DeckConfigModel {
         loaded.flatMap { l in l.context.allConfig.first(where: { $0.config.id == l.config.id })?.useCount } ?? 0
     }
 
+    /// Whether the backend reported the collection-wide scheduling settings;
+    /// without them there is nothing safe to edit.
+    var hasSchedulingSettings: Bool { loaded?.context.schedulingSettings != nil }
+
+    var editedSchedulingSettings: CollectionSchedulingSettings? {
+        guard hasSchedulingSettings else { return nil }
+        return CollectionSchedulingSettings(
+            loadBalancerEnabled: loadBalancerEnabled,
+            fsrsShortTermWithStepsEnabled: fsrsShortTermWithStepsEnabled,
+            fsrsLearningQueuesDisabled: fsrsLearningQueuesDisabled,
+            reviewFuzzEnabled: reviewFuzzEnabled,
+            reviewFuzzBase: Float(reviewFuzzBase),
+            reviewFuzzFactorShort: Float(reviewFuzzFactorShort),
+            reviewFuzzFactorMid: Float(reviewFuzzFactorMid),
+            reviewFuzzFactorLong: Float(reviewFuzzFactorLong)
+        )
+    }
+
     var defaultParamSearch: String {
         let escaped = (loaded?.config.name ?? deckName)
             .replacingOccurrences(of: "\"", with: "\\\"")
@@ -185,11 +238,24 @@ final class DeckConfigModel {
         graduatingEasyDays = Int32(cfg.graduatingIntervalEasy)
         leechThreshold = Int32(max(1, cfg.leechThreshold))
         leechAction = cfg.leechAction
+        leechOnlyIfYoung = cfg.leechOnlyIfYoung
+        sameDayReviewsIgnoreReviewLimit = cfg.sameDayReviewsIgnoreReviewLimit
+        schedulerSelection = cfg.schedulerSelection
 
         newCardsIgnoreReviewLimit = context.newCardsIgnoreReviewLimit
         applyAllParentLimits = context.applyAllParentLimits
         fsrsHealthCheck = context.fsrsHealthCheck
         fsrsEnabled = context.fsrs
+        if let settings = context.schedulingSettings {
+            loadBalancerEnabled = settings.loadBalancerEnabled
+            fsrsShortTermWithStepsEnabled = settings.fsrsShortTermWithStepsEnabled
+            fsrsLearningQueuesDisabled = settings.fsrsLearningQueuesDisabled
+            reviewFuzzEnabled = settings.reviewFuzzEnabled
+            reviewFuzzBase = Double(settings.reviewFuzzBase)
+            reviewFuzzFactorShort = Double(settings.reviewFuzzFactorShort)
+            reviewFuzzFactorMid = Double(settings.reviewFuzzFactorMid)
+            reviewFuzzFactorLong = Double(settings.reviewFuzzFactorLong)
+        }
 
         if let override = context.currentDeck?.limits?.desiredRetention {
             desiredRetentionPercent = Double(override * 100)
@@ -198,8 +264,24 @@ final class DeckConfigModel {
         }
         historicalRetentionPercent = cfg.historicalRetention > 0 ? Double(cfg.historicalRetention * 100) : 90
 
-        fsrsWeightsText = formatWeights(currentWeights(from: cfg))
+        parkedFsrsParams = [:]
+        optimizedDynamicDesiredRetention = nil
+        fsrsWeightsText = formatWeights(cfg.activeFsrsParams)
         fsrsParamSearch = cfg.paramSearch
+        fsrsEvaluationSearch = cfg.fsrsEvaluationSearch
+        fsrsMinimumIntervalSecs = min(Self.maximumIntervalSecs, max(1, cfg.fsrsMinimumIntervalSecs))
+        fsrs7IncludeSameDayReviews = cfg.fsrs7IncludeSameDayReviews
+        fsrs7SchedulingPenaltiesEnabled = cfg.fsrs7SchedulingPenaltiesEnabled
+        dynamicDesiredRetentionEnabled = cfg.fsrsDynamicDesiredRetentionEnabled
+        dynamicDesiredRetentionClamp = cfg.fsrsDynamicDesiredRetentionClamp
+
+        // Clamped to the ranges the backend enforces on save.
+        rwkvMinimumReviewsPerDay = Int32(min(9999, max(0, cfg.rwkvReviewMinimumReviewsPerDay)))
+        rwkvCandidateRefreshEnabled = cfg.rwkvReviewCandidateRefreshEnabled
+        rwkvRefreshInterval = Int32(min(10_000, max(1, cfg.rwkvReviewRefreshInterval)))
+        rwkvMinInterveningReviews = Int32(min(10_000, max(0, cfg.rwkvReviewMinInterveningReviews)))
+        rwkvMinElapsedSecs = Int32(min(86_400, max(0, cfg.rwkvReviewMinElapsedSecs)))
+        rwkvEnforceGradeOrder = cfg.rwkvReviewEnforceGradeOrder
 
         buryNew = cfg.buryNew
         buryReviews = cfg.buryReviews
@@ -211,6 +293,7 @@ final class DeckConfigModel {
         newMix = cfg.newMix
         reviewOrder = cfg.reviewOrder
         interdayLearningMix = cfg.interdayLearningMix
+        intradayLearningMix = cfg.intradayLearningMix
 
         showTimer = cfg.showTimer
         capAnswerTimeToSecs = Int32(max(5, cfg.capAnswerTimeToSecs))
@@ -244,6 +327,7 @@ final class DeckConfigModel {
             || applyAllParentLimits != loaded.context.applyAllParentLimits
             || fsrsHealthCheck != loaded.context.fsrsHealthCheck
             || fsrsEnabled != loaded.context.fsrs
+            || editedSchedulingSettings != loaded.context.schedulingSettings
     }
 
     func editedConfig(from base: DeckConfig) -> DeckConfig {
@@ -257,9 +341,35 @@ final class DeckConfigModel {
         cfg.graduatingIntervalEasy = Int(max(0, graduatingEasyDays))
         cfg.leechThreshold = Int(max(1, leechThreshold))
         cfg.leechAction = leechAction
+        cfg.leechOnlyIfYoung = leechOnlyIfYoung
+        cfg.sameDayReviewsIgnoreReviewLimit = sameDayReviewsIgnoreReviewLimit
         cfg.desiredRetention = Float(desiredRetentionPercent / 100)
         cfg.historicalRetention = Float(historicalRetentionPercent / 100)
         cfg.paramSearch = fsrsParamSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        cfg.fsrsEvaluationSearch = fsrsEvaluationSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        cfg.schedulerSelection = schedulerSelection
+        // Only the edited arrays are written; the fork treats an empty array
+        // as "use defaults", so the other versions' params are left alone.
+        for (version, params) in parkedFsrsParams {
+            cfg.setFsrsParams(params, for: version)
+        }
+        cfg.setFsrsParams(activeFsrsParams(), for: schedulerSelection.fsrsVersion)
+        cfg.fsrsMinimumIntervalSecs = min(Self.maximumIntervalSecs, max(1, fsrsMinimumIntervalSecs))
+        cfg.fsrs7IncludeSameDayReviews = fsrs7IncludeSameDayReviews
+        cfg.fsrs7SchedulingPenaltiesEnabled = fsrs7SchedulingPenaltiesEnabled
+        cfg.fsrsDynamicDesiredRetentionEnabled = dynamicDesiredRetentionEnabled
+        cfg.fsrsDynamicDesiredRetentionClamp = dynamicDesiredRetentionClamp
+        if let optimizedDynamicDesiredRetention {
+            cfg.fsrsDynamicDesiredRetention = optimizedDynamicDesiredRetention
+        }
+
+        cfg.rwkvReviewMinimumReviewsPerDay = Int(rwkvMinimumReviewsPerDay)
+        cfg.rwkvReviewCandidateRefreshEnabled = rwkvCandidateRefreshEnabled
+        cfg.rwkvReviewRefreshInterval = Int(max(1, rwkvRefreshInterval))
+        cfg.rwkvReviewMinInterveningReviews = Int(max(0, rwkvMinInterveningReviews))
+        cfg.rwkvReviewMinElapsedSecs = Int(max(0, rwkvMinElapsedSecs))
+        cfg.rwkvReviewEnforceGradeOrder = rwkvEnforceGradeOrder
 
         cfg.buryNew = buryNew
         cfg.buryReviews = buryReviews
@@ -271,6 +381,7 @@ final class DeckConfigModel {
         cfg.newMix = newMix
         cfg.reviewOrder = reviewOrder
         cfg.interdayLearningMix = interdayLearningMix
+        cfg.intradayLearningMix = intradayLearningMix
 
         cfg.showTimer = showTimer
         cfg.capAnswerTimeToSecs = Int(max(5, capAnswerTimeToSecs))
@@ -290,21 +401,6 @@ final class DeckConfigModel {
 
         cfg.easyDaysPercentages = easyDayPercentages.map { Float(max(50, min(150, $0)) / 100) }
 
-        if fsrsEnabled {
-            let parsed = parseFloats(fsrsWeightsText)
-            if !parsed.isEmpty {
-                // Newer FSRS revisions write to params6; clear the older slots
-                // so the backend uses the current generation.
-                cfg.fsrsParams6 = parsed
-                cfg.fsrsParams5 = []
-                cfg.fsrsParams4 = []
-            }
-        } else {
-            cfg.fsrsParams6 = []
-            cfg.fsrsParams5 = []
-            cfg.fsrsParams4 = []
-        }
-
         updated.config = cfg
         return updated
     }
@@ -322,7 +418,8 @@ final class DeckConfigModel {
                 fsrsEnabled,
                 newCardsIgnoreReviewLimit,
                 applyAllParentLimits,
-                fsrsHealthCheck
+                fsrsHealthCheck,
+                editedSchedulingSettings
             )
             return true
         } catch {
@@ -331,11 +428,38 @@ final class DeckConfigModel {
         }
     }
 
+    // MARK: - Scheduler
+
+    /// Longest FSRS minimum interval the backend accepts (36500 days).
+    static let maximumIntervalSecs = 36_500 * 86_400
+
+    func selectScheduler(_ choice: SchedulerChoice) {
+        updateSchedulerSelection(schedulerSelection.withScheduler(choice))
+    }
+
+    func selectDueDateScheduler(_ choice: SchedulerChoice) {
+        updateSchedulerSelection(schedulerSelection.withDueDateScheduler(choice))
+    }
+
+    private func updateSchedulerSelection(_ updated: SchedulerSelection) {
+        let previous = schedulerSelection.fsrsVersion
+        if updated.fsrsVersion != previous {
+            // Park the edited params of the old version and show the new
+            // version's; each version keeps its own array.
+            parkedFsrsParams[previous] = activeFsrsParams()
+            fsrsWeightsText = formatWeights(fsrsParams(for: updated.fsrsVersion))
+        }
+        schedulerSelection = updated
+        // Picking a model enables machine-learning scheduling, as on desktop.
+        fsrsEnabled = true
+    }
+
     // MARK: - Helpers
 
     func fallbackContext(from config: DeckConfig) -> DeckConfigsForUpdate {
         let cfg = config.config
-        let fsrsBacked = !cfg.fsrsParams6.isEmpty || !cfg.fsrsParams5.isEmpty || !cfg.fsrsParams4.isEmpty
+        let fsrsBacked = !cfg.fsrsParams7.isEmpty || !cfg.fsrsParams6.isEmpty
+            || !cfg.fsrsParams5.isEmpty || !cfg.fsrsParams4.isEmpty
         return DeckConfigsForUpdate(
             allConfig: [DeckConfigsForUpdate.ConfigWithExtra(config: config, useCount: 0)],
             currentDeck: DeckConfigsForUpdate.CurrentDeck(name: deckName, configID: config.id),

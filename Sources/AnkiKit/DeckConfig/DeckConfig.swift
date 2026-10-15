@@ -39,12 +39,16 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
         public var fsrsParams4: [Float]
         public var fsrsParams5: [Float]
         public var fsrsParams6: [Float]
+        /// FSRS-7 parameters (fork); empty means the backend's defaults.
+        public var fsrsParams7: [Float]
 
         // MARK: Daily limits
         public var newPerDay: Int
         public var reviewsPerDay: Int
         /// Currently unused upstream; preserved for round-trip safety.
         public var newPerDayMinimum: Int
+        /// Cards already answered today can repeat past the review limit.
+        public var sameDayReviewsIgnoreReviewLimit: Bool
 
         // MARK: Multipliers + intervals
         public var initialEase: Float
@@ -68,6 +72,9 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
         // MARK: Leeches
         public var leechAction: LeechAction
         public var leechThreshold: Int
+        /// Only count a lapse toward the leech threshold when `Again` makes
+        /// the card young again.
+        public var leechOnlyIfYoung: Bool
 
         // MARK: Audio + timer
         public var disableAutoplay: Bool
@@ -93,14 +100,38 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
         public var historicalRetention: Float
         public var paramSearch: String
 
-        /// Opaque add-on/JSON blob the backend round-trips. Passed
-        /// through unchanged.
+        // MARK: FSRS (JSChoreels/anki fork)
+        /// Which FSRS generation schedules this preset; selects the params
+        /// array the backend reads.
+        public var fsrsVersion: FsrsVersion
+        /// Floor for FSRS same-day (re)learning intervals, in seconds.
+        public var fsrsMinimumIntervalSecs: Int
+        /// FSRS-7 Dynamic Desired Retention (ADR).
+        public var fsrsDynamicDesiredRetentionEnabled: Bool
+        public var fsrsDynamicDesiredRetentionClamp: Bool
+        /// The ADR model the optimizer fitted; not user-editable.
+        public var fsrsDynamicDesiredRetention: FsrsDynamicDesiredRetention
+
+        // MARK: RWKV (JSChoreels/anki fork)
+        /// RWKV-Curve computes the answer intervals.
+        public var rwkvReviewEnabled: Bool
+        /// RWKV-Instant picks which reviews are due by predicted recall.
+        public var rwkvReviewInstantOrderEnabled: Bool
+        public var rwkvReviewRefreshInterval: Int
+        public var rwkvReviewCandidateRefreshEnabled: Bool
+        public var rwkvReviewMinInterveningReviews: Int
+        public var rwkvReviewMinElapsedSecs: Int
+        public var rwkvReviewEnforceGradeOrder: Bool
+        public var rwkvReviewMinimumReviewsPerDay: Int
+
+        /// Add-on/JSON object the backend round-trips. Only the fork keys
+        /// in `DeckConfig+AuxData.swift` are edited; the rest pass through.
         public var other: Data
 
         /// The serialized `Anki_DeckConfig_DeckConfig.Config` this mirror was
         /// read from. `toProto()` starts from it, so preset fields the mirror
-        /// doesn't name (e.g. FSRS-7 params and RWKV settings added by the
-        /// JSChoreels/anki fork) survive a save instead of being reset.
+        /// doesn't name (e.g. RWKV batch size and the review-fuzz fields added
+        /// by the JSChoreels/anki fork) survive a save instead of being reset.
         public var unmirrored: Data
 
         public init(
@@ -109,9 +140,11 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             fsrsParams4: [Float] = [],
             fsrsParams5: [Float] = [],
             fsrsParams6: [Float] = [],
+            fsrsParams7: [Float] = [],
             newPerDay: Int = 0,
             reviewsPerDay: Int = 0,
             newPerDayMinimum: Int = 0,
+            sameDayReviewsIgnoreReviewLimit: Bool = false,
             initialEase: Float = 0,
             easyMultiplier: Float = 0,
             hardMultiplier: Float = 0,
@@ -129,6 +162,7 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             interdayLearningMix: ReviewMix = .mixWithReviews,
             leechAction: LeechAction = .suspend,
             leechThreshold: Int = 0,
+            leechOnlyIfYoung: Bool = false,
             disableAutoplay: Bool = false,
             capAnswerTimeToSecs: Int = 0,
             showTimer: Bool = false,
@@ -147,6 +181,19 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             easyDaysPercentages: [Float] = [],
             historicalRetention: Float = 0,
             paramSearch: String = "",
+            fsrsVersion: FsrsVersion = .seven,
+            fsrsMinimumIntervalSecs: Int = 0,
+            fsrsDynamicDesiredRetentionEnabled: Bool = false,
+            fsrsDynamicDesiredRetentionClamp: Bool = false,
+            fsrsDynamicDesiredRetention: FsrsDynamicDesiredRetention = FsrsDynamicDesiredRetention(),
+            rwkvReviewEnabled: Bool = false,
+            rwkvReviewInstantOrderEnabled: Bool = false,
+            rwkvReviewRefreshInterval: Int = 0,
+            rwkvReviewCandidateRefreshEnabled: Bool = false,
+            rwkvReviewMinInterveningReviews: Int = 0,
+            rwkvReviewMinElapsedSecs: Int = 0,
+            rwkvReviewEnforceGradeOrder: Bool = false,
+            rwkvReviewMinimumReviewsPerDay: Int = 0,
             other: Data = Data(),
             unmirrored: Data = Data()
         ) {
@@ -155,9 +202,11 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             self.fsrsParams4 = fsrsParams4
             self.fsrsParams5 = fsrsParams5
             self.fsrsParams6 = fsrsParams6
+            self.fsrsParams7 = fsrsParams7
             self.newPerDay = newPerDay
             self.reviewsPerDay = reviewsPerDay
             self.newPerDayMinimum = newPerDayMinimum
+            self.sameDayReviewsIgnoreReviewLimit = sameDayReviewsIgnoreReviewLimit
             self.initialEase = initialEase
             self.easyMultiplier = easyMultiplier
             self.hardMultiplier = hardMultiplier
@@ -175,6 +224,7 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             self.interdayLearningMix = interdayLearningMix
             self.leechAction = leechAction
             self.leechThreshold = leechThreshold
+            self.leechOnlyIfYoung = leechOnlyIfYoung
             self.disableAutoplay = disableAutoplay
             self.capAnswerTimeToSecs = capAnswerTimeToSecs
             self.showTimer = showTimer
@@ -193,6 +243,19 @@ public struct DeckConfig: Sendable, Hashable, Identifiable {
             self.easyDaysPercentages = easyDaysPercentages
             self.historicalRetention = historicalRetention
             self.paramSearch = paramSearch
+            self.fsrsVersion = fsrsVersion
+            self.fsrsMinimumIntervalSecs = fsrsMinimumIntervalSecs
+            self.fsrsDynamicDesiredRetentionEnabled = fsrsDynamicDesiredRetentionEnabled
+            self.fsrsDynamicDesiredRetentionClamp = fsrsDynamicDesiredRetentionClamp
+            self.fsrsDynamicDesiredRetention = fsrsDynamicDesiredRetention
+            self.rwkvReviewEnabled = rwkvReviewEnabled
+            self.rwkvReviewInstantOrderEnabled = rwkvReviewInstantOrderEnabled
+            self.rwkvReviewRefreshInterval = rwkvReviewRefreshInterval
+            self.rwkvReviewCandidateRefreshEnabled = rwkvReviewCandidateRefreshEnabled
+            self.rwkvReviewMinInterveningReviews = rwkvReviewMinInterveningReviews
+            self.rwkvReviewMinElapsedSecs = rwkvReviewMinElapsedSecs
+            self.rwkvReviewEnforceGradeOrder = rwkvReviewEnforceGradeOrder
+            self.rwkvReviewMinimumReviewsPerDay = rwkvReviewMinimumReviewsPerDay
             self.other = other
             self.unmirrored = unmirrored
         }

@@ -10,6 +10,7 @@ import AnkiProtoBridge
 public import AnkiKit
 public import Dependencies
 import DependenciesMacros
+import Foundation
 
 @DependencyClient
 public struct NotesService: Sendable {
@@ -30,7 +31,12 @@ extension NotesService: DependencyKey {
                 try backend.invoke(.getNote(id: noteId))
             },
             searchNoteIds: { query in
-                try backend.invoke(.searchNoteIds(query: query))
+                // `prop:rwkv:r<…` and `is:rwkv:due` match on RWKV scores
+                // prepared for exactly this search.
+                if RwkvEnvironment.modelPath != nil, query.localizedCaseInsensitiveContains("rwkv") {
+                    _ = try? backend.invoke(Request<Void>.rwkvSearchScores(search: query, wait: true))
+                }
+                return try backend.invoke(.searchNoteIds(query: query))
             },
             saveNote: { note in
                 try backend.invoke(.updateNote(note))

@@ -91,6 +91,7 @@ struct DailyLimitsSection: View {
     @Binding var newCardsPerDay: Int32
     @Binding var reviewsPerDay: Int32
     @Binding var newCardsIgnoreReviewLimit: Bool
+    @Binding var sameDayReviewsIgnoreReviewLimit: Bool
     @Binding var applyAllParentLimits: Bool
 
     var body: some View {
@@ -98,6 +99,7 @@ struct DailyLimitsSection: View {
             Stepper("New cards/day: \(newCardsPerDay)", value: $newCardsPerDay, in: 0...9999)
             Stepper("Reviews/day: \(reviewsPerDay)", value: $reviewsPerDay, in: 0...9999)
             Toggle("New cards ignore review limit", isOn: $newCardsIgnoreReviewLimit)
+            Toggle("Same-day reviews ignore review limit", isOn: $sameDayReviewsIgnoreReviewLimit)
             Toggle("Apply all parent limits", isOn: $applyAllParentLimits)
         }
     }
@@ -127,6 +129,7 @@ struct LapsesSection: View {
     @Binding var relearningStepsText: String
     @Binding var leechThreshold: Int32
     @Binding var leechAction: LeechAction
+    @Binding var leechOnlyIfYoung: Bool
 
     var body: some View {
         Section("Lapses") {
@@ -142,6 +145,9 @@ struct LapsesSection: View {
                 Text("Suspend card").tag(LeechAction.suspend)
                 Text("Tag only").tag(LeechAction.tagOnly)
             }
+            if leechAction == .suspend {
+                Toggle("Only mark if young again", isOn: $leechOnlyIfYoung)
+            }
         }
     }
 }
@@ -153,6 +159,9 @@ struct OrderSection: View {
     @Binding var newMix: ReviewMix
     @Binding var reviewOrder: ReviewCardOrder
     @Binding var interdayLearningMix: ReviewMix
+    @Binding var intradayLearningMix: ReviewMix
+    /// FSRS relabels the ease orders as difficulty orders.
+    let fsrsEnabled: Bool
 
     var body: some View {
         Section("Order") {
@@ -188,15 +197,34 @@ struct OrderSection: View {
                 Text("Deck, then day").tag(ReviewCardOrder.deckThenDay)
                 Text("Intervals — ascending").tag(ReviewCardOrder.intervalsAscending)
                 Text("Intervals — descending").tag(ReviewCardOrder.intervalsDescending)
+                Text(easeAscendingLabel).tag(ReviewCardOrder.easeAscending)
+                Text(easeDescendingLabel).tag(ReviewCardOrder.easeDescending)
+                Text("Retrievability — ascending").tag(ReviewCardOrder.retrievabilityAscending)
                 Text("Retrievability — descending").tag(ReviewCardOrder.retrievabilityDescending)
+                Text("Relative overdueness").tag(ReviewCardOrder.relativeOverdueness)
                 Text("Random").tag(ReviewCardOrder.random)
+                Text("Order added").tag(ReviewCardOrder.added)
+                Text("Latest added first").tag(ReviewCardOrder.reverseAdded)
             }
             Picker("Interday learning mix", selection: $interdayLearningMix) {
                 Text("Mix with reviews").tag(ReviewMix.mixWithReviews)
                 Text("After reviews").tag(ReviewMix.afterReviews)
                 Text("Before reviews").tag(ReviewMix.beforeReviews)
             }
+            Picker("Intraday learning/review order", selection: $intradayLearningMix) {
+                Text("Mix with reviews").tag(ReviewMix.mixWithReviews)
+                Text("After reviews").tag(ReviewMix.afterReviews)
+                Text("Before reviews").tag(ReviewMix.beforeReviews)
+            }
         }
+    }
+
+    private var easeAscendingLabel: String {
+        fsrsEnabled ? "Difficult cards first" : "Ease — ascending"
+    }
+
+    private var easeDescendingLabel: String {
+        fsrsEnabled ? "Easy cards first" : "Ease — descending"
     }
 }
 
@@ -303,12 +331,117 @@ struct AdvancedSection: View {
     }
 }
 
-struct FsrsSection: View {
+struct SchedulerSection: View {
     @Binding var fsrsEnabled: Bool
+    let scheduler: SchedulerChoice
+    let dueDateScheduler: SchedulerChoice
+    let onSelectScheduler: (SchedulerChoice) -> Void
+    let onSelectDueDateScheduler: (SchedulerChoice) -> Void
+
+    var body: some View {
+        Section {
+            Toggle("Machine Learning Based scheduling", isOn: $fsrsEnabled)
+            Picker("Review scheduler", selection: Binding(
+                get: { scheduler },
+                set: { onSelectScheduler($0) }
+            )) {
+                ForEach(Self.choices(SchedulerChoice.reviewChoices, showing: scheduler), id: \.self) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            }
+            if scheduler == .rwkvInstant {
+                Picker("Fallback: Due-Date Calculator", selection: Binding(
+                    get: { dueDateScheduler },
+                    set: { onSelectDueDateScheduler($0) }
+                )) {
+                    ForEach(Self.choices(SchedulerChoice.dueDateChoices, showing: dueDateScheduler), id: \.self) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+            }
+        } header: {
+            Text("Scheduler")
+        } footer: {
+            Text(footerText)
+        }
+    }
+
+    private var footerText: String {
+        let models = "RWKV runs on this device. RWKV-Curve computes answer intervals; "
+            + "RWKV-Instant picks which reviews are due by predicted recall, while its "
+            + "fallback writes due dates for sync and statistics. "
+            + "Machine Learning Based scheduling applies to all presets."
+        guard fsrsEnabled else {
+            return "Machine learning scheduling is disabled for this collection. "
+                + "Selecting a model enables it; RWKV settings remain independent. " + models
+        }
+        return models
+    }
+
+    /// Legacy FSRS-4/5 presets keep showing their current value.
+    private static func choices(_ base: [SchedulerChoice], showing current: SchedulerChoice) -> [SchedulerChoice] {
+        base.contains(current) ? base : [current] + base
+    }
+}
+
+struct RwkvSection: View {
+    let instantEnabled: Bool
+    let curveEnabled: Bool
+    @Binding var minimumReviewsPerDay: Int32
+    @Binding var candidateRefreshEnabled: Bool
+    @Binding var refreshInterval: Int32
+    @Binding var minInterveningReviews: Int32
+    @Binding var minElapsedSecs: Int32
+    @Binding var enforceGradeOrder: Bool
+
+    var body: some View {
+        if instantEnabled {
+            Section {
+                Stepper("Minimum reviews per day: \(minimumReviewsPerDay)", value: $minimumReviewsPerDay, in: 0...9999)
+                Toggle("Use faster, approximate queue updates", isOn: $candidateRefreshEnabled)
+                Stepper("Update the RWKV queue every \(refreshInterval) answers", value: $refreshInterval, in: 1...10_000)
+            } header: {
+                Text("RWKV-Instant")
+            } footer: {
+                Text("Instant picks review cards by predicted recall, ignoring scheduled due dates. RWKV runs on this device; setting a daily review limit is recommended.")
+            }
+            Section {
+                Stepper("Minimum reviews between repeats: \(minInterveningReviews)", value: $minInterveningReviews, in: 0...10_000)
+                Stepper("Minimum seconds between repeats: \(minElapsedSecs)", value: $minElapsedSecs, in: 0...86_400, step: 5)
+            } header: {
+                Text("Same-day repeats")
+            } footer: {
+                Text("Both minimums must be met before RWKV repeats a card. Set either to 0 to remove it.")
+            }
+        }
+        if curveEnabled {
+            Section {
+                Toggle("Enforce Again ≤ Hard ≤ Good ≤ Easy intervals", isOn: $enforceGradeOrder)
+            } header: {
+                Text("RWKV-Curve")
+            } footer: {
+                Text("Curve replaces FSRS answer intervals with RWKV ones, computed on this device.")
+            }
+        }
+    }
+}
+
+struct FsrsSection: View {
+    let fsrsEnabled: Bool
+    let fsrsVersion: FsrsVersion
+    let paramsLabel: String
+    let defaultParamSearch: String
     @Binding var desiredRetentionPercent: Double
     @Binding var historicalRetentionPercent: Double
     @Binding var fsrsHealthCheck: Bool
+    @Binding var fsrsMinimumIntervalSecs: Int
     @Binding var fsrsWeightsText: String
+    @Binding var fsrsParamSearch: String
+    @Binding var fsrsEvaluationSearch: String
+    @Binding var fsrs7IncludeSameDayReviews: Bool
+    @Binding var fsrs7SchedulingPenaltiesEnabled: Bool
+    @Binding var dynamicDesiredRetentionEnabled: Bool
+    @Binding var dynamicDesiredRetentionClamp: Bool
     let isOptimizingFsrs: Bool
     let onOptimizeCurrent: () -> Void
     let onCancelOptimize: () -> Void
@@ -316,13 +449,14 @@ struct FsrsSection: View {
     let onOpenSimulatorWorkload: () -> Void
     let onOptimizeAll: () -> Void
 
+    @Environment(\.palette) private var palette
+
     var body: some View {
         Section("FSRS") {
-            Toggle("Enable FSRS", isOn: $fsrsEnabled)
             LabeledSlider(
                 label: "Desired retention",
                 value: $desiredRetentionPercent,
-                in: 70...97,
+                in: 10...99,
                 step: 1,
                 valueText: "\(Int(desiredRetentionPercent))%"
             )
@@ -336,10 +470,16 @@ struct FsrsSection: View {
             Toggle("Run FSRS health check on save", isOn: $fsrsHealthCheck)
 
             if fsrsEnabled {
+                Picker("Minimum interval", selection: $fsrsMinimumIntervalSecs) {
+                    ForEach(Self.minimumIntervalOptions(showing: fsrsMinimumIntervalSecs), id: \.self) { secs in
+                        Text(Self.formatInterval(secs)).tag(secs)
+                    }
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Weights").amgiFont(.body)
+                    Text(paramsLabel).amgiFont(.body)
                     TextField(
-                        "Space- or comma-separated parameters",
+                        "Empty uses the default parameters",
                         text: $fsrsWeightsText,
                         axis: .vertical
                     )
@@ -347,6 +487,34 @@ struct FsrsSection: View {
                     .amgiFont(.caption, .monospaced)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Optimize search filter").amgiFont(.body)
+                    TextField(defaultParamSearch, text: $fsrsParamSearch)
+                        .amgiFont(.caption, .monospaced)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Evaluation search filter").amgiFont(.body)
+                    TextField("Same as the optimize search", text: $fsrsEvaluationSearch)
+                        .amgiFont(.caption, .monospaced)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+
+                if fsrsVersion == .seven {
+                    Toggle("Include same-day reviews in FSRS-7", isOn: $fsrs7IncludeSameDayReviews)
+                    Toggle("Use scheduling penalties in FSRS-7 optimization", isOn: $fsrs7SchedulingPenaltiesEnabled)
+                    Toggle("Dynamic DR (ADR)", isOn: $dynamicDesiredRetentionEnabled)
+                    if dynamicDesiredRetentionEnabled {
+                        Toggle("Clamp unsupported dynamic DR targets", isOn: $dynamicDesiredRetentionClamp)
+                        Text("Optimize the parameters to fit the dynamic DR model.")
+                            .amgiFont(.caption)
+                            .foregroundStyle(palette.textSecondary)
+                    }
                 }
 
                 Button(action: onOptimizeCurrent) {
@@ -380,6 +548,68 @@ struct FsrsSection: View {
                 .disabled(isOptimizingFsrs)
             }
         }
+    }
+}
+
+struct CollectionSchedulingSection: View {
+    let fsrsEnabled: Bool
+    let instantEnabled: Bool
+    @Binding var loadBalancerEnabled: Bool
+    @Binding var fsrsShortTermWithStepsEnabled: Bool
+    @Binding var fsrsLearningQueuesDisabled: Bool
+    @Binding var reviewFuzzEnabled: Bool
+    @Binding var reviewFuzzBase: Double
+    @Binding var reviewFuzzFactorShort: Double
+    @Binding var reviewFuzzFactorMid: Double
+    @Binding var reviewFuzzFactorLong: Double
+
+    var body: some View {
+        Section {
+            Toggle("Enable load balancer", isOn: $loadBalancerEnabled)
+            if fsrsEnabled || instantEnabled {
+                Toggle("Allow same-day review for (re)learning steps", isOn: $fsrsShortTermWithStepsEnabled)
+            }
+            if fsrsEnabled {
+                Toggle("Skip learning/relearning queues with FSRS/RWKV", isOn: $fsrsLearningQueuesDisabled)
+            }
+            Toggle("Enable review fuzz", isOn: $reviewFuzzEnabled)
+            LabeledSlider(
+                label: "Base fuzz (days)",
+                value: $reviewFuzzBase,
+                in: 0...10,
+                step: 0.1,
+                valueText: String(format: "%.1f", reviewFuzzBase)
+            )
+            LabeledSlider(
+                label: "Fuzz factor (2.5–7 days)",
+                value: $reviewFuzzFactorShort,
+                in: 0...1,
+                step: 0.01,
+                valueText: Self.percent(reviewFuzzFactorShort)
+            )
+            LabeledSlider(
+                label: "Fuzz factor (7–20 days)",
+                value: $reviewFuzzFactorMid,
+                in: 0...1,
+                step: 0.01,
+                valueText: Self.percent(reviewFuzzFactorMid)
+            )
+            LabeledSlider(
+                label: "Fuzz factor (20+ days)",
+                value: $reviewFuzzFactorLong,
+                in: 0...1,
+                step: 0.01,
+                valueText: Self.percent(reviewFuzzFactorLong)
+            )
+        } header: {
+            Text("Scheduling (all presets)")
+        } footer: {
+            Text("These settings apply to every preset in the collection. The load balancer spreads day-based reviews within the fuzz range to smooth out the workload.")
+        }
+    }
+
+    private static func percent(_ fraction: Double) -> String {
+        "\(Int((fraction * 100).rounded()))%"
     }
 }
 
@@ -454,6 +684,26 @@ struct LabeledSlider: View {
             }
             Slider(value: $value, in: range, step: step)
         }
+    }
+}
+
+private extension FsrsSection {
+    static let commonMinimumIntervals = [1, 60, 600, 3600, 86_400]
+
+    /// Common choices, plus the preset's value when it is something else.
+    static func minimumIntervalOptions(showing current: Int) -> [Int] {
+        commonMinimumIntervals.contains(current)
+            ? commonMinimumIntervals
+            : (commonMinimumIntervals + [current]).sorted()
+    }
+
+    /// "1s", "10m", "1h", "2d" — the largest unit that divides evenly,
+    /// matching the desktop's minimum-interval field.
+    static func formatInterval(_ seconds: Int) -> String {
+        let units: [(String, Int)] = [("d", 86_400), ("h", 3600), ("m", 60), ("s", 1)]
+        let value = max(1, seconds)
+        let (suffix, unit) = units.first { value % $0.1 == 0 } ?? ("s", 1)
+        return "\(value / unit)\(suffix)"
     }
 }
 

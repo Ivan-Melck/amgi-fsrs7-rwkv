@@ -176,7 +176,7 @@ extension Request where Response == QueuedCardsResult {
     /// Returns the next batch of due cards along with pre-computed
     /// scheduling states (opaque tokens) and next-interval display
     /// strings for each rating button.
-    public static func getQueuedCards(fetchLimit: UInt32) -> Self {
+    public static func getQueuedCards(fetchLimit: UInt32, showFuzzDelta: Bool = false) -> Self {
         Self(
             serviceId: ServiceID.scheduler,
             methodId: SchedulerMethod.getQueuedCards,
@@ -199,10 +199,10 @@ extension Request where Response == QueuedCardsResult {
                         easy:    SchedulingStateToken(try queued.states.easy.serializedData())
                     )
                     let intervals: [Rating: String] = [
-                        .again: formatInterval(scheduledSecs(queued.states.again)),
-                        .hard:  formatInterval(scheduledSecs(queued.states.hard)),
-                        .good:  formatInterval(scheduledSecs(queued.states.good)),
-                        .easy:  formatInterval(scheduledSecs(queued.states.easy)),
+                        .again: intervalLabel(queued.states.again, showFuzzDelta: showFuzzDelta),
+                        .hard:  intervalLabel(queued.states.hard, showFuzzDelta: showFuzzDelta),
+                        .good:  intervalLabel(queued.states.good, showFuzzDelta: showFuzzDelta),
+                        .easy:  intervalLabel(queued.states.easy, showFuzzDelta: showFuzzDelta),
                     ]
                     cards.append(QueuedReviewCard(
                         card: CardRecord(queued.card),
@@ -238,16 +238,38 @@ extension Request where Response == FsrsOptimizeResult {
                 }
                 proto.numOfRelearningSteps = UInt32(max(0, input.relearningStepsPerDay))
                 proto.healthCheck = input.runHealthCheck
+                if let fsrsVersion = input.fsrsVersion {
+                    proto.fsrsVersion = .init(fsrsVersion)
+                }
+                if let includeSameDayReviews = input.includeSameDayReviews {
+                    proto.includeSameDayReviews = includeSameDayReviews
+                }
+                if let enableSchedulingPenalties = input.enableSchedulingPenalties {
+                    proto.enableSchedulingPenalties = enableSchedulingPenalties
+                }
+                proto.dynamicDesiredRetentionEnabled = input.dynamicDesiredRetentionEnabled
                 return try proto.serializedData()
             },
             decode: { bytes in
                 let resp = try Anki_Scheduler_ComputeFsrsParamsResponse(serializedBytes: bytes)
+                let dynamicDesiredRetention = FsrsDynamicDesiredRetention(
+                    params: resp.fsrsDynamicDesiredRetentionParams,
+                    weights: resp.fsrsDynamicDesiredRetentionWeights,
+                    avgDrs: resp.fsrsDynamicDesiredRetentionAvgDrs,
+                    minimum: resp.fsrsDynamicDesiredRetentionMin,
+                    maximum: resp.fsrsDynamicDesiredRetentionMax,
+                    fsrsEqWeights: resp.fsrsDynamicDesiredRetentionFsrsEqWeights,
+                    fsrsEqDrs: resp.fsrsDynamicDesiredRetentionFsrsEqDrs,
+                    fixedTargetWeights: resp.fsrsDynamicDesiredRetentionFixedTargetWeights,
+                    fixedTargetDrs: resp.fsrsDynamicDesiredRetentionFixedTargetDrs
+                )
                 return FsrsOptimizeResult(
                     weights: FsrsWeights(resp.params),
                     trainingItemCount: Int(resp.fsrsItems),
                     healthCheck: resp.hasHealthCheckPassed
                         ? (resp.healthCheckPassed ? .passed : .failed)
-                        : nil
+                        : nil,
+                    dynamicDesiredRetention: dynamicDesiredRetention.isEmpty ? nil : dynamicDesiredRetention
                 )
             }
         )

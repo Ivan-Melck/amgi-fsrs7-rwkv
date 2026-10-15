@@ -28,6 +28,7 @@ private let decoder: JSONDecoder = {
 private struct PrepareBody: Encodable {
     let modelPath: String
     let cacheDir: String?
+    let precision: String
 }
 
 private struct PrepareResponse: Decodable {
@@ -66,12 +67,14 @@ extension Request where Response == RwkvPrepareResult {
     /// Loads the model and makes its resident state match the collection's
     /// review history: revalidated, restored from `cacheDir`, or replayed.
     /// Long-running on first use, so it bypasses the global call lock.
-    public static func rwkvPrepare(modelPath: String, cacheDir: String?) -> Self {
+    public static func rwkvPrepare(modelPath: String, cacheDir: String?, precision: String) -> Self {
         Self(
             serviceId: ServiceID.aux,
             methodId: AuxMethod.rwkvPrepare,
             bypassesCallLock: true,
-            encode: { try encoder.encode(PrepareBody(modelPath: modelPath, cacheDir: cacheDir)) },
+            encode: {
+                try encoder.encode(PrepareBody(modelPath: modelPath, cacheDir: cacheDir, precision: precision))
+            },
             decode: { data in
                 let response = try decoder.decode(PrepareResponse.self, from: data)
                 return RwkvPrepareResult(active: response.active, ready: response.ready, source: response.source)
@@ -85,7 +88,7 @@ extension Request where Response == RwkvPrepareResult {
 extension Request where Response == QueuedReviewCard {
     /// The card as the answer buttons should show it: unchanged, or with
     /// RWKV-Curve's states and intervals when its preset uses Curve.
-    public static func rwkvShownCard(_ queued: QueuedReviewCard) -> Self {
+    public static func rwkvShownCard(_ queued: QueuedReviewCard, showFuzzDelta: Bool = false) -> Self {
         Self(
             serviceId: ServiceID.aux,
             methodId: AuxMethod.rwkvSchedulingStates,
@@ -119,10 +122,10 @@ extension Request where Response == QueuedReviewCard {
                         easy: SchedulingStateToken(try states.easy.serializedBytes())
                     ),
                     nextIntervals: [
-                        .again: formatInterval(scheduledSecs(states.again)),
-                        .hard: formatInterval(scheduledSecs(states.hard)),
-                        .good: formatInterval(scheduledSecs(states.good)),
-                        .easy: formatInterval(scheduledSecs(states.easy)),
+                        .again: intervalLabel(states.again, showFuzzDelta: showFuzzDelta),
+                        .hard: intervalLabel(states.hard, showFuzzDelta: showFuzzDelta),
+                        .good: intervalLabel(states.good, showFuzzDelta: showFuzzDelta),
+                        .easy: intervalLabel(states.easy, showFuzzDelta: showFuzzDelta),
                     ]
                 )
             }
@@ -207,6 +210,117 @@ extension Request where Response == Void {
             bypassesCallLock: true,
             encode: { Data("{}".utf8) },
             decode: { _ in () }
+        )
+    }
+}
+
+// MARK: - scores outside the review screen
+
+private struct SearchScoresBody: Encodable {
+    let search: String
+    let wait: Bool
+}
+
+private struct DeckIdBody: Encodable {
+    let deckId: Int64
+}
+
+private struct OptionalDeckIdBody: Encodable {
+    let deckId: Int64?
+}
+
+private struct CardIdBody: Encodable {
+    let cardId: Int64
+}
+
+private struct CardInfoResponse: Decodable {
+    struct Row: Decodable {
+        let label: String
+        let value: String
+    }
+
+    let rows: [Row]
+}
+
+private struct RescheduleResponse: Decodable {
+    let built: Bool
+    let predicted: Int
+    let updated: Int
+}
+
+extension Request where Response == Void {
+    /// RWKV-Instant decks' counts include the cards RWKV would admit today.
+    /// Call before fetching the deck tree; a no-op until the model is ready.
+    public static var rwkvDeckCounts: Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvDeckCounts,
+            bypassesCallLock: true,
+            encode: { Data("{}".utf8) },
+            decode: { _ in () }
+        )
+    }
+
+    /// RWKV scores for `search`, read by the graphs and by searches using
+    /// `prop:rwkv:r` / `is:rwkv:due`. `wait` rebuilds the model state if
+    /// needed; graphs don't wait.
+    public static func rwkvSearchScores(search: String, wait: Bool) -> Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvSearchScores,
+            bypassesCallLock: true,
+            encode: { try encoder.encode(SearchScoresBody(search: search, wait: wait)) },
+            decode: { _ in () }
+        )
+    }
+
+    /// Before building a filtered deck whose terms order or filter by RWKV.
+    public static func rwkvFilteredDeckScores(deckId: DeckID) -> Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvFilteredDeckScores,
+            bypassesCallLock: true,
+            encode: { try encoder.encode(DeckIdBody(deckId: deckId.rawValue)) },
+            decode: { _ in () }
+        )
+    }
+}
+
+extension Request where Response == [RwkvCardInfoRow] {
+    /// The desktop's RWKV Card Info rows; empty when the card's preset
+    /// doesn't use RWKV.
+    public static func rwkvCardInfo(cardId: CardID) -> Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvCardInfo,
+            bypassesCallLock: true,
+            encode: { try encoder.encode(CardIdBody(cardId: cardId.rawValue)) },
+            decode: { data in
+                try decoder.decode(CardInfoResponse.self, from: data)
+                    .rows
+                    .map { RwkvCardInfoRow(label: $0.label, value: $0.value) }
+            }
+        )
+    }
+}
+
+extension Request where Response == RwkvRescheduleResult {
+    /// Writes RWKV-Curve's current interval and S90 to the review cards of
+    /// RWKV-Curve presets, in `deckId` and its subdecks or (nil) everywhere.
+    public static func rwkvReschedule(deckId: DeckID?) -> Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvReschedule,
+            bypassesCallLock: true,
+            encode: { try encoder.encode(OptionalDeckIdBody(deckId: deckId?.rawValue)) },
+            decode: { data in
+                let response = try decoder.decode(RescheduleResponse.self, from: data)
+                return RwkvRescheduleResult(
+                    built: response.built,
+                    predicted: response.predicted,
+                    updated: response.updated
+                )
+            }
         )
     }
 }

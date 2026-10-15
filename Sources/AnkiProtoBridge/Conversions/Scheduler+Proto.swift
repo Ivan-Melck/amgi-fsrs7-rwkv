@@ -78,6 +78,33 @@ package func normalScheduledSecs(_ normal: Anki_Scheduler_SchedulingState.Normal
     }
 }
 
+// MARK: - Fuzz delta
+
+/// " (+2d)" for a Review state whose interval was fuzzed by 2 days, as the
+/// FSRS7/RWKV fork's desktop shows next to the answer buttons when
+/// "Show fuzz delta next to answer button intervals" is on; empty otherwise.
+package func fuzzDeltaSuffix(_ state: Anki_Scheduler_SchedulingState) -> String {
+    let review: Anki_Scheduler_SchedulingState.Review? = switch state.kind {
+    case .normal(let n):
+        if case .review(let r) = n.kind { r } else { nil }
+    case .filtered(let f):
+        if case .rescheduling(let r) = f.kind, case .review(let review) = r.originalState.kind {
+            review
+        } else {
+            nil
+        }
+    case .none:
+        nil
+    }
+    guard let delta = review?.fuzzDeltaDays, delta != 0 else { return "" }
+    return " (\(delta > 0 ? "+" : "")\(delta)d)"
+}
+
+/// The answer button label for a state.
+package func intervalLabel(_ state: Anki_Scheduler_SchedulingState, showFuzzDelta: Bool) -> String {
+    formatInterval(scheduledSecs(state)) + (showFuzzDelta ? fuzzDeltaSuffix(state) : "")
+}
+
 // MARK: - Interval formatting
 
 package func formatInterval(_ secs: UInt32) -> String {

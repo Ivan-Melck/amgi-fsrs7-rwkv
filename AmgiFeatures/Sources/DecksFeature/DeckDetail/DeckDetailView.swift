@@ -48,6 +48,7 @@ struct DeckDetailView: View {
         guard let alert = currentAlert else { return "" }
         switch alert {
         case .empty: return "Empty \"\(shortTitle)\"?"
+        case .rescheduleRwkv: return "Reschedule with RWKV-Curve?"
         case .error(let title, _): return title
         }
     }
@@ -163,6 +164,14 @@ struct DeckDetailView: View {
                         } label: {
                             Label("Increase Review Limit…", systemImage: "plus.rectangle.on.rectangle")
                         }
+                        if model.canRescheduleWithRwkv {
+                            Button {
+                                destination = .alert(.rescheduleRwkv)
+                            } label: {
+                                Label("Reschedule with RWKV-Curve…", systemImage: "brain")
+                            }
+                            .disabled(model.actionInFlight)
+                        }
                     }
                 }
                 Section {
@@ -253,6 +262,11 @@ private extension DeckDetailView {
                 Task { await runEmpty() }
             }
             Button("Cancel", role: .cancel) {}
+        case .rescheduleRwkv:
+            Button("Reschedule") {
+                Task { await runRescheduleRwkv() }
+            }
+            Button("Cancel", role: .cancel) {}
         case .error:
             Button("OK", role: .cancel) {}
         }
@@ -263,6 +277,8 @@ private extension DeckDetailView {
         switch alert {
         case .empty:
             Text("Cards will be returned to their home decks.")
+        case .rescheduleRwkv:
+            Text("Review cards in this deck and its subdecks whose preset uses RWKV-Curve get RWKV's current interval and stability. No review history is added.")
         case .error(_, let message):
             Text(message)
         }
@@ -273,6 +289,12 @@ private extension DeckDetailView {
     func runRebuild() async {
         if let err = await model.rebuild() {
             destination = .alert(.error(title: "Couldn't rebuild \"\(shortTitle)\"", message: err))
+        }
+    }
+
+    func runRescheduleRwkv() async {
+        if let err = await model.rescheduleWithRwkv() {
+            destination = .alert(.error(title: "Couldn't reschedule \"\(shortTitle)\"", message: err))
         }
     }
 

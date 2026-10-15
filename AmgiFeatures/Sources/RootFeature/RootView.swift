@@ -57,8 +57,14 @@ public struct RootView: View {
                 let scheduler = scheduler
                 if newPhase == .active {
                     Task { await writeWidgetSnapshot() }
-                    // Warm RWKV's model state before the user starts a review.
-                    Task.detached(priority: .utility) { _ = try? scheduler.prepareRwkv() }
+                    // Warm RWKV's model state before the user starts a review,
+                    // then refresh deck counts, which include RWKV-Instant's
+                    // admissions only once the model is ready.
+                    let store = store
+                    Task.detached(priority: .utility) {
+                        guard let result = try? scheduler.prepareRwkv(), result.active else { return }
+                        await MainActor.run { store.invalidateAll() }
+                    }
                 } else if newPhase == .background {
                     // So the next launch restores instead of replaying history.
                     Task.detached(priority: .utility) { try? scheduler.saveRwkvState() }

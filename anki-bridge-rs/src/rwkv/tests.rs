@@ -19,9 +19,11 @@ use anki::backend::Backend;
 use anki::services::BackendCollectionService;
 use anki::services::CollectionService;
 use anki::services::DeckConfigService;
+use anki::services::DecksService;
 use anki::services::NotesService;
 use anki::services::NotetypesService;
 use anki::services::SchedulerService;
+use anki::services::SearchService;
 use anki_proto::scheduler as pb;
 use data_encoding::BASE64;
 use prost::Message;
@@ -599,4 +601,245 @@ fn inactive_collection_is_left_alone() {
         )
         .unwrap();
     assert!(!scored.instant);
+}
+
+fn rwkv_score(fx: &Fixture, card_id: i64) -> Option<f32> {
+    fx.backend
+        .with_col(|col| {
+            SchedulerService::get_rwkv_retrievability_score(
+                col,
+                anki_proto::cards::CardId { cid: card_id },
+            )
+        })
+        .unwrap()
+        .retrievability
+}
+
+#[test]
+fn deck_counts_install_scores_for_instant_scopes() {
+    let Some(fx) = fixture("counts", 6) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    // Not prepared yet: deferred, nothing installed.
+    let counts = engine.deck_counts(&fx.backend).unwrap();
+    assert_eq!(counts.scopes, 0);
+    prepare(&mut engine, &fx, None);
+    assert_eq!(rwkv_score(&fx, fx.card_ids[0]), None);
+
+    let counts = engine.deck_counts(&fx.backend).unwrap();
+    assert_eq!((counts.scopes, counts.deferred), (1, false));
+    let r = rwkv_score(&fx, fx.card_ids[0]).expect("deck count score installed");
+    assert!((0.0..=1.0).contains(&r));
+    // The deck tree with counts builds with the scores in place.
+    let _ = fx
+        .backend
+        .with_col(|col| {
+            DecksService::deck_tree(
+                col,
+                anki_proto::decks::DeckTreeRequest {
+                    now: now_millis() / 1000,
+                },
+            )
+        })
+        .unwrap();
+}
+
+#[test]
+fn search_scores_feed_graphs_and_rwkv_searches() {
+    let Some(fx) = fixture("search", 6) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    let pending = engine
+        .search_scores(
+            &fx.backend,
+            views::SearchScoresRequest {
+                search: "deck:current".into(),
+                wait: false,
+            },
+        )
+        .unwrap();
+    // No model loaded yet.
+    assert_eq!(pending.status, "unavailable");
+    prepare(&mut engine, &fx, None);
+
+    let ready = engine
+        .search_scores(
+            &fx.backend,
+            views::SearchScoresRequest {
+                search: "deck:current".into(),
+                wait: false,
+            },
+        )
+        .unwrap();
+    assert_eq!((ready.status, ready.scored), ("ready", 6));
+    let graphs = fx
+        .backend
+        .with_col(|col| {
+            anki::services::StatsService::graphs(
+                col,
+                anki_proto::stats::GraphsRequest {
+                    search: "deck:current".into(),
+                    days: 30,
+                },
+            )
+        })
+        .unwrap();
+    assert!(graphs.retrievability.is_some());
+
+    // A browser search on RWKV retrievability matches once scores exist.
+    let search = "prop:rwkv:r<=1";
+    let scores = engine
+        .search_scores(
+            &fx.backend,
+            views::SearchScoresRequest {
+                search: search.into(),
+                wait: true,
+            },
+        )
+        .unwrap();
+    assert_eq!(scores.status, "ready");
+    let found = fx
+        .backend
+        .with_col(|col| {
+            SearchService::search_cards(
+                col,
+                anki_proto::search::SearchRequest {
+                    search: search.into(),
+                    order: None,
+                },
+            )
+        })
+        .unwrap();
+    assert_eq!(found.ids.len(), 6);
+
+    // Curve due searches get full predictions.
+    let curve = engine
+        .search_scores(
+            &fx.backend,
+            views::SearchScoresRequest {
+                search: "is:rwkv-curve:due".into(),
+                wait: true,
+            },
+        )
+        .unwrap();
+    assert_eq!(curve.status, "ready");
+}
+
+#[test]
+fn filtered_deck_ordered_by_retrievability_gets_scores() {
+    let Some(fx) = fixture("filtered", 4) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let deck_id = fx
+        .backend
+        .with_col(|col| {
+            let mut deck = DecksService::get_or_create_filtered_deck(
+                col,
+                anki_proto::decks::DeckId { did: 0 },
+            )?;
+            let config = deck.config.as_mut().unwrap();
+            config.search_terms[0].search = "deck:Default".into();
+            config.search_terms[0].set_order(
+                anki_proto::decks::deck::filtered::search_term::Order::RetrievabilityAscending,
+            );
+            deck.name = "RWKV filtered".into();
+            Ok(DecksService::add_or_update_filtered_deck(col, deck)?.id)
+        })
+        .unwrap();
+    let scores = engine
+        .filtered_deck_scores(&fx.backend, views::FilteredDeckRequest { deck_id })
+        .unwrap();
+    assert_eq!(scores.status, "ready");
+    let skipped = engine
+        .filtered_deck_scores(&fx.backend, views::FilteredDeckRequest { deck_id: 1 })
+        .unwrap();
+    assert_eq!(skipped.status, "skipped");
+}
+
+#[test]
+fn card_info_rows_match_the_desktop_labels() {
+    let Some(fx) = fixture("cardinfo", 3) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    let unavailable = engine
+        .card_info(
+            &fx.backend,
+            views::CardInfoRequest {
+                card_id: fx.card_ids[0],
+            },
+        )
+        .unwrap();
+    assert_eq!(unavailable.rows[0].value, "Unavailable");
+
+    prepare(&mut engine, &fx, None);
+    let info = engine
+        .card_info(
+            &fx.backend,
+            views::CardInfoRequest {
+                card_id: fx.card_ids[0],
+            },
+        )
+        .unwrap();
+    let labels: Vec<&str> = info.rows.iter().map(|r| r.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "RWKV computed R",
+            "RWKV : Answer Button Probability",
+            "Retrievability source",
+            "RWKV Curve Next S90",
+            "FSRS Next S90",
+            "RWKV : R After Review",
+            "RWKV : R After 10min",
+        ]
+    );
+    assert!(info.rows[0].value.ends_with('%'));
+    assert_eq!(info.rows[2].value, "RWKV");
+    assert!(
+        !info.rows[5].value.contains("Unavailable"),
+        "{}",
+        info.rows[5].value
+    );
+    assert!(rwkv_score(&fx, fx.card_ids[0]).is_some());
+}
+
+#[test]
+fn curve_reschedule_writes_intervals_and_s90() {
+    let Some(fx) = fixture("reschedule", 5) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let before = sql(
+        &fx.backend,
+        "select ivl, due from cards order by id",
+        vec![],
+    );
+    let result = engine
+        .reschedule(&fx.backend, views::RescheduleRequest { deck_id: Some(1) })
+        .unwrap();
+    assert!(result.built);
+    assert_eq!(result.predicted, 5);
+    assert_eq!(result.updated, 5);
+    let after = sql(
+        &fx.backend,
+        "select ivl, due from cards order by id",
+        vec![],
+    );
+    assert_ne!(before, after);
+    let card = get_card(&fx.backend, fx.card_ids[0]).unwrap();
+    assert!(card.memory_state.unwrap().stability > 0.0);
+
+    // Whole collection; no history changed, so the state stays trusted.
+    let all = engine
+        .reschedule(&fx.backend, views::RescheduleRequest { deck_id: None })
+        .unwrap();
+    assert_eq!(all.predicted, 5);
+    engine.trusted = false;
+    assert_eq!(engine.ensure_ready(&fx.backend).unwrap().0, "revalidated");
 }

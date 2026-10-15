@@ -47,6 +47,7 @@ final class DeckDetailModel {
 
     @ObservationIgnored @Dependency(\.deckClient) private var deckClient
     @ObservationIgnored @Dependency(\.statsClient) private var statsClient
+    @ObservationIgnored @Dependency(\.rwkvClient) private var rwkvClient
     @ObservationIgnored @Dependency(\.collectionStore) private var store
     @ObservationIgnored private var statsTask: Task<Void, Never>?
     @ObservationIgnored private var feedbackTask: Task<Void, Never>?
@@ -120,6 +121,33 @@ final class DeckDetailModel {
             let count = try await deckClient.rebuildFilteredDeck(deck.id)
             showFeedback("Rebuilt — \(count) cards")
             // Rebuild's request only decodes a count — invalidate conservatively.
+            store.apply(CollectionChanges(card: true, deck: true, studyQueues: true))
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// The app can reschedule with RWKV-Curve (it bundles the model).
+    var canRescheduleWithRwkv: Bool { rwkvClient.isAvailable() }
+
+    /// Writes RWKV-Curve's current interval and S90 to the review cards of
+    /// RWKV-Curve presets in this deck and its subdecks, as the desktop's
+    /// "Reschedule With RWKV-Curve". Returns nil on success; otherwise an
+    /// error message to surface.
+    func rescheduleWithRwkv() async -> String? {
+        actionInFlight = true
+        defer { actionInFlight = false }
+        do {
+            let result = try await rwkvClient.reschedule(deck.id)
+            guard result.built else {
+                return "The RWKV model state couldn't be prepared."
+            }
+            showFeedback(
+                result.predicted == 0
+                    ? "No RWKV-Curve review cards"
+                    : "RWKV rescheduled \(result.updated) cards"
+            )
             store.apply(CollectionChanges(card: true, deck: true, studyQueues: true))
             return nil
         } catch {

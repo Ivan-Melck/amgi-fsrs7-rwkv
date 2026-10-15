@@ -27,6 +27,7 @@ enum ReviewDestination {
     case editNote(NoteRecord)
     case editTemplate(ReviewSession.TemplateTarget)
     case lookup(String)
+    case rwkvCardInfo(CardID)
 }
 
 extension Optional where Wrapped == ReviewDestination {

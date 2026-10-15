@@ -40,6 +40,7 @@ enum DeckDetailSheet: Identifiable {
 @CasePathable
 enum DeckDetailAlert {
     case empty
+    case rescheduleRwkv
     case error(title: String, message: String)
 }
 

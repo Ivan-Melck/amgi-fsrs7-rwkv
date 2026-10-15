@@ -29,6 +29,8 @@ public struct DecksService: Sendable {
     public var extendLimits: @Sendable (_ deckId: DeckID, _ newDelta: Int32, _ reviewDelta: Int32) throws -> Void
     public var fetchDeckConfigContext: @Sendable (_ deckId: DeckID) throws -> DeckConfigsForUpdate
     public var getDeckConfig: @Sendable (_ deckId: DeckID) throws -> DeckConfig
+    /// `schedulingSettings` carries the edited collection-wide scheduler
+    /// settings; `nil` echoes the values currently stored.
     public var updateDeckConfig: @Sendable (
         _ deckId: DeckID,
         _ config: DeckConfig,
@@ -36,7 +38,8 @@ public struct DecksService: Sendable {
         _ fsrsEnabled: Bool,
         _ newCardsIgnoreReviewLimit: Bool,
         _ applyAllParentLimits: Bool,
-        _ fsrsHealthCheck: Bool
+        _ fsrsHealthCheck: Bool,
+        _ schedulingSettings: CollectionSchedulingSettings?
     ) throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) throws -> FsrsOptimizeResult
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsReviewSimulation
@@ -66,9 +69,17 @@ extension DecksService: DependencyKey {
                 }
             },
             fetchTree: {
-                try backend.invoke(.deckTree())
+                // RWKV-Instant decks count the cards RWKV would admit today,
+                // once the model is ready; until then, due-date counts.
+                if RwkvEnvironment.modelPath != nil {
+                    _ = try? backend.invoke(Request<Void>.rwkvDeckCounts)
+                }
+                return try backend.invoke(.deckTree())
             },
             countsForDeck: { deckId in
+                if RwkvEnvironment.modelPath != nil {
+                    _ = try? backend.invoke(Request<Void>.rwkvDeckCounts)
+                }
                 let counts = try? backend.invoke(.deckCounts(for: deckId))
                 return counts.flatMap { $0 } ?? .zero
             },
@@ -89,7 +100,11 @@ extension DecksService: DependencyKey {
                 try backend.invoke(.removeDecks(deckIds: [deckId]))
             },
             rebuildFilteredDeck: { deckId in
-                try backend.invoke(.rebuildFilteredDeck(deckId: deckId))
+                // Terms that order or filter by RWKV need its scores first.
+                if RwkvEnvironment.modelPath != nil {
+                    _ = try? backend.invoke(Request<Void>.rwkvFilteredDeckScores(deckId: deckId))
+                }
+                return try backend.invoke(.rebuildFilteredDeck(deckId: deckId))
             },
             emptyFilteredDeck: { deckId in
                 try backend.invoke(.emptyFilteredDeck(deckId: deckId))
@@ -118,7 +133,7 @@ extension DecksService: DependencyKey {
                     message: "Deck \(deckId.rawValue) has no valid config id and no defaults available"
                 )
             },
-            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, newCardsIgnoreReviewLimit, applyAllParentLimits, fsrsHealthCheck in
+            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, newCardsIgnoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings in
                 let context = try backend.invoke(.deckConfigsForUpdate(deckId: deckId))
                 let request = UpdateDeckConfigsRequest(
                     targetDeckID: deckId,
@@ -130,7 +145,7 @@ extension DecksService: DependencyKey {
                     fsrs: fsrsEnabled,
                     applyAllParentLimits: applyAllParentLimits,
                     fsrsHealthCheck: fsrsHealthCheck,
-                    schedulingSettings: context.schedulingSettings
+                    schedulingSettings: schedulingSettings ?? context.schedulingSettings
                 )
                 try backend.invoke(.updateDeckConfigs(request))
             },
