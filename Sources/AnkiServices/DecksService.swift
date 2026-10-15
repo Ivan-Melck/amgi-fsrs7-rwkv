@@ -51,6 +51,9 @@ public struct DecksService: Sendable {
     /// the supplied baseline config as the deck's selected preset. Routes
     /// through `updateDeckConfigs` with mode `.computeAllParams`.
     public var optimizeFsrsPresets: @Sendable (_ deckId: DeckID, _ config: DeckConfig) throws -> Void
+    /// Saves several presets in one undoable step; the last one stays the
+    /// deck's preset.
+    public var updatePresets: @Sendable (_ deckId: DeckID, _ configs: [DeckConfig]) throws -> Void
     /// Switch the deck to an existing preset. The supplied config keeps its
     /// id so the backend reuses the row instead of creating a new one.
     public var selectDeckPreset: @Sendable (_ deckId: DeckID, _ config: DeckConfig, _ applyToChildren: Bool) throws -> Void
@@ -176,6 +179,18 @@ extension DecksService: DependencyKey {
                     removed: [],
                     mode: .computeAllParams,
                     fsrs: true
+                )
+                try backend.invoke(.updateDeckConfigs(request))
+            },
+            updatePresets: { deckId, configs in
+                let context = try backend.invoke(.deckConfigsForUpdate(deckId: deckId))
+                let request = makeUpdateRequest(
+                    deckId: deckId,
+                    context: context,
+                    configs: configs,
+                    removed: [],
+                    mode: .normal,
+                    fsrs: context.fsrs
                 )
                 try backend.invoke(.updateDeckConfigs(request))
             },

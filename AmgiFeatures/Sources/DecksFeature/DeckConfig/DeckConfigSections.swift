@@ -359,6 +359,8 @@ struct SchedulerSection: View {
     let dueDateScheduler: SchedulerChoice
     let onSelectScheduler: (SchedulerChoice) -> Void
     let onSelectDueDateScheduler: (SchedulerChoice) -> Void
+    let canApplyToAllPresets: Bool
+    let onApplyToAllPresets: () -> Void
 
     var body: some View {
         Section {
@@ -379,6 +381,13 @@ struct SchedulerSection: View {
                     ForEach(Self.choices(SchedulerChoice.dueDateChoices, showing: dueDateScheduler), id: \.self) { choice in
                         Text(choice.title).tag(choice)
                     }
+                }
+            }
+            if canApplyToAllPresets {
+                Button {
+                    onApplyToAllPresets()
+                } label: {
+                    Label("Apply Schedule to All Presets…", systemImage: "doc.on.doc")
                 }
             }
         } header: {

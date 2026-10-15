@@ -43,6 +43,8 @@ public struct DeckClient: Sendable {
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsReviewSimulation
     public var simulateFsrsWorkload: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsWorkloadSimulation
     public var optimizeFsrsPresets: @Sendable (_ deckId: DeckID, _ config: DeckConfig) async throws -> Void
+    /// Saves several presets at once; the last one stays the deck's preset.
+    public var updatePresets: @Sendable (_ deckId: DeckID, _ configs: [DeckConfig]) async throws -> Void
     public var selectDeckPreset: @Sendable (_ deckId: DeckID, _ config: DeckConfig, _ applyToChildren: Bool) async throws -> Void
     public var createDeckPreset: @Sendable (_ deckId: DeckID, _ baseConfig: DeckConfig, _ name: String, _ applyToChildren: Bool) async throws -> Void
     public var deleteDeckPreset: @Sendable (_ deckId: DeckID, _ removingConfigId: DeckConfigID, _ fallbackConfig: DeckConfig, _ applyToChildren: Bool) async throws -> Void

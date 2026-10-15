@@ -91,6 +91,9 @@ extension DeckClient: DependencyKey {
                     logger.info("Optimized FSRS presets reachable from deck=\(deckId)")
                 }
             },
+            updatePresets: { deckId, configs in
+                try await backendOffload { try decks.updatePresets(deckId, configs) }
+            },
             selectDeckPreset: { deckId, config, applyToChildren in
                 try await backendOffload {
                     try decks.selectDeckPreset(deckId, config, applyToChildren)

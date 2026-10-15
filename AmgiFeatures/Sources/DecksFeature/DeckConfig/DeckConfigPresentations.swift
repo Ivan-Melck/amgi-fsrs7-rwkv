@@ -5,6 +5,7 @@
 //  Created by Vladimir Gusev on 14.05.2026.
 //
 
+import AnkiKit
 import SwiftUI
 import SwiftNavigation
 import SwiftUINavigation
@@ -25,6 +26,7 @@ struct DeckConfigPresentations: ViewModifier {
     let onDiscard: () -> Void
     let onSaveThen: (DeckConfigPresetAction) -> Void
     let onDiscardThen: (DeckConfigPresetAction) -> Void
+    let onApplySchedule: (ScheduleCopyOptions) async -> String?
 
     func body(content: Content) -> some View {
         content
@@ -82,6 +84,8 @@ struct DeckConfigPresentations: ViewModifier {
                 onConfirm: { _ in await onCreate(false) },
                 text: $newPresetName
             )
+        case .applySchedule:
+            ApplyScheduleSheet(onApply: onApplySchedule)
         case .renamePreset:
             TextPromptSheet(
                 title: "Rename Preset",

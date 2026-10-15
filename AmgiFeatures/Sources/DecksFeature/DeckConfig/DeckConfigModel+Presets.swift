@@ -24,6 +24,7 @@ extension DeckConfigModel {
     func saveThenPerform(_ action: DeckConfigPresetAction) async {
         guard await saveConfig() else { return }
         await loadConfig()
+        await waitForDismissal()
         performPresetAction(action)
     }
 
@@ -31,9 +32,21 @@ extension DeckConfigModel {
         if let loaded {
             apply(config: loaded.config, context: loaded.context)
         }
-        // Let the alert finish dismissing before a prompt is presented.
-        try? await Task.sleep(for: .milliseconds(350))
+        await waitForDismissal()
         performPresetAction(action)
+    }
+
+    /// Lets an alert or sheet finish dismissing before the next one is
+    /// presented.
+    func waitForDismissal() async {
+        try? await Task.sleep(for: .milliseconds(450))
+    }
+
+    func showNoticeAfterDismissal(title: String, message: String) {
+        Task {
+            await waitForDismissal()
+            destination = .alert(.notice(title: title, message: message))
+        }
     }
 
     func performPresetAction(_ action: DeckConfigPresetAction) {
@@ -122,6 +135,50 @@ extension DeckConfigModel {
         var n = 2
         while existing.contains("\(base) \(n)".lowercased()) { n += 1 }
         return "\(base) \(n)"
+    }
+
+    // MARK: - Apply schedule to all presets
+
+    var canApplyScheduleToAllPresets: Bool {
+        presetOptions.count > 1 && !isFallbackContext
+    }
+
+    /// `applyScheduleToAllPresets`. The desktop copies into the other
+    /// presets and saves on Save; here edits are saved first and the copies
+    /// saved at once. Returns an error message for the sheet.
+    func applyScheduleToAllPresets(_ options: ScheduleCopyOptions) async -> String? {
+        guard canApplyScheduleToAllPresets else { return nil }
+        if hasUnsavedChanges {
+            guard await saveConfig() else { return "Couldn't save your changes." }
+            await loadConfig()
+        }
+        guard let loaded else { return nil }
+        let source = loaded.config.config
+        let changed = loaded.context.allConfig.map(\.config).compactMap { target -> DeckConfig? in
+            guard target.id != loaded.config.id else { return nil }
+            var updated = target
+            updated.config = target.config.withCopiedSchedule(from: source, options: options)
+            return updated == target ? nil : updated
+        }
+        guard !changed.isEmpty else {
+            showNoticeAfterDismissal(
+                title: "Nothing to change",
+                message: "The other presets already match this one."
+            )
+            return nil
+        }
+        do {
+            // The current preset goes last so it stays this deck's preset.
+            try await deckClient.updatePresets(deckId, changed + [loaded.config])
+        } catch {
+            return error.localizedDescription
+        }
+        await loadConfig()
+        showNoticeAfterDismissal(
+            title: "Schedule applied",
+            message: "Copied to \(changed.count) preset\(changed.count == 1 ? "" : "s")."
+        )
+        return nil
     }
 
     // MARK: - RWKV maintenance

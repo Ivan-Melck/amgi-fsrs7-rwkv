@@ -40,6 +40,7 @@ enum DeckConfigPrompt: String, Identifiable {
     case createPreset
     case clonePreset
     case renamePreset
+    case applySchedule
 
     var id: String { rawValue }
 }

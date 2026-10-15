@@ -39,6 +39,7 @@ extension DeckClient {
             throw PreviewClientError.notImplementedInPreview("simulateFsrsWorkload")
         },
         optimizeFsrsPresets: { _, _ in },
+        updatePresets: { _, _ in },
         selectDeckPreset: { _, _, _ in },
         createDeckPreset: { _, _, _, _ in },
         deleteDeckPreset: { _, _, _, _ in }

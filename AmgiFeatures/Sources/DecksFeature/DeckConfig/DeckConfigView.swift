@@ -56,7 +56,8 @@ struct DeckConfigView: View {
                 onDelete: { Task { await model.deletePreset() } },
                 onDiscard: onDismiss,
                 onSaveThen: { action in Task { await model.saveThenPerform(action) } },
-                onDiscardThen: { action in Task { await model.discardThenPerform(action) } }
+                onDiscardThen: { action in Task { await model.discardThenPerform(action) } },
+                onApplySchedule: { await model.applyScheduleToAllPresets($0) }
             ))
             .task { await model.loadConfig() }
     }
@@ -117,7 +118,9 @@ struct DeckConfigView: View {
             scheduler: model.schedulerSelection.scheduler,
             dueDateScheduler: model.schedulerSelection.dueDateScheduler,
             onSelectScheduler: { model.selectScheduler($0) },
-            onSelectDueDateScheduler: { model.selectDueDateScheduler($0) }
+            onSelectDueDateScheduler: { model.selectDueDateScheduler($0) },
+            canApplyToAllPresets: model.canApplyScheduleToAllPresets,
+            onApplyToAllPresets: { model.destination = .prompt(.applySchedule) }
         )
         if model.schedulerSelection.usesRwkv {
             RwkvSection(
