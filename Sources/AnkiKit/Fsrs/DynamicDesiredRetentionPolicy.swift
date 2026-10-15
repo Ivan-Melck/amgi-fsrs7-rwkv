@@ -376,29 +376,7 @@ extension DynamicDesiredRetentionPolicy {
     /// JS `Number.prototype.toFixed`: rounds the exact binary value, and an
     /// exact tie goes up (unlike `%f`, which rounds ties to even).
     public static func toFixed(_ value: Double, _ digits: Int) -> String {
-        if value.isNaN { return "NaN" }
-        if value < 0 { return "-" + toFixed(-value, digits) }
-        if value.isInfinite { return "Infinity" }
-        let expanded = String(format: "%.\(digits + 30)f", value)
-        let parts = expanded.split(separator: ".", omittingEmptySubsequences: false)
-        var kept = Array(parts[0]) + Array(parts.count > 1 ? parts[1].prefix(digits) : "")
-        let next = parts.count > 1 ? parts[1].dropFirst(digits).first : nil
-        if let next, next >= "5" {
-            var index = kept.count - 1
-            while index >= 0 {
-                if kept[index] == "9" {
-                    kept[index] = "0"
-                    index -= 1
-                } else {
-                    kept[index] = Character(String(kept[index].wholeNumberValue! + 1))
-                    break
-                }
-            }
-            if index < 0 { kept.insert("1", at: 0) }
-        }
-        let intCount = kept.count - digits
-        let intPart = String(kept.prefix(intCount))
-        return digits == 0 ? intPart : intPart + "." + String(kept.suffix(digits))
+        JSNumberFormat.toFixed(value, digits)
     }
 }
 

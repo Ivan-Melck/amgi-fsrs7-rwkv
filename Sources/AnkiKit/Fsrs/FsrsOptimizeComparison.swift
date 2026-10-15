@@ -59,32 +59,7 @@ public enum FsrsMetricComparison {
     /// value half away from zero (printf rounds exact ties to even, so
     /// 0.125 would give "0.12" instead of "0.13"), and -0 prints as "0".
     public static func toFixed(_ value: Double, _ digits: Int) -> String {
-        if value.isNaN { return "NaN" }
-        if value.isInfinite { return value < 0 ? "-Infinity" : "Infinity" }
-        if value < 0 { return "-" + toFixed(-value, digits) }
-        // Enough exact digits that rounding the tail can't reach `digits`.
-        let expanded = String(format: "%.\(digits + 30)f", value == 0 ? 0 : value)
-        let parts = expanded.split(separator: ".", maxSplits: 1)
-        var number = Array(parts[0]).compactMap(\.wholeNumberValue)
-            + Array(parts[1].prefix(digits)).compactMap(\.wholeNumberValue)
-        let roundUp = (parts[1].dropFirst(digits).first?.wholeNumberValue ?? 0) >= 5
-        if roundUp {
-            var index = number.count - 1
-            while index >= 0 {
-                if number[index] == 9 {
-                    number[index] = 0
-                    index -= 1
-                } else {
-                    number[index] += 1
-                    break
-                }
-            }
-            if index < 0 { number.insert(1, at: 0) }
-        }
-        let integerCount = number.count - digits
-        let integer = number[..<integerCount].map(String.init).joined()
-        guard digits > 0 else { return integer }
-        return integer + "." + number[integerCount...].map(String.init).joined()
+        JSNumberFormat.toFixed(value, digits)
     }
 }
 
