@@ -248,9 +248,17 @@ public struct CardContextMenu: View {
                 Button {
                     Task { if let advance = await model.undo(cardId) { forward(advance) } }
                 } label: {
-                    Label("Undo", systemImage: "arrow.uturn.backward")
+                    Label(model.undoStatus.undoTitle, systemImage: "arrow.uturn.backward")
                 }
-                .disabled(!model.canUndo || model.isUndoing)
+                .disabled(!model.undoStatus.canUndo || model.isUndoing)
+                if model.undoStatus.showsRedo {
+                    Button {
+                        Task { if let advance = await model.redo(cardId) { forward(advance) } }
+                    } label: {
+                        Label(model.undoStatus.redoTitle, systemImage: "arrow.uturn.forward")
+                    }
+                    .disabled(!model.undoStatus.canRedo || model.isUndoing)
+                }
             }
         } label: {
             Image(systemName: "ellipsis.circle")

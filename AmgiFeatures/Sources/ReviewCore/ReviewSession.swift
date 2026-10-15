@@ -43,7 +43,8 @@ public final class ReviewSession {
     public private(set) var remainingCounts: DeckCounts = .zero
     public private(set) var deckName: String = ""
     public private(set) var isFinished: Bool = false
-    public private(set) var canUndo: Bool = false
+    /// The collection's undo queue (`mw.undo_actions_info()`).
+    public private(set) var undoStatus = UndoStatus()
     public private(set) var nextIntervals: [Rating: String] = [:]
     public private(set) var replayRequestID: Int = 0       // plumbed; consumer is PR 1b
     public private(set) var stopAudioRequestID: Int = 0    // plumbed; consumer is PR 1b
@@ -57,6 +58,7 @@ public final class ReviewSession {
     public private(set) var answerTapCount: Int = 0
     public private(set) var tappedRating: Rating = .good
     public private(set) var undoneCount: Int = 0
+    public private(set) var redoneCount: Int = 0
 
     public private(set) var isAdvancing: Bool = false
     public var answerError: String?
@@ -66,7 +68,9 @@ public final class ReviewSession {
     var cardQueue: [QueuedReviewCard] = []
     var notetypeCache: [NotetypeID: Notetype] = [:]
     var currentQueuedCard: QueuedReviewCard?
-    private var lastRating: Rating? = nil
+    /// This session's answers on the undo queue, to keep `sessionStats`
+    /// in step with undo and redo.
+    private var undoLedger = ReviewUndoLedger()
     private var preparedNext: (id: CardID, card: PreparedCard)?
     @ObservationIgnored private var prefetchTask: Task<Void, Never>?
 
@@ -104,6 +108,11 @@ public final class ReviewSession {
     public var currentCardId: CardID? {
         currentQueuedCard?.card.id
     }
+
+    /// Undo stays available while the collection can undo, as on the
+    /// desktop: several answers, and other undoable steps, in a row.
+    public var canUndo: Bool { undoStatus.canUndo }
+    public var canRedo: Bool { undoStatus.canRedo }
 
     // MARK: - Session progress
 
@@ -170,6 +179,7 @@ public final class ReviewSession {
                 )
                 Log.review.info("Started with \(self.cardQueue.count) cards, counts: new=\(queue.newCount) learn=\(queue.learningCount) review=\(queue.reviewCount)")
                 await advanceToNextCard(notes: notes, notetypes: notetypes, notetypesClient: notetypesClient, cardRendering: cardRendering)
+                await refreshUndoStatus()
             } catch {
                 // NOT isFinished: that is the "queue ran dry" state and drives
                 // the congratulations surface plus a success haptic. A start
@@ -225,6 +235,7 @@ public final class ReviewSession {
         let cardId = queued.card.id
         let states = queued.states
         let scheduler = self.scheduler
+        let collection = self.collection
         let notes = self.notes
         let notetypes = self.notetypes
         let notetypesClient = self.notetypesClient
@@ -240,17 +251,24 @@ public final class ReviewSession {
             defer { isAdvancing = false }
             await AppSignpost.measure("AnswerCard") {
                 do {
-                    let queue = try await Task.detached {
+                    let (status, queue) = try await Task.detached { () -> (UndoStatus?, QueuedCardsResult) in
                         try scheduler.answerReviewCard(cardId, rating, timeSpent, states)
-                        return try scheduler.getQueuedCards(200)
+                        // The answer's undo step, before anything else runs.
+                        let status = try? collection.undoStatus()
+                        return (status, try scheduler.getQueuedCards(200))
                     }.value
 
                     answerError = nil
-                    sessionStats.reviewed += 1
-                    if rating != .again { sessionStats.correct += 1 }
-                    sessionStats.totalTimeMs += Int(timeSpent)
-                    lastRating = rating
-                    canUndo = true
+                    sessionStats.add(rating, timeMs: Int(timeSpent))
+                    if let status {
+                        undoStatus = status
+                        undoLedger.answered(.init(
+                            counter: status.lastStep,
+                            cardId: cardId,
+                            rating: rating,
+                            timeMs: Int(timeSpent)
+                        ))
+                    }
 
                     cardQueue = queue.cards
                     remainingCounts = DeckCounts(
@@ -272,8 +290,31 @@ public final class ReviewSession {
         }
     }
 
+    /// The desktop's Undo (`aqt.operations.collection.undo`): reverts the
+    /// collection's newest undoable step, answer or not, with RWKV's state
+    /// reconciled, then shows the queue's head: an undone answer's card
+    /// comes back in front.
     public func undo() {
         guard canUndo, !isAdvancing else { return }
+        undoOrRedo(redo: false)
+    }
+
+    /// The desktop's Redo (`aqt.operations.collection.redo`).
+    public func redo() {
+        guard canRedo, !isAdvancing else { return }
+        undoOrRedo(redo: true)
+    }
+
+    /// Re-reads the undo queue after a step taken outside `answer`/`undo`/
+    /// `redo`, e.g. a card action or a note edit.
+    public func refreshUndoStatus() async {
+        let collection = self.collection
+        if let status = try? await Task.detached(operation: { try collection.undoStatus() }).value {
+            undoStatus = status
+        }
+    }
+
+    private func undoOrRedo(redo: Bool) {
         isAdvancing = true
 
         let collection = self.collection
@@ -282,34 +323,43 @@ public final class ReviewSession {
         let notetypes = self.notetypes
         let notetypesClient = self.notetypesClient
         let cardRendering = self.cardRendering
-        let undoesAnswer = lastRating != nil
 
         Task {
             defer { isAdvancing = false }
+            let outcome: UndoOutcome
+            do {
+                outcome = try await Task.detached {
+                    try redo ? collection.redo() : collection.undo()
+                }.value
+            } catch {
+                Log.review.error("\(redo ? "Redo" : "Undo") failed: \(error)")
+                await refreshUndoStatus()
+                return
+            }
+
+            undoStatus = outcome.newStatus
+            // The desktop's tooltip ("Answer Card undone"), spoken.
+            AccessibilityNotification.Announcement(
+                redo ? outcome.redoneMessage : outcome.undoneMessage
+            ).post()
+            // Only this session's answers move its counts; other steps
+            // (a note edit, a flag) leave them alone.
+            if redo {
+                redoneCount += 1
+                if let answer = undoLedger.redone(outcome) {
+                    sessionStats.add(answer.rating, timeMs: answer.timeMs)
+                }
+            } else {
+                undoneCount += 1
+                if let answer = undoLedger.undone(outcome) {
+                    sessionStats.remove(answer.rating, timeMs: answer.timeMs)
+                }
+            }
+
             do {
                 let queue = try await Task.detached {
-                    try collection.undoLast()
-                    // Puts RWKV's model state back to before the answer.
-                    try? scheduler.didUndo(undoesAnswer)
-                    // Re-fetch queue — Anki places the undone card at the front
-                    return try scheduler.getQueuedCards(200)
+                    try scheduler.getQueuedCards(200)
                 }.value
-
-                canUndo = false
-                undoneCount += 1
-                // Roll back session stats only if the operation we just
-                // undid was actually an answer. undoLast() undoes the last
-                // *collection* operation, and a note edit is reachable from
-                // this screen (refreshAfterEdit) — decrementing regardless
-                // drove the counters below their true value, and negative.
-                if let last = lastRating {
-                    sessionStats.reviewed = max(0, sessionStats.reviewed - 1)
-                    if last != .again {
-                        sessionStats.correct = max(0, sessionStats.correct - 1)
-                    }
-                }
-                lastRating = nil
-
                 cardQueue = queue.cards
                 remainingCounts = DeckCounts(
                     newCount: queue.newCount,
@@ -318,7 +368,7 @@ public final class ReviewSession {
                 )
                 await advanceToNextCard(notes: notes, notetypes: notetypes, notetypesClient: notetypesClient, cardRendering: cardRendering)
             } catch {
-                Log.review.error("Undo failed: \(error)")
+                Log.review.error("Queue refresh after \(redo ? "redo" : "undo") failed: \(error)")
             }
         }
     }
@@ -378,6 +428,8 @@ public final class ReviewSession {
         frontHTML = prepared.frontHTML
         backHTML = strippingTypedAnswerPlaceholders(from: prepared.renderedBackHTML)
         reresolveCurrentCard()
+        // The edit is now the step Undo reverts.
+        await refreshUndoStatus()
 
         if showAnswer, let state = prepared.typedAnswerState {
             // Re-substitute the back placeholder with the diff; the typed text
@@ -437,6 +489,9 @@ private extension ReviewSession {
             invalidatePrefetch()
             return
         }
+
+        // An undo can bring a card back after the queue ran dry.
+        isFinished = false
 
         let prepared: PreparedCard
         if let hit = preparedNext, hit.id == next.card.id {
@@ -559,7 +614,10 @@ extension ReviewSession {
         session.remainingCounts = counts
         session.deckName = "한국어 · Vocab Typing"
         session.nextIntervals = [.again: "<1m", .hard: "8m", .good: "1d", .easy: "4d"]
-        session.canUndo = reviewed > 0
+        session.undoStatus = UndoStatus(
+            undo: reviewed > 0 ? "Answer Card" : "",
+            lastStep: UInt32(reviewed)
+        )
         session.templateName = "Card 1"
         return session
     }

@@ -18,9 +18,13 @@ public struct CardClient: Sendable {
     public var flag: @Sendable (_ cardId: CardID, _ value: UInt32) async throws -> Void
     public var resetToNew: @Sendable (_ cardId: CardID) async throws -> Void
     public var setDueDate: @Sendable (_ cardId: CardID, _ days: String) async throws -> Void
-    public var undoLast: @Sendable () async throws -> Void
+    /// The collection's undo, with RWKV's state reconciled (`CollectionService.undo`).
+    public var undo: @Sendable () async throws -> UndoOutcome
+    /// The collection's redo, with RWKV's state reconciled (`CollectionService.redo`).
+    public var redo: @Sendable () async throws -> UndoOutcome
     public var getCardFlags: @Sendable (_ cardId: CardID) async throws -> UInt32
-    public var hasUndoableAction: @Sendable () async throws -> Bool
+    /// What undo and redo would revert.
+    public var undoStatus: @Sendable () async throws -> UndoStatus
     public var removeCards: @Sendable (_ cardIds: [CardID]) async throws -> Void
 }
 

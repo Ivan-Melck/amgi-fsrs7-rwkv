@@ -24,7 +24,8 @@ public import Observation
 public final class CardContextMenuModel {
     var isMarkedNote = false
     public var currentFlag: UInt32 = 0
-    var canUndo = false
+    /// The collection's undo queue, for the Undo/Redo items' titles.
+    var undoStatus = UndoStatus()
     var isUndoing = false
     var errorMessage: String?
     var showError = false
@@ -92,15 +93,26 @@ public final class CardContextMenuModel {
         }
     }
 
+    /// The browser's Edit > Undo (`aqt.operations.collection.undo`).
     func undo(_ cardId: CardID) async -> Bool? {
-        guard !isUndoing, canUndo else { return nil }
+        guard !isUndoing, undoStatus.canUndo else { return nil }
+        return await undoOrRedo("Undo failed") { try await cardClient.undo() }
+    }
+
+    /// The browser's Edit > Redo (`aqt.operations.collection.redo`).
+    func redo(_ cardId: CardID) async -> Bool? {
+        guard !isUndoing, undoStatus.canRedo else { return nil }
+        return await undoOrRedo("Redo failed") { try await cardClient.redo() }
+    }
+
+    private func undoOrRedo(_ prefix: String, _ body: () async throws -> UndoOutcome) async -> Bool? {
         isUndoing = true
         defer { isUndoing = false }
         do {
-            try await cardClient.undoLast()
+            undoStatus = try await body().newStatus
             return true
         } catch {
-            setError("Undo failed: \(error.localizedDescription)")
+            setError("\(prefix): \(error.localizedDescription)")
             await refreshUndoAvailability()
             return nil
         }
@@ -118,7 +130,10 @@ public final class CardContextMenuModel {
 
     private func run(_ prefix: String, _ body: () async throws -> Bool) async -> Bool? {
         do {
-            return try await body()
+            let shouldAdvance = try await body()
+            // The action is now the step Undo reverts.
+            await refreshUndoAvailability()
+            return shouldAdvance
         } catch {
             setError("\(prefix): \(error.localizedDescription)")
             return nil
@@ -152,8 +167,8 @@ public final class CardContextMenuModel {
         }
     }
 
-    private func refreshUndoAvailability() async {
-        canUndo = (try? await cardClient.hasUndoableAction()) ?? false
+    func refreshUndoAvailability() async {
+        undoStatus = (try? await cardClient.undoStatus()) ?? UndoStatus()
     }
 
     private func setError(_ message: String) {

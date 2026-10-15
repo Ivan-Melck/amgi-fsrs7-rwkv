@@ -20,6 +20,7 @@ extension CardClient: DependencyKey {
         @Dependency(\.ankiBackend) var backend
         @Dependency(\.schedulerService) var scheduler
         @Dependency(\.decksService) var decks
+        @Dependency(\.collectionService) var collection
 
         return Self(
             fetchDue: { deckId in
@@ -73,15 +74,18 @@ extension CardClient: DependencyKey {
             setDueDate: { cardId, days in
                 try await backend.invoke(.setDueDate(cardIds: [cardId], days: days))
             },
-            undoLast: {
-                try await backend.invoke(.undoLastAction)
+            undo: {
+                try await backendOffload { try collection.undo() }
+            },
+            redo: {
+                try await backendOffload { try collection.redo() }
             },
             getCardFlags: { cardId in
                 let card = try await backend.invoke(.getCard(id: cardId))
                 return UInt32(card.flags) & 0b111
             },
-            hasUndoableAction: {
-                try await backend.invoke(.hasUndoableAction)
+            undoStatus: {
+                try await backend.invoke(.undoStatus)
             },
             removeCards: { cardIds in
                 try await backend.invoke(.removeCards(cardIds: cardIds))

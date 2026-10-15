@@ -101,6 +101,11 @@ struct ReviewContent: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     ReviewUndoButton(session: session, shortcutEnabled: keyboardActive)
                 }
+                if session.undoStatus.showsRedo {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ReviewRedoButton(session: session, shortcutEnabled: keyboardActive)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     CardActionsMenu(
                         session: session,
@@ -115,7 +120,8 @@ struct ReviewContent: View {
                 model: cardActions,
                 cardId: session.currentCardId,
                 noteId: session.currentNote?.id,
-                confirmDeleteNote: $confirmDeleteNote
+                confirmDeleteNote: $confirmDeleteNote,
+                onAction: { _ in Task { await session.refreshUndoStatus() } }
             )
             #if canImport(UIKit)
             .cardChromeToolbar(session: session, enabled: autoMatchCardBackground)
@@ -173,6 +179,9 @@ struct ReviewContent: View {
                 ReviewPositionCounter(session: session)
             }
             ReviewUndoButton(session: session, shortcutEnabled: keyboardActive)
+            if session.undoStatus.showsRedo {
+                ReviewRedoButton(session: session, shortcutEnabled: keyboardActive)
+            }
             CardActionsMenu(
                 session: session,
                 cardActions: cardActions,
@@ -224,6 +233,7 @@ private struct ReviewHaptics: ViewModifier {
                     : .impact(weight: .light)
             }
             .sensoryFeedback(.impact(flexibility: .soft), trigger: session.undoneCount)
+            .sensoryFeedback(.impact(flexibility: .soft), trigger: session.redoneCount)
             .sensoryFeedback(trigger: session.isFinished) { _, finished in
                 finished ? .success : nil
             }
@@ -274,6 +284,7 @@ private struct ReviewPositionCounter: View {
     }
 }
 
+/// The desktop's Edit > Undo (Ctrl+Z), named after the step it reverts.
 private struct ReviewUndoButton: View {
     let session: ReviewSession
     let shortcutEnabled: Bool
@@ -286,7 +297,24 @@ private struct ReviewUndoButton: View {
         }
         .disabled(!session.canUndo)
         .keyboardShortcut(shortcutEnabled ? KeyboardShortcut("z", modifiers: .command) : nil)
-        .accessibilityLabel("Undo")
+        .accessibilityLabel(session.undoStatus.undoTitle)
+    }
+}
+
+/// The desktop's Edit > Redo (Ctrl+Shift+Z).
+private struct ReviewRedoButton: View {
+    let session: ReviewSession
+    let shortcutEnabled: Bool
+
+    var body: some View {
+        Button {
+            session.redo()
+        } label: {
+            Image(systemName: "arrow.uturn.forward")
+        }
+        .disabled(!session.canRedo)
+        .keyboardShortcut(shortcutEnabled ? KeyboardShortcut("z", modifiers: [.command, .shift]) : nil)
+        .accessibilityLabel(session.undoStatus.redoTitle)
     }
 }
 
@@ -304,7 +332,7 @@ private struct CardActionsMenu: View {
     var body: some View {
         Menu {
             if let cardId = session.currentCardId {
-                CardFlagPicker(model: cardActions, cardId: cardId)
+                CardFlagPicker(model: cardActions, cardId: cardId, onAction: refreshUndo)
             }
 
             Section {
@@ -359,7 +387,8 @@ private struct CardActionsMenu: View {
                     model: cardActions,
                     cardId: cardId,
                     noteId: session.currentNote?.id,
-                    confirmDeleteNote: $confirmDeleteNote
+                    confirmDeleteNote: $confirmDeleteNote,
+                    onAction: refreshUndo
                 )
             }
         } label: {
@@ -371,6 +400,11 @@ private struct CardActionsMenu: View {
                 )
         }
         .accessibilityLabel("Card actions")
+    }
+
+    /// A card action is now the step Undo reverts.
+    private func refreshUndo(_: Bool) {
+        Task { await session.refreshUndoStatus() }
     }
 }
 
