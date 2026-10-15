@@ -101,10 +101,15 @@ extension DecksService: DependencyKey {
             },
             rebuildFilteredDeck: { deckId in
                 // Terms that order or filter by RWKV need its scores first.
-                if RwkvEnvironment.modelPath != nil {
-                    _ = try? backend.invoke(Request<Void>.rwkvFilteredDeckScores(deckId: deckId))
+                guard let modelPath = RwkvEnvironment.modelPath else {
+                    return try backend.invoke(.rebuildFilteredDeck(deckId: deckId))
                 }
-                return try backend.invoke(.rebuildFilteredDeck(deckId: deckId))
+                _ = try? backend.invoke(.rwkvPrepare(
+                    modelPath: modelPath,
+                    cacheDir: RwkvEnvironment.cacheDir(backend),
+                    precision: RwkvEnvironment.precision
+                ))
+                return try backend.invoke(Request<Int>.rwkvRebuildFilteredDeck(deckId: deckId))
             },
             emptyFilteredDeck: { deckId in
                 try backend.invoke(.emptyFilteredDeck(deckId: deckId))

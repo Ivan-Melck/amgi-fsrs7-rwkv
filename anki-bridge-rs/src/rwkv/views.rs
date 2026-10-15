@@ -82,6 +82,21 @@ pub(super) struct RescheduleRequest {
     pub deck_id: Option<i64>,
 }
 
+#[derive(Deserialize)]
+pub(super) struct SearchNoteIdsRequest {
+    pub search: String,
+}
+
+#[derive(Serialize)]
+pub(super) struct SearchNoteIdsResponse {
+    pub ids: Vec<i64>,
+}
+
+#[derive(Serialize)]
+pub(super) struct RebuildFilteredDeckResponse {
+    pub count: u32,
+}
+
 #[derive(Serialize)]
 pub(super) struct RescheduleResponse {
     /// False when the model state couldn't be prepared.
@@ -158,12 +173,6 @@ fn occurrences<'a>(
 }
 
 impl Engine {
-    /// Ready without rebuilding anything: what the desktop's deck browser,
-    /// graphs and card info require before they use RWKV.
-    pub(super) fn warm(&self) -> bool {
-        self.model.is_some() && self.trusted && self.base.is_some()
-    }
-
     /// Full predictions (`predict_many`) for query inputs, in reschedule-size
     /// batches.
     pub(super) fn predict_full(
@@ -192,7 +201,7 @@ impl Engine {
     /// counts include the cards RWKV would admit today.
     pub(super) fn deck_counts(&mut self, backend: &Backend) -> Result<DeckCountsResponse> {
         clear_deck_counts(backend)?;
-        if !self.warm() {
+        if !self.current(backend)? {
             return Ok(DeckCountsResponse {
                 scopes: 0,
                 deferred: self.model.is_some(),
@@ -336,7 +345,7 @@ impl Engine {
         let active = all_deck_configs(backend)?.iter().any(rwkv_active);
         let ready = active
             && self.model.is_some()
-            && (self.warm() || ((wait || needs.any()) && self.ready(backend)));
+            && (self.current(backend)? || ((wait || needs.any()) && self.ready(backend)));
         if !ready {
             set_stats_scores(backend, search, vec![])?;
             let status = if active && self.model.is_some() {
@@ -538,6 +547,61 @@ impl Engine {
         self.search_scores_with(backend, &search, needs, true)
     }
 
+    /// Note search whose matches depend on RWKV scores
+    /// (`prepare_browser_retrievability_scores` + the search): scoring and
+    /// searching under the engine lock, so a graph scoring another search
+    /// in between can't replace the scores the search reads.
+    pub(super) fn search_note_ids(
+        &mut self,
+        backend: &Backend,
+        req: SearchNoteIdsRequest,
+    ) -> Result<SearchNoteIdsResponse> {
+        let needs = SearchNeeds::of(&req.search);
+        if needs.any() {
+            self.search_scores_with(backend, &req.search, needs, true)?;
+        }
+        let found = backend.with_col(|col| {
+            SearchService::search_notes(
+                col,
+                anki_proto::search::SearchRequest {
+                    search: req.search.clone(),
+                    order: None,
+                },
+            )
+        })?;
+        Ok(SearchNoteIdsResponse { ids: found.ids })
+    }
+
+    /// `_prepare_filtered_deck_retrievability_scores` + the rebuild, under
+    /// the engine lock. Like the desktop, the rebuild fails rather than build
+    /// without the RWKV scores its terms need.
+    pub(super) fn rebuild_filtered_deck(
+        &mut self,
+        backend: &Backend,
+        req: FilteredDeckRequest,
+    ) -> Result<RebuildFilteredDeckResponse> {
+        let scores = self.filtered_deck_scores(
+            backend,
+            FilteredDeckRequest {
+                deck_id: req.deck_id,
+            },
+        )?;
+        if scores.status == "pending" {
+            return Err(Error(
+                "RWKV scores for this filtered deck aren't ready yet; try again shortly.".into(),
+            ));
+        }
+        let changes = backend.with_col(|col| {
+            SchedulerService::rebuild_filtered_deck(
+                col,
+                anki_proto::decks::DeckId { did: req.deck_id },
+            )
+        })?;
+        Ok(RebuildFilteredDeckResponse {
+            count: changes.count,
+        })
+    }
+
     // MARK: card info
 
     /// `rwkv_card_info_rows`: rows the desktop appends to Card Info, and the
@@ -579,9 +643,9 @@ impl Engine {
                 )
             })
             .ok();
-        let prediction = match (&states, self.warm()) {
+        let prediction = match (&states, self.current(backend)?) {
             (Some(states), true) => {
-                let context = LiveContext::load(backend, &card, &config, &self.session)?;
+                let context = LiveContext::load(backend, &card, &config, &self.synthetic)?;
                 let input = context.query_input(&card, &config, states);
                 let prediction = self.predict_full(std::slice::from_ref(&input))?.pop();
                 prediction.map(|p| (input, p))
@@ -788,6 +852,9 @@ impl Engine {
             })
             .collect();
         let predicted = items.len() as u32;
+        for item in &items {
+            clear_card_info_score(backend, item.card_id)?;
+        }
         if items.is_empty() {
             return Ok(RescheduleResponse {
                 built: true,
@@ -985,6 +1052,22 @@ fn s90_for_normal(normal: &pb::scheduling_state::Normal) -> Option<f32> {
             .and_then(|l| stability(&l.memory_state))
             .or_else(|| r.review.as_ref().and_then(|r| stability(&r.memory_state))),
         N::New(_) => None,
+    }
+}
+
+/// Card info while the model state is being built (`_prepare_reviewer_backend_for_card_info`).
+pub(super) fn loading_card_info() -> CardInfoResponse {
+    CardInfoResponse {
+        rows: vec![
+            CardInfoRow {
+                label: "RWKV computed R".into(),
+                value: "Unavailable".into(),
+            },
+            CardInfoRow {
+                label: "Retrievability source".into(),
+                value: "RWKV state is loading".into(),
+            },
+        ],
     }
 }
 

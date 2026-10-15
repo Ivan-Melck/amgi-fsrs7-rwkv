@@ -286,7 +286,6 @@ fn answer_next(engine: &mut Engine, fx: &Fixture, rating: u8) -> Option<i64> {
             },
         )
         .unwrap();
-    assert!(shown.active);
     let states =
         pb::SchedulingStates::decode(BASE64.decode(shown.states.as_bytes()).unwrap().as_slice())
             .unwrap();
@@ -348,7 +347,7 @@ fn live_answers_match_a_fresh_canonical_replay() {
             None => break,
         }
     }
-    assert_eq!(live.own_answers, answered.len() as u64);
+    assert_eq!(live.own_review_ids.len(), answered.len());
 
     // Every dataset state was exercised by a live answer.
     let kinds: Vec<i64> = sql(
@@ -842,4 +841,315 @@ fn curve_reschedule_writes_intervals_and_s90() {
     assert_eq!(all.predicted, 5);
     engine.trusted = false;
     assert_eq!(engine.ensure_ready(&fx.backend).unwrap().0, "revalidated");
+}
+
+/// Moves the cards at `indices` into a "Default::Plain" subdeck whose preset
+/// uses plain FSRS-7 (no RWKV).
+fn add_plain_subdeck(fx: &Fixture, indices: &[usize]) -> i64 {
+    let deck_id = fx
+        .backend
+        .with_col(|col| {
+            let mut deck = DecksService::new_deck(col)?;
+            deck.name = "Default::Plain".into();
+            let deck_id = DecksService::add_deck(col, deck)?.id;
+            let mut config = DeckConfigService::get_deck_config(
+                col,
+                anki_proto::deck_config::DeckConfigId { dcid: 1 },
+            )?;
+            config.id = 0;
+            config.name = "Plain FSRS".into();
+            let inner = config.config.as_mut().unwrap();
+            inner.rwkv_review_enabled = false;
+            inner.rwkv_review_instant_order_enabled = false;
+            let _ = DeckConfigService::update_deck_configs(
+                col,
+                anki_proto::deck_config::UpdateDeckConfigsRequest {
+                    target_deck_id: deck_id,
+                    configs: vec![config],
+                    fsrs: true,
+                    fsrs_short_term_with_steps_enabled: true,
+                    ..Default::default()
+                },
+            )?;
+            Ok(deck_id)
+        })
+        .unwrap();
+    for i in indices {
+        sql(
+            &fx.backend,
+            "update cards set did = ? where id = ?",
+            vec![deck_id.into(), fx.card_ids[*i].into()],
+        );
+    }
+    deck_id
+}
+
+#[test]
+fn answers_on_plain_presets_also_advance_the_model() {
+    let Some(fx) = fixture("mixed", 10) else {
+        return;
+    };
+    let plain = add_plain_subdeck(&fx, &[0, 2, 4, 6, 8]);
+    let mut live = Engine::default();
+    assert_eq!(prepare(&mut live, &fx, None).source, "replayed");
+    live.score_deck_request(
+        &fx.backend,
+        ScoreDeckRequest {
+            deck_id: 1,
+            new_session: true,
+        },
+    )
+    .unwrap();
+
+    let mut answered = vec![];
+    for rating in [3, 1, 3, 4, 2, 3, 1, 3].iter().cycle().take(40) {
+        match answer_next(&mut live, &fx, *rating) {
+            Some(card_id) => answered.push(card_id),
+            None => break,
+        }
+    }
+    let plain_answers = sql(
+        &fx.backend,
+        "select count() from revlog r join cards c on c.id = r.cid where c.did = ? and r.id > ?",
+        vec![plain.into(), (now_millis() - 600_000).into()],
+    )[0][0]
+        .as_i64()
+        .unwrap();
+    assert!(plain_answers > 0, "no answers landed on the plain preset");
+    assert!(
+        live.current(&fx.backend).unwrap(),
+        "live state should still be current"
+    );
+
+    let queries = all_queries(&fx);
+    let mut fresh = Engine::default();
+    prepare(&mut fresh, &fx, None);
+    assert_same_predictions(
+        &live.predict_many(&queries).unwrap(),
+        &fresh.predict_many(&queries).unwrap(),
+    );
+}
+
+#[test]
+fn reviewer_bookkeeping_survives_a_new_session() {
+    let Some(fx) = fixture("sessions", 15) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+    for rating in [3, 1, 3, 4, 2, 1, 3, 3, 1, 4, 3, 2].iter().cycle().take(60) {
+        if answer_next(&mut engine, &fx, *rating).is_none() {
+            break;
+        }
+    }
+    let synthetic = engine.synthetic.len();
+    let answered = engine.answered_ids.len();
+    assert!(
+        synthetic > 0,
+        "the fixture's same-day cards should synthesise states"
+    );
+    engine
+        .score_deck_request(
+            &fx.backend,
+            ScoreDeckRequest {
+                deck_id: 1,
+                new_session: true,
+            },
+        )
+        .unwrap();
+    assert_eq!(engine.synthetic.len(), synthetic);
+    assert_eq!(engine.answered_ids.len(), answered);
+}
+
+#[test]
+fn a_learning_restart_after_history_rebuilds_the_state() {
+    let Some(fx) = fixture("restart", 1) else {
+        return;
+    };
+    let mut live = Engine::default();
+    prepare(&mut live, &fx, None);
+    // Back to new without a reset entry: the next answer starts a new
+    // learning history, which the canonical history keeps from there on.
+    sql(
+        &fx.backend,
+        "update cards set type = 0, queue = 0, due = 0 where id = ?",
+        vec![fx.card_ids[0].into()],
+    );
+    let _ = fx.backend.with_col(|col| {
+        let mut config = DeckConfigService::get_deck_config(
+            col,
+            anki_proto::deck_config::DeckConfigId { dcid: 1 },
+        )?;
+        config.config.as_mut().unwrap().new_per_day = 10;
+        DeckConfigService::update_deck_configs(
+            col,
+            anki_proto::deck_config::UpdateDeckConfigsRequest {
+                target_deck_id: 1,
+                configs: vec![config],
+                fsrs: true,
+                fsrs_short_term_with_steps_enabled: true,
+                ..Default::default()
+            },
+        )
+    });
+    assert_eq!(answer_next(&mut live, &fx, 3), Some(fx.card_ids[0]));
+    assert!(
+        live.base.is_none(),
+        "a restart must drop the resident state"
+    );
+    assert_eq!(live.ensure_ready(&fx.backend).unwrap().0, "replayed");
+
+    let queries = all_queries(&fx);
+    let mut fresh = Engine::default();
+    prepare(&mut fresh, &fx, None);
+    assert_same_predictions(
+        &live.predict_many(&queries).unwrap(),
+        &fresh.predict_many(&queries).unwrap(),
+    );
+}
+
+#[test]
+fn changes_made_elsewhere_are_noticed_and_caught_up() {
+    let Some(fx) = fixture("elsewhere", 6) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    assert!(engine.current(&fx.backend).unwrap());
+
+    // Another client (or the browser) answers a card behind the engine's back.
+    let queued = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap()
+        .cards
+        .remove(0);
+    let states = queued.states.unwrap();
+    let _ = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::answer_card(
+                col,
+                pb::CardAnswer {
+                    card_id: queued.card.unwrap().id,
+                    current_state: states.current,
+                    new_state: states.good,
+                    rating: 2,
+                    answered_at_millis: now_millis(),
+                    milliseconds_taken: 3000,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap();
+    assert!(
+        !engine.current(&fx.backend).unwrap(),
+        "the outside answer must be noticed"
+    );
+    let counts = engine.deck_counts(&fx.backend).unwrap();
+    assert!(counts.deferred);
+    assert_eq!(engine.ensure_ready(&fx.backend).unwrap(), ("suffix", 1));
+
+    let queries = all_queries(&fx);
+    let mut fresh = Engine::default();
+    prepare(&mut fresh, &fx, None);
+    assert_same_predictions(
+        &engine.predict_many(&queries).unwrap(),
+        &fresh.predict_many(&queries).unwrap(),
+    );
+}
+
+#[test]
+fn answering_clears_the_card_info_score() {
+    let Some(fx) = fixture("infoclear", 4) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let head = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap()
+        .cards[0]
+        .card
+        .as_ref()
+        .unwrap()
+        .id;
+    engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id: head })
+        .unwrap();
+    assert!(rwkv_score(&fx, head).is_some());
+    assert_eq!(answer_next(&mut engine, &fx, 3), Some(head));
+    assert_eq!(rwkv_score(&fx, head), None);
+}
+
+#[test]
+fn undo_still_works_after_a_save() {
+    let Some(fx) = fixture("undosave", 6) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("undosave-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    let queries = all_queries(&fx);
+    let before = engine.predict_many(&queries).unwrap();
+    answer_next(&mut engine, &fx, 3).unwrap();
+    assert!(engine.save(&fx.backend).unwrap().saved);
+
+    let _ = fx.backend.with_col(CollectionService::undo).unwrap();
+    assert!(engine.undo_answer(&fx.backend).unwrap().restored);
+    assert!(
+        engine.current(&fx.backend).unwrap(),
+        "undo should revalidate, not replay"
+    );
+    assert_same_predictions(&before, &engine.predict_many(&queries).unwrap());
+}
+
+#[test]
+fn another_collection_on_the_same_backend_is_not_trusted() {
+    let Some(fx) = fixture("switch", 3) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    assert!(engine.current(&fx.backend).unwrap());
+
+    let other = tempfile_dir::Dir::new("switch-other");
+    fx.backend
+        .close_collection(anki_proto::collection::CloseCollectionRequest::default())
+        .unwrap();
+    fx.backend
+        .open_collection(anki_proto::collection::OpenCollectionRequest {
+            collection_path: other.0.join("collection.anki2").to_string_lossy().into(),
+            media_folder_path: other.0.join("media").to_string_lossy().into(),
+            media_db_path: other.0.join("media.db").to_string_lossy().into(),
+        })
+        .unwrap();
+    assert!(!engine.current(&fx.backend).unwrap());
+    assert!(engine.base.is_none() && engine.answered_ids.is_empty());
 }

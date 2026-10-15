@@ -33,8 +33,16 @@ extension NotesService: DependencyKey {
             searchNoteIds: { query in
                 // `prop:rwkv:r<…` and `is:rwkv:due` match on RWKV scores
                 // prepared for exactly this search.
-                if RwkvEnvironment.modelPath != nil, query.localizedCaseInsensitiveContains("rwkv") {
-                    _ = try? backend.invoke(Request<Void>.rwkvSearchScores(search: query, wait: true))
+                let lowered = query.lowercased()
+                if let modelPath = RwkvEnvironment.modelPath,
+                   lowered.contains("prop:rwkv") || lowered.contains("is:rwkv") {
+                    // Load the model if this is the first RWKV use this launch.
+                    _ = try? backend.invoke(.rwkvPrepare(
+                        modelPath: modelPath,
+                        cacheDir: RwkvEnvironment.cacheDir(backend),
+                        precision: RwkvEnvironment.precision
+                    ))
+                    return try backend.invoke(.rwkvSearchNoteIds(query: query))
                 }
                 return try backend.invoke(.searchNoteIds(query: query))
             },

@@ -274,14 +274,47 @@ extension Request where Response == Void {
         )
     }
 
-    /// Before building a filtered deck whose terms order or filter by RWKV.
-    public static func rwkvFilteredDeckScores(deckId: DeckID) -> Self {
+}
+
+private struct SearchBody: Encodable {
+    let search: String
+}
+
+private struct NoteIdsResponse: Decodable {
+    let ids: [Int64]
+}
+
+private struct CountResponse: Decodable {
+    let count: Int
+}
+
+extension Request where Response == [NoteID] {
+    /// A note search using `prop:rwkv*:r` / `is:rwkv*:due`: RWKV scores are
+    /// prepared and the search runs in one bridge call, so no other scoring
+    /// can replace the scores in between.
+    public static func rwkvSearchNoteIds(query: String) -> Self {
         Self(
             serviceId: ServiceID.aux,
-            methodId: AuxMethod.rwkvFilteredDeckScores,
+            methodId: AuxMethod.rwkvSearchNoteIds,
+            bypassesCallLock: true,
+            encode: { try encoder.encode(SearchBody(search: query.isEmpty ? "deck:*" : query)) },
+            decode: { data in
+                try decoder.decode(NoteIdsResponse.self, from: data).ids.map { NoteID($0) }
+            }
+        )
+    }
+}
+
+extension Request where Response == Int {
+    /// Rebuilds a filtered deck after preparing the RWKV scores its terms
+    /// order or filter by; fails, like the desktop, when they aren't ready.
+    public static func rwkvRebuildFilteredDeck(deckId: DeckID) -> Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvRebuildFilteredDeck,
             bypassesCallLock: true,
             encode: { try encoder.encode(DeckIdBody(deckId: deckId.rawValue)) },
-            decode: { _ in () }
+            decode: { data in try decoder.decode(CountResponse.self, from: data).count }
         )
     }
 }

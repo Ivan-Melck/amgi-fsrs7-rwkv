@@ -62,9 +62,11 @@ pub const SEARCH_SCORES: u32 = 108;
 pub const FILTERED_DECK_SCORES: u32 = 109;
 pub const CARD_INFO: u32 = 110;
 pub const RESCHEDULE: u32 = 111;
+pub const SEARCH_NOTE_IDS: u32 = 112;
+pub const REBUILD_FILTERED_DECK: u32 = 113;
 
 pub fn handles(method: u32) -> bool {
-    (PREPARE..=RESCHEDULE).contains(&method)
+    (PREPARE..=REBUILD_FILTERED_DECK).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -82,18 +84,15 @@ const OVERLAY_KEY: &str = "fsrsPresetOverlay";
 const DYNAMIC_PRESET_REPLAY_KEY: &str = "rwkvDynamicPresetReplay";
 
 pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
-    // The deck list and graphs must not wait behind a history replay; like
-    // the desktop, they show due-date values until the model is ready.
-    let mut engines = match method {
-        DECK_COUNTS | SEARCH_SCORES => match engines().try_lock() {
-            Ok(engines) => engines,
-            Err(std::sync::TryLockError::Poisoned(e)) => e.into_inner(),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                return busy(backend, method, input);
-            }
-        },
-        _ => engines().lock().unwrap_or_else(|e| e.into_inner()),
-    };
+    // The deck list, graphs and card info must not wait behind a history
+    // replay; like the desktop while its state cache loads, they show
+    // due-date / FSRS values until the model is ready. Searches whose
+    // matches depend on RWKV scores do wait.
+    if REPLAYING.load(std::sync::atomic::Ordering::SeqCst) && answers_without_waiting(method, input)
+    {
+        return busy(backend, method, input);
+    }
+    let mut engines = engines().lock().unwrap_or_else(|e| e.into_inner());
     let engine = engines.entry(backend_key(backend)).or_default();
     let result = match method {
         PREPARE => call(input, |req| engine.prepare(backend, req)),
@@ -108,6 +107,8 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         FILTERED_DECK_SCORES => call(input, |req| engine.filtered_deck_scores(backend, req)),
         CARD_INFO => call(input, |req| engine.card_info(backend, req)),
         RESCHEDULE => call(input, |req| engine.reschedule(backend, req)),
+        SEARCH_NOTE_IDS => call(input, |req| engine.search_note_ids(backend, req)),
+        REBUILD_FILTERED_DECK => call(input, |req| engine.rebuild_filtered_deck(backend, req)),
         other => Err(Error(format!("unknown rwkv method {other}"))),
     };
     result.map_err(|err| {
@@ -116,6 +117,16 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
             format!("rwkv: {}", err.0),
         )
     })
+}
+
+fn answers_without_waiting(method: u32, input: &[u8]) -> bool {
+    match method {
+        DECK_COUNTS | CARD_INFO => true,
+        SEARCH_SCORES => {
+            serde_json::from_slice::<views::SearchScoresRequest>(input).is_ok_and(|r| !r.wait)
+        }
+        _ => false,
+    }
 }
 
 /// The engine is busy (a replay is running): answer without it.
@@ -129,6 +140,10 @@ fn busy(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>
     match method {
         DECK_COUNTS => call(input, |_: Empty| {
             views::clear_deck_counts_without_engine(backend)
+        })
+        .map_err(to_bytes),
+        CARD_INFO => call(input, |_: views::CardInfoRequest| {
+            Ok(views::loading_card_info())
         })
         .map_err(to_bytes),
         _ => call(input, |req: views::SearchScoresRequest| {
@@ -323,9 +338,6 @@ struct HistoryParams {
 #[derive(Default)]
 struct Session {
     deck_id: Option<i64>,
-    /// `reviewer._answeredIds`, oldest first.
-    answered_ids: Vec<i64>,
-    synthetic: HashMap<i64, SyntheticAnswer>,
     prediction: Option<Prediction>,
     /// The states last shown for a card (`_scheduling_states(reviewer)`),
     /// whose dynamic desired retentions the answer input reuses.
@@ -356,15 +368,30 @@ struct UndoFrame {
 struct Engine {
     model: Option<Model>,
     cache_dir: Option<PathBuf>,
-    /// History the resident state reflects, before `own_answers`.
+    /// History the resident state reflects, before `own_review_ids`.
     base: Option<Identity>,
-    /// Answers applied live since `base`.
-    own_answers: u64,
+    /// Revlog ids of the answers applied live since `base`, oldest first.
+    own_review_ids: Vec<i64>,
     replay_key: Option<String>,
     /// False when the collection may have changed behind our back.
     trusted: bool,
+    /// The collection file and its modification time when the state was
+    /// last known to match it. Any operation (sync, import, edits, undo,
+    /// card actions) bumps the time, so a mismatch means "revalidate".
+    collection_path: Option<String>,
+    collection_mod: Option<i64>,
     unsaved: bool,
     session: Session,
+    /// `reviewer._answeredIds`, oldest first; like the desktop reviewer's,
+    /// kept across review sessions.
+    answered_ids: Vec<i64>,
+    /// Same-day states this bridge synthesised (`_RwkvSyntheticAnswerState`),
+    /// kept across review sessions like the desktop reviewer's.
+    synthetic: HashMap<i64, SyntheticAnswer>,
+    /// A refresh the desktop runs after showing the next card.
+    deferred_refresh: Option<i64>,
+    /// The deck and cards of the queue scores installed in the backend.
+    installed_scores: Option<(i64, std::collections::HashSet<i64>)>,
     undo: Vec<UndoFrame>,
 }
 
@@ -373,6 +400,7 @@ impl Engine {
 
     fn prepare(&mut self, backend: &Backend, req: PrepareRequest) -> Result<PrepareResponse> {
         let started = Instant::now();
+        self.follow_collection(backend)?;
         self.cache_dir = req.cache_dir.map(PathBuf::from);
         let configs = all_deck_configs(backend)?;
         let active = configs.iter().any(rwkv_active);
@@ -387,7 +415,11 @@ impl Engine {
             });
         }
 
-        let precision_name = req.precision.unwrap_or_else(|| "int8".into());
+        // `state_precision_for_profile`: unknown values fall back to int8.
+        let precision_name = req
+            .precision
+            .filter(|p| StatePrecision::parse(p).is_ok())
+            .unwrap_or_else(|| "int8".into());
         let precision = StatePrecision::parse(&precision_name).map_err(|e| Error(e.to_string()))?;
         let path = PathBuf::from(&req.model_path);
         let reload = self
@@ -409,12 +441,8 @@ impl Engine {
                 precision_name,
                 digest,
             });
-            self.base = None;
+            self.forget_state();
         }
-        // Sessions start here, so revalidate against the collection: syncs,
-        // browser edits and preset changes since the last session all show
-        // up in the history fingerprint or the replay key.
-        self.trusted = false;
         let (source, replayed_reviews) = self.ensure_ready(backend)?;
         Ok(PrepareResponse {
             active,
@@ -425,37 +453,109 @@ impl Engine {
         })
     }
 
+    /// Drops everything tied to the resident state's history.
+    fn forget_state(&mut self) {
+        self.base = None;
+        self.own_review_ids.clear();
+        self.trusted = false;
+        self.collection_mod = None;
+        self.undo.clear();
+        self.session.prediction = None;
+    }
+
+    /// Another collection was opened on this backend (profile switch, full
+    /// download): its history, cache and reviewer bookkeeping don't apply.
+    fn follow_collection(&mut self, backend: &Backend) -> Result<()> {
+        let path = collection_path(backend)?;
+        if self.collection_path.as_deref() != Some(path.as_str()) {
+            if self.collection_path.is_some() {
+                self.forget_state();
+                self.cache_dir = None;
+                self.session = Session::default();
+                self.answered_ids.clear();
+                self.synthetic.clear();
+                self.deferred_refresh = None;
+            }
+            self.collection_path = Some(path);
+        }
+        Ok(())
+    }
+
+    /// Whether the resident state matches the collection right now, without
+    /// rebuilding anything: the collection is unchanged since we last
+    /// checked, or its history is exactly what we replayed plus our own
+    /// answers. Cheap (one fingerprint at most); what the desktop requires
+    /// before review-time predictions, deck counts, graphs and card info.
+    fn current(&mut self, backend: &Backend) -> Result<bool> {
+        self.follow_collection(backend)?;
+        if self.model.is_none() {
+            return Ok(false);
+        }
+        let Some(base) = self.base.clone() else {
+            return Ok(false);
+        };
+        let modified = collection_mod(backend)?;
+        if self.trusted && self.collection_mod == Some(modified) {
+            return Ok(true);
+        }
+        let params = history_params(backend, self.model_precision_name())?;
+        if self.replay_key.as_deref() != Some(&params.replay_key) {
+            self.trusted = false;
+            return Ok(false);
+        }
+        let fingerprint = fingerprint(backend, &params, Some(&base))?;
+        let current = (fingerprint.history_is_valid || fingerprint.history_prefix_is_valid)
+            && fingerprint.review_count == base.review_count + self.own_review_ids.len() as u64
+            && self.own_reviews_are_the_suffix(backend, &base)?;
+        self.trusted = current;
+        self.collection_mod = current.then_some(modified);
+        Ok(current)
+    }
+
+    /// The eligible reviews after `base` are exactly the answers we applied:
+    /// equal counts alone could hide a skipped answer plus an undone one.
+    fn own_reviews_are_the_suffix(&self, backend: &Backend, base: &Identity) -> Result<bool> {
+        let sql = format!(
+            "select id from revlog where id > ? and {} order by id",
+            historical_answer_condition("revlog")
+        );
+        let ids: Vec<i64> =
+            db_query::<(i64,)>(backend, &sql, vec![serde_json::json!(base.last_review_id)])?
+                .into_iter()
+                .map(|(id,)| id)
+                .collect();
+        let mut own = self.own_review_ids.clone();
+        own.sort_unstable();
+        Ok(ids == own)
+    }
+
     /// Makes the resident state match the collection's canonical history,
-    /// cheapest way first: trusted as is, revalidated, restored from disk
-    /// (plus newer reviews), or a full replay.
+    /// cheapest way first: current as is, newer reviews replayed on top,
+    /// restored from disk (plus newer reviews), or a full replay.
     fn ensure_ready(&mut self, backend: &Backend) -> Result<(&'static str, u64)> {
         if self.model.is_none() {
             return Err(Error("model not loaded; call prepare first".into()));
         }
-        if self.trusted && self.base.is_some() {
-            return Ok(("resident", 0));
+        let was_trusted = self.trusted;
+        if self.current(backend)? {
+            return Ok((
+                if was_trusted {
+                    "resident"
+                } else {
+                    "revalidated"
+                },
+                0,
+            ));
         }
         let params = history_params(backend, self.model_precision_name())?;
         if self.replay_key.as_deref() != Some(&params.replay_key) {
-            self.base = None;
-            self.undo.clear();
+            self.forget_state();
         }
-
-        if let Some(base) = self.base.clone() {
-            let fingerprint = fingerprint(backend, &params, Some(&base))?;
-            let expected = base.review_count + self.own_answers;
-            if fingerprint.history_prefix_is_valid || fingerprint.history_is_valid {
-                if fingerprint.review_count == expected {
-                    self.adopt(&params, Identity::from_fingerprint(&fingerprint));
-                    return Ok(("revalidated", 0));
-                }
-                if self.own_answers == 0 {
-                    let replayed = self.replay_suffix(backend, &params, base.review_count)?;
-                    return Ok(("suffix", replayed));
-                }
+        if let (Some(base), true) = (self.base.clone(), self.own_review_ids.is_empty()) {
+            if let Some(replayed) = self.replay_suffix(backend, &params, &base)? {
+                return Ok(("suffix", replayed));
             }
         }
-
         if let Some(restored) = self.restore_from_disk(backend, &params)? {
             return Ok(restored);
         }
@@ -469,11 +569,18 @@ impl Engine {
             .map_or("", |m| m.precision_name.as_str())
     }
 
-    fn adopt(&mut self, params: &HistoryParams, identity: Identity) {
+    fn adopt(
+        &mut self,
+        backend: &Backend,
+        params: &HistoryParams,
+        identity: Identity,
+    ) -> Result<()> {
         self.base = Some(identity);
-        self.own_answers = 0;
+        self.own_review_ids.clear();
         self.replay_key = Some(params.replay_key.clone());
         self.trusted = true;
+        self.collection_mod = Some(collection_mod(backend)?);
+        Ok(())
     }
 
     fn model_mut(&mut self) -> Result<&mut RwkvInference> {
@@ -483,8 +590,7 @@ impl Engine {
             .ok_or_else(|| Error("model not loaded".into()))
     }
 
-    /// `_warm_up_reviewer_backend` from scratch, on a fresh runtime.
-    fn replay_full(&mut self, backend: &Backend, params: &HistoryParams) -> Result<u64> {
+    fn reload_model(&mut self) -> Result<()> {
         let model = self
             .model
             .as_mut()
@@ -495,7 +601,13 @@ impl Engine {
             MAX_INTERVAL_DAYS,
             model.precision,
         )?;
-        self.undo.clear();
+        Ok(())
+    }
+
+    /// `_warm_up_reviewer_backend` from scratch, on a fresh runtime.
+    fn replay_full(&mut self, backend: &Backend, params: &HistoryParams) -> Result<u64> {
+        self.forget_state();
+        self.reload_model()?;
         let response = history_inputs(backend, params)?;
         let identity = response
             .metadata
@@ -505,43 +617,61 @@ impl Engine {
             .ok_or_else(|| Error("history response has no identity".into()))?;
         let count = response.reviews.len() as u64;
         self.warm_up(response.reviews.iter().map(history_review_input).collect())?;
-        self.adopt(params, identity);
+        self.adopt(backend, params, identity)?;
         self.unsaved = true;
         self.save_now(backend);
         Ok(count)
     }
 
-    /// Replays only the reviews after the first `known` canonical ones; valid
-    /// when the fingerprint confirmed the first `known` as a prefix.
+    /// Replays only the reviews after `known`, if the collection's history
+    /// still starts with it. The prefix check and the inputs come from one
+    /// collection lock, so a sync can't slip in between. `None` when the
+    /// prefix no longer holds.
     fn replay_suffix(
         &mut self,
         backend: &Backend,
         params: &HistoryParams,
-        known: u64,
-    ) -> Result<u64> {
-        let response = history_inputs(backend, params)?;
+        known: &Identity,
+    ) -> Result<Option<u64>> {
+        let (fingerprint, response) = backend.with_col(|col| {
+            let mut request = params.request.clone();
+            request.expected_identity = Some(known.into());
+            let fingerprint = SchedulerService::rwkv_historical_review_fingerprint(col, request)?;
+            if !(fingerprint.history_is_valid || fingerprint.history_prefix_is_valid) {
+                return Ok((fingerprint, None));
+            }
+            let response =
+                SchedulerService::rwkv_historical_review_inputs(col, history_request(params))?;
+            Ok((fingerprint, Some(response)))
+        })?;
+        let Some(response) = response else {
+            return Ok(None);
+        };
         let identity = response
             .metadata
             .as_ref()
             .and_then(|m| m.identity.as_ref())
             .map(Identity::from)
             .ok_or_else(|| Error("history response has no identity".into()))?;
+        debug_assert_eq!(identity.review_count, fingerprint.review_count);
         let suffix: Vec<_> = response
             .reviews
             .iter()
-            .skip(known as usize)
+            .skip(known.review_count as usize)
             .map(history_review_input)
             .collect();
         let count = suffix.len() as u64;
+        // A failed replay leaves the state partly advanced: never reuse it.
+        self.forget_state();
         self.warm_up(suffix)?;
-        self.undo.clear();
-        self.adopt(params, identity);
+        self.adopt(backend, params, identity)?;
         self.unsaved = true;
         self.save_now(backend);
-        Ok(count)
+        Ok(Some(count))
     }
 
     fn warm_up(&mut self, reviews: Vec<ReviewInput>) -> Result<()> {
+        let _replaying = ReplayGuard::start();
         let model = self.model_mut()?;
         for chunk in reviews.chunks(WARM_UP_CHUNK) {
             model.warm_up_reviews(chunk.to_vec(), false)?;
@@ -567,27 +697,35 @@ impl Engine {
         if !fingerprint.history_is_valid && !fingerprint.history_prefix_is_valid {
             return Ok(None);
         }
-        let model = self
-            .model
-            .as_mut()
-            .ok_or_else(|| Error("model not loaded".into()))?;
-        model.inference = RwkvInference::load_with_precision(
-            model.path.clone(),
-            TARGET_RETENTION,
-            MAX_INTERVAL_DAYS,
-            model.precision,
-        )?;
-        if cache::restore(&dir, &mut model.inference).is_err() {
+        self.forget_state();
+        self.reload_model()?;
+        let restored = {
+            let _replaying = ReplayGuard::start();
+            let model = self.model_mut()?;
+            cache::restore(&dir, model).is_ok()
+        };
+        if !restored {
+            self.reload_model()?;
             return Ok(None);
         }
-        self.undo.clear();
-        if fingerprint.history_is_valid {
-            self.adopt(params, header.identity);
+        if fingerprint.history_is_valid && fingerprint.review_count == header.identity.review_count
+        {
+            self.adopt(backend, params, header.identity)?;
             self.unsaved = false;
             return Ok(Some(("restored", 0)));
         }
-        let replayed = self.replay_suffix(backend, params, header.identity.review_count)?;
-        Ok(Some(("restored+suffix", replayed)))
+        // The cached state is the prefix; it stays the base until the suffix
+        // replay adopts the full history.
+        self.base = Some(header.identity.clone());
+        self.replay_key = Some(params.replay_key.clone());
+        match self.replay_suffix(backend, params, &header.identity)? {
+            Some(replayed) => Ok(Some(("restored+suffix", replayed))),
+            None => {
+                self.forget_state();
+                self.reload_model()?;
+                Ok(None)
+            }
+        }
     }
 
     /// Persists the resident state if it is ahead of the saved copy.
@@ -597,8 +735,10 @@ impl Engine {
         })
     }
 
+    /// Saves under the identity of the full current history, without
+    /// rebasing: our answers stay undoable after a save.
     fn save_now(&mut self, backend: &Backend) -> bool {
-        if !self.unsaved || !self.trusted {
+        if !self.unsaved || !matches!(self.current(backend), Ok(true)) {
             return false;
         }
         let (Some(dir), Some(model), Some(base), Some(key)) = (
@@ -610,7 +750,7 @@ impl Engine {
             return false;
         };
         let digest = model.digest.clone();
-        let identity = if self.own_answers == 0 {
+        let identity = if self.own_review_ids.is_empty() {
             base
         } else {
             // Our answers appended reviews; the saved identity must name them.
@@ -620,16 +760,7 @@ impl Engine {
             let Ok(fp) = fingerprint(backend, &params, Some(&base)) else {
                 return false;
             };
-            if !(fp.history_prefix_is_valid || fp.history_is_valid)
-                || fp.review_count != base.review_count + self.own_answers
-            {
-                self.trusted = false;
-                return false;
-            }
-            let identity = Identity::from_fingerprint(&fp);
-            self.base = Some(identity.clone());
-            self.own_answers = 0;
-            identity
+            Identity::from_fingerprint(&fp)
         };
         let header = cache::Header {
             version: REPLAY_VERSION,
@@ -655,7 +786,8 @@ impl Engine {
         Ok(Empty {})
     }
 
-    /// Whether resident state may be used now, rebuilding it if needed.
+    /// Whether resident state may be used now, rebuilding it if needed. For
+    /// session starts and explicit actions; review-time paths use `current`.
     fn ready(&mut self, backend: &Backend) -> bool {
         self.model.is_some() && self.ensure_ready(backend).is_ok()
     }
@@ -672,6 +804,7 @@ impl Engine {
                 deck_id: Some(req.deck_id),
                 ..Default::default()
             };
+            self.deferred_refresh = None;
         }
         self.score_deck(backend, req.deck_id)
     }
@@ -680,8 +813,8 @@ impl Engine {
     fn score_deck(&mut self, backend: &Backend, deck_id: i64) -> Result<ScoreDeckResponse> {
         let config = deck_config_for_deck(backend, deck_id)?;
         let instant = config.as_ref().is_some_and(instant_enabled);
-        if !instant || !self.ready(backend) {
-            set_queue_scores(backend, deck_id, vec![])?;
+        if !instant || !self.current(backend)? {
+            self.clear_queue_scores(backend, deck_id)?;
             return Ok(ScoreDeckResponse { instant, scored: 0 });
         }
         let config = config.ok_or_else(|| Error("missing deck config".into()))?;
@@ -700,7 +833,7 @@ impl Engine {
         let scores = match self.predict_many(&inputs) {
             Ok(scores) => scores,
             Err(err) => {
-                set_queue_scores(backend, deck_id, vec![])?;
+                self.clear_queue_scores(backend, deck_id)?;
                 return Err(err);
             }
         };
@@ -718,8 +851,18 @@ impl Engine {
             )
             .collect();
         let scored = request.len() as u32;
+        self.installed_scores = Some((deck_id, request.iter().map(|s| s.card_id).collect()));
         set_queue_scores(backend, deck_id, request)?;
         Ok(ScoreDeckResponse { instant, scored })
+    }
+
+    /// `_clear_rwkv_review_queue_scores`; a no-op when none are installed, so
+    /// collections without RWKV-Instant keep their cached queues.
+    fn clear_queue_scores(&mut self, backend: &Backend, deck_id: i64) -> Result<()> {
+        if self.installed_scores.take().is_some() {
+            set_queue_scores(backend, deck_id, vec![])?;
+        }
+        Ok(())
     }
 
     /// `predict_retrievability_inputs_from_warm_up`, validated like
@@ -770,7 +913,7 @@ impl Engine {
             .collect();
         Ok(inputs::intervening_reviews(
             min,
-            &self.session.answered_ids,
+            &self.answered_ids,
             &recent,
         ))
     }
@@ -783,6 +926,18 @@ impl Engine {
         backend: &Backend,
         req: SchedulingStatesRequest,
     ) -> Result<SchedulingStatesResponse> {
+        // The reviewer's deferred refresh runs once the next card is chosen,
+        // and keeps that card in front (`rebuild_queued_cards_preserving_current_card`).
+        if let Some(deck_id) = self.deferred_refresh.take() {
+            if self.score_deck(backend, deck_id).is_ok() {
+                let _ = backend.with_col(|col| {
+                    SchedulerService::rebuild_queued_cards_preserving_current_card(
+                        col,
+                        anki_proto::cards::CardId { cid: req.card_id },
+                    )
+                });
+            }
+        }
         let states_bytes = BASE64
             .decode(req.states.as_bytes())
             .map_err(|e| Error(format!("states: {e}")))?;
@@ -818,10 +973,12 @@ impl Engine {
             return Ok(unchanged(false, false));
         }
         let curve = curve_enabled(&config);
-        if !self.ready(backend) {
+        // Like the desktop, never rebuild here: until the state is current
+        // the card keeps its FSRS states and the answer its plain metadata.
+        if !self.current(backend)? {
             return Ok(unchanged(true, curve));
         }
-        let context = LiveContext::load(backend, &card, &config, &self.session)?;
+        let context = LiveContext::load(backend, &card, &config, &self.synthetic)?;
         let input = context.query_input(&card, &config, &states);
 
         if !curve {
@@ -842,7 +999,8 @@ impl Engine {
         let state = model.warm_up_state(&input);
         let output = model.review(input, review_state(&state))?;
         validate_output(&output)?;
-        let has_intervals = output.intervals.iter().any(Option::is_some);
+        // `_has_interval_overrides`: all four buttons.
+        let has_intervals = output.intervals.iter().all(Option::is_some);
         self.session.prediction = Some(Prediction {
             card_id: card.id,
             retrievability: output.retrievability,
@@ -904,6 +1062,17 @@ impl Engine {
             .filter(rwkv_active);
         let answered_at_millis = now_millis();
 
+        // Before the answer changes the collection: is the resident state
+        // current (so the answer can be applied on top), and what did the
+        // queue look like (`_answered_card_was_last_queued_*`)?
+        let current = self.model.is_some() && self.current(backend).unwrap_or(false);
+        let queue_before = self.queue_snapshot(backend);
+        let identity_before = if current && overlay_has_routing_rules(backend).unwrap_or(false) {
+            Some(answer_identity(backend, card.id)?)
+        } else {
+            None
+        };
+
         let mut answer = pb::CardAnswer {
             card_id: card.id,
             current_state: Some(current_state.clone()),
@@ -915,27 +1084,21 @@ impl Engine {
         };
 
         // set_answer_rwkv_metadata. A failure here answers without RWKV
-        // metadata and leaves the state to be rebuilt, rather than failing
-        // the answer.
-        let pending = match &config {
-            Some(config) => match self.answer_metadata(
-                backend,
-                &card,
-                config,
-                &current_state,
-                &req,
-                answered_at_millis,
-            ) {
-                Ok(pending) => pending,
-                Err(_) => {
-                    self.trusted = false;
-                    None
+        // metadata rather than failing the answer.
+        let synthetic_state = match &config {
+            Some(_) => {
+                match self.answer_state(backend, &card, &current_state, answered_at_millis) {
+                    Ok(state) => state,
+                    Err(_) => {
+                        self.trusted = false;
+                        None
+                    }
                 }
-            },
+            }
             None => None,
         };
-        if let Some((_, state, _)) = &pending {
-            answer.rwkv_review_kind = raw_review_kind(*state);
+        if let Some((state, _)) = synthetic_state {
+            answer.rwkv_review_kind = raw_review_kind(state);
         }
         if let Some(prediction) = self
             .session
@@ -957,12 +1120,19 @@ impl Engine {
         let _changes = backend.with_col(|col| SchedulerService::answer_card(col, answer))?;
         self.session.prediction = None;
         self.session.shown_states = None;
-        self.session.answered_ids.push(card.id);
+        self.answered_ids.push(card.id);
 
         // The answer is committed; from here on a failure must not surface as
         // a failed answer (the app would retry it), only invalidate the state.
-        let state_invalidated = match self.after_answer(backend, &card, pending, answered_at_millis)
-        {
+        let state_invalidated = match self.after_answer(
+            backend,
+            &card,
+            current,
+            identity_before,
+            synthetic_state,
+            answered_at_millis,
+            queue_before,
+        ) {
             Ok(invalidated) => invalidated,
             Err(_) => {
                 self.trusted = false;
@@ -972,94 +1142,108 @@ impl Engine {
         Ok(AnswerCardResponse { state_invalidated })
     }
 
-    /// The state the answer is recorded with and the input that advances the
-    /// model: `set_answer_rwkv_metadata` / `_rwkv_pending_answer_review_input`.
-    fn answer_metadata(
+    /// The state an RWKV-preset answer is recorded with, and the state the
+    /// scheduler alone would have used: `set_answer_rwkv_metadata` /
+    /// `_rwkv_review_state_for_live_context`.
+    fn answer_state(
         &self,
         backend: &Backend,
         card: &Card,
-        config: &DeckConfig,
         current_state: &pb::SchedulingState,
-        req: &AnswerCardRequest,
         answered_at_millis: i64,
-    ) -> Result<Option<(ReviewInput, i64, i64)>> {
-        let context = LiveContext::load(backend, card, config, &self.session)?;
+    ) -> Result<Option<(i64, i64)>> {
+        let timing = backend.with_col(SchedulerService::sched_timing_today)?;
         let base_state = review_state_for_kind(state_kind(Some(current_state)), card.ctype.into());
         let state = review_state_for_live_context(
             base_state,
-            context.previous,
-            context.timing,
+            latest_eligible_review(backend, card.id)?,
+            Timing {
+                days_elapsed: timing.days_elapsed.into(),
+                next_day_at: timing.next_day_at,
+            },
             answered_at_millis,
-            context.synthetic,
+            self.synthetic.get(&card.id).copied(),
         );
-        if raw_review_kind(state).is_none() {
-            return Ok(None);
-        }
-        let shown = self
-            .session
-            .shown_states
-            .as_ref()
-            .filter(|(card_id, _)| *card_id == card.id)
-            .map(|(_, states)| states);
-        let input = context.answer_input(
-            card,
-            config,
-            shown,
-            req.rating,
-            req.milliseconds_taken,
-            state,
-            answered_at_millis,
-        );
-        Ok(Some((input, state, base_state)))
+        Ok(raw_review_kind(state).map(|_| (state, base_state)))
     }
 
-    /// `record_reviewer_answer`, then the reviewer's `_after_answering`
-    /// refresh. Returns whether the resident state was invalidated.
+    /// `record_reviewer_answer` (for every answered card, as the desktop's
+    /// `review_answered`), then the reviewer's `_after_answering` refresh.
+    /// The model advances with the input the canonical history derives from
+    /// the revlog row just written, so live answers and a fresh replay agree
+    /// by construction. Returns whether the resident state was invalidated.
+    #[allow(clippy::too_many_arguments)]
     fn after_answer(
         &mut self,
         backend: &Backend,
         card: &Card,
-        pending: Option<(ReviewInput, i64, i64)>,
+        current: bool,
+        identity_before: Option<AnswerIdentity>,
+        synthetic_state: Option<(i64, i64)>,
         answered_at_millis: i64,
+        queue_before: Option<QueueSnapshot>,
     ) -> Result<bool> {
+        clear_card_info_score(backend, card.id)?;
+
         let mut state_invalidated = false;
-        if let Some((input, state, base_state)) = pending {
-            if self.trusted && self.base.is_some() && self.model.is_some() {
-                if self.answer_needs_canonical_recovery(backend, card, &input, state)? {
-                    self.trusted = false;
-                    self.base = None;
-                    self.undo.clear();
+        if current {
+            match canonical_answer_input(backend, card.id)? {
+                CanonicalAnswer::NotInHistory => {
+                    // E.g. a preview-only filtered answer: the history skips
+                    // it, so the state is still current.
+                    self.collection_mod = Some(collection_mod(backend)?);
+                }
+                CanonicalAnswer::RestartsHistory => {
+                    // `_rwkv_live_answer_canonical_recovery_reason`: a new
+                    // learning start drops the card's earlier history.
+                    self.forget_state();
                     state_invalidated = true;
-                } else {
-                    let review_id =
-                        latest_review_id(backend, card.id)?.unwrap_or(answered_at_millis);
-                    let model = self.model_mut()?;
-                    let before = model.warm_up_state(&input);
-                    let runtime = model.state_for_card(input.card_id);
-                    let frame = UndoFrame {
-                        review_id,
-                        card_id: input.card_id,
-                        note_id: input.note_id,
-                        deck_id: input.deck_id,
-                        preset_id: input.preset_id,
-                        before: clone_state(&before),
-                        runtime,
-                    };
-                    model.review(input, review_state(&before))?;
-                    self.own_answers += 1;
-                    self.unsaved = true;
-                    self.undo.push(frame);
-                    if self.undo.len() > UNDO_LIMIT {
-                        self.undo.remove(0);
+                }
+                CanonicalAnswer::Input { review_id, input } => {
+                    let identity = answer_identity(backend, card.id)?;
+                    if identity_before.is_some_and(|before| before != identity) {
+                        // The answer changed the card's preset routing.
+                        self.forget_state();
+                        state_invalidated = true;
+                    } else {
+                        let input = ReviewInput {
+                            note_id: Some(identity.note_id),
+                            deck_id: Some(identity.deck_id),
+                            preset_id: identity.preset_id,
+                            ..input
+                        };
+                        let model = self.model_mut()?;
+                        let before = model.warm_up_state(&input);
+                        let runtime = model.state_for_card(input.card_id);
+                        let frame = UndoFrame {
+                            review_id,
+                            card_id: input.card_id,
+                            note_id: input.note_id,
+                            deck_id: input.deck_id,
+                            preset_id: input.preset_id,
+                            before: clone_state(&before),
+                            runtime,
+                        };
+                        model.review(input, review_state(&before))?;
+                        self.own_review_ids.push(review_id);
+                        self.collection_mod = Some(collection_mod(backend)?);
+                        self.unsaved = true;
+                        self.undo.push(frame);
+                        if self.undo.len() > UNDO_LIMIT {
+                            self.undo.remove(0);
+                        }
                     }
                 }
-            } else {
-                // Not warm: the next readiness check replays this answer.
-                self.trusted = false;
-                state_invalidated = true;
             }
+        } else {
+            // Not current: the next readiness check replays this answer.
+            self.trusted = false;
+            state_invalidated = true;
+        }
+
+        if let Some((state, base_state)) = synthetic_state {
             if state != base_state {
-                self.session.synthetic.insert(
+                self.synthetic.insert(
                     card.id,
                     SyntheticAnswer {
                         review_state: state,
@@ -1067,61 +1251,76 @@ impl Engine {
                     },
                 );
             } else {
-                self.session.synthetic.remove(&card.id);
+                self.synthetic.remove(&card.id);
             }
         }
 
-        // _after_answering
         if let Some(deck_id) = self.session.deck_id {
-            self.refresh_after_answer(backend, deck_id, card)?;
+            self.refresh_after_answer(backend, deck_id, card, queue_before)?;
         }
         Ok(state_invalidated)
     }
 
-    /// `_rwkv_live_answer_canonical_recovery_reason`: answers whose canonical
-    /// history differs from "previous history + this answer".
-    fn answer_needs_canonical_recovery(
-        &self,
+    /// The reviewer's `_after_answering` queue refresh.
+    fn refresh_after_answer(
+        &mut self,
         backend: &Backend,
+        deck_id: i64,
         card: &Card,
-        input: &ReviewInput,
-        state: i64,
-    ) -> Result<bool> {
-        if state == LEARN_START && retained_history_rows(backend, card.id)? > 1 {
-            return Ok(true);
+        queue_before: Option<QueueSnapshot>,
+    ) -> Result<()> {
+        // `reviewer_queue_order_enabled`: the studied deck uses Instant.
+        let Some(config) = deck_config_for_deck(backend, deck_id)?.filter(instant_enabled) else {
+            // `prepare_reviewer_queue_order`.
+            return self.clear_queue_scores(backend, deck_id);
+        };
+        // `reviewer_queue_order_refresh_due`: the answered card's preset.
+        let answered_config =
+            deck_config_for_deck(backend, current_deck_id(card))?.filter(rwkv_active);
+        let refresh_due = answered_config.as_ref().is_some_and(|c| {
+            let interval = config_inner(c).rwkv_review_refresh_interval.max(1) as usize;
+            instant_enabled(c)
+                && !self.answered_ids.is_empty()
+                && self.answered_ids.len().is_multiple_of(interval)
+        });
+        let last_card = queue_before.is_some_and(|q| q.total <= 1);
+        let last_review =
+            !last_card && queue_before.is_some_and(|q| q.review_count == 1 && q.top_is_review);
+        let min_intervening = answered_config
+            .as_ref()
+            .map_or(0, |c| config_inner(c).rwkv_review_min_intervening_reviews);
+
+        if refresh_due || last_card || last_review {
+            let before_next_card = last_card
+                || last_review
+                || (refresh_due && new_gather_uses_retrievability(&config));
+            if before_next_card {
+                self.score_deck(backend, deck_id)?;
+            } else {
+                self.update_intervening_reviews(backend, deck_id, card, min_intervening)?;
+                self.deferred_refresh = Some(deck_id);
+            }
+            return Ok(());
         }
-        if !overlay_has_routing_rules(backend)? {
-            return Ok(false);
-        }
-        let reloaded = get_card(backend, card.id)?;
-        let deck_id = current_deck_id(&reloaded);
-        let config = deck_config_for_deck(backend, deck_id)?;
-        let preset = preset_id_for_card(backend, reloaded.id, config.as_ref())?;
-        Ok(Some(reloaded.note_id) != input.note_id
-            || Some(deck_id) != input.deck_id
-            || preset != input.preset_id)
+        self.update_intervening_reviews(backend, deck_id, card, min_intervening)?;
+        self.patch_answered_score(backend, deck_id, card, &config)
     }
 
-    /// The reviewer's `_after_answering` queue refresh for RWKV-Instant.
-    fn refresh_after_answer(&mut self, backend: &Backend, deck_id: i64, card: &Card) -> Result<()> {
-        let Some(config) = deck_config_for_deck(backend, deck_id)? else {
-            return Ok(());
-        };
-        if !instant_enabled(&config) {
-            return Ok(());
-        }
-        let answered_config = deck_config_for_deck(backend, current_deck_id(card))?;
-        let interval = answered_config
+    /// `refresh_answered_card_queue_score`.
+    fn patch_answered_score(
+        &mut self,
+        backend: &Backend,
+        deck_id: i64,
+        card: &Card,
+        config: &DeckConfig,
+    ) -> Result<()> {
+        if self
+            .installed_scores
             .as_ref()
-            .map_or(1, |c| config_inner(c).rwkv_review_refresh_interval.max(1))
-            as usize;
-        let answered = self.session.answered_ids.len();
-        let refresh_due = answered > 0 && answered.is_multiple_of(interval);
-        if refresh_due || self.queue_is_empty(backend)? {
-            self.score_deck(backend, deck_id)?;
+            .is_none_or(|(d, _)| *d != deck_id)
+        {
             return Ok(());
         }
-        // refresh_answered_card_queue_score + intervening-review update.
         let rows = backend.with_col(|col| {
             SchedulerService::rwkv_review_input_rows_for_cards(
                 col,
@@ -1132,17 +1331,27 @@ impl Engine {
             )
         })?;
         let score = match rows.rows.first().map(query_input_from_row) {
-            Some(input) if self.ready(backend) => {
+            Some(input) if self.current(backend)? => {
                 let retrievability = self.predict_many(std::slice::from_ref(&input))?[0];
                 Some(pb::rwkv_review_queue_scores_request::Score {
                     card_id: card.id,
                     retrievability,
-                    intervening_reviews: None,
+                    intervening_reviews: self
+                        .intervening_reviews(backend, deck_id, config)?
+                        .get(&card.id)
+                        .copied(),
                     target_retention: input_target_retention(&input),
                 })
             }
             _ => None,
         };
+        if let Some((_, ids)) = self.installed_scores.as_mut() {
+            if score.is_some() {
+                ids.insert(card.id);
+            } else {
+                ids.remove(&card.id);
+            }
+        }
         backend.with_col(|col| {
             SchedulerService::patch_answered_card_rwkv_review_queue_score(
                 col,
@@ -1153,51 +1362,100 @@ impl Engine {
                 },
             )
         })?;
-        let intervening = self.intervening_reviews(backend, deck_id, &config)?;
-        if !intervening.is_empty() {
-            backend.with_col(|col| {
-                SchedulerService::update_rwkv_review_queue_intervening_reviews(
-                    col,
-                    pb::RwkvReviewQueueInterveningReviewsRequest {
-                        deck_id,
-                        items: intervening
-                            .iter()
-                            .map(|(card_id, n)| {
-                                pb::rwkv_review_queue_intervening_reviews_request::Item {
-                                    card_id: *card_id,
-                                    intervening_reviews: *n,
-                                }
-                            })
-                            .collect(),
-                    },
-                )
-            })?;
-        }
         Ok(())
     }
 
-    fn queue_is_empty(&self, backend: &Backend) -> Result<bool> {
-        let queued = backend.with_col(|col| {
-            SchedulerService::get_queued_cards(
-                col,
-                pb::GetQueuedCardsRequest {
-                    fetch_limit: 1,
-                    ..Default::default()
+    /// `update_reviewer_queue_intervening_reviews`: session spacing for the
+    /// cards already in the score map, without rescoring.
+    fn update_intervening_reviews(
+        &mut self,
+        backend: &Backend,
+        session_deck_id: i64,
+        card: &Card,
+        min: u32,
+    ) -> Result<()> {
+        if min == 0 {
+            return Ok(());
+        }
+        let card_deck_id = current_deck_id(card);
+        let Some((deck_id, scored)) = self
+            .installed_scores
+            .as_ref()
+            .filter(|(d, _)| *d == card_deck_id || *d == session_deck_id)
+        else {
+            return Ok(());
+        };
+        let window = &self.answered_ids[self.answered_ids.len().saturating_sub(min as usize + 1)..];
+        let mut last_index = HashMap::new();
+        for (index, card_id) in window.iter().enumerate() {
+            last_index.insert(*card_id, index);
+        }
+        let mut items: Vec<_> = last_index
+            .into_iter()
+            .map(|(card_id, index)| (card_id, (window.len() - index - 1) as u32))
+            .filter(|(card_id, reviews)| scored.contains(card_id) && *reviews <= min)
+            .map(
+                |(card_id, reviews)| pb::rwkv_review_queue_intervening_reviews_request::Item {
+                    card_id,
+                    intervening_reviews: reviews.min(min),
                 },
             )
+            .collect();
+        if items.is_empty() {
+            return Ok(());
+        }
+        items.sort_by_key(|item| item.card_id);
+        let deck_id = *deck_id;
+        backend.with_col(|col| {
+            SchedulerService::update_rwkv_review_queue_intervening_reviews(
+                col,
+                pb::RwkvReviewQueueInterveningReviewsRequest { deck_id, items },
+            )
         })?;
-        Ok(queued.cards.is_empty())
+        Ok(())
+    }
+
+    /// The queue as the answer found it.
+    fn queue_snapshot(&self, backend: &Backend) -> Option<QueueSnapshot> {
+        self.session.deck_id?;
+        let queued = backend
+            .with_col(|col| {
+                SchedulerService::get_queued_cards(
+                    col,
+                    pb::GetQueuedCardsRequest {
+                        fetch_limit: 1,
+                        ..Default::default()
+                    },
+                )
+            })
+            .ok()?;
+        Some(QueueSnapshot {
+            total: queued.new_count + queued.learning_count + queued.review_count,
+            review_count: queued.review_count,
+            top_is_review: queued
+                .cards
+                .first()
+                .is_some_and(|c| c.queue == pb::queued_cards::Queue::Review as i32),
+        })
     }
 
     /// `answer_undone`, for the answer most recently applied here. Call after
-    /// the collection's undo removed it.
+    /// the collection's undo removed it. Like the desktop, the queue isn't
+    /// rescored: the collection's undo puts the card back in front.
     fn undo_answer(&mut self, backend: &Backend) -> Result<UndoResponse> {
         self.session.prediction = None;
         let Some(frame) = self.undo.pop() else {
             self.trusted = false;
             return Ok(UndoResponse { restored: false });
         };
-        if review_exists(backend, frame.review_id)? || self.own_answers == 0 {
+        clear_card_info_score(backend, frame.card_id)?;
+        if self.answered_ids.last() == Some(&frame.card_id) {
+            self.answered_ids.pop();
+        }
+        self.synthetic.remove(&frame.card_id);
+        if review_exists(backend, frame.review_id)?
+            || self.own_review_ids.last() != Some(&frame.review_id)
+        {
             // Whatever was undone, it was not this answer.
             self.undo.clear();
             self.trusted = false;
@@ -1212,16 +1470,129 @@ impl Engine {
             frame.before,
         )?;
         model.restore_state(&frame.runtime);
-        self.own_answers -= 1;
-        if self.session.answered_ids.last() == Some(&frame.card_id) {
-            self.session.answered_ids.pop();
-        }
-        self.session.synthetic.remove(&frame.card_id);
-        if let Some(deck_id) = self.session.deck_id {
-            self.score_deck(backend, deck_id)?;
-        }
+        self.own_review_ids.pop();
+        // Revalidate (cheaply) against the post-undo collection.
+        self.collection_mod = None;
         Ok(UndoResponse { restored: true })
     }
+}
+
+#[derive(Clone, Copy)]
+struct QueueSnapshot {
+    total: u32,
+    review_count: u32,
+    top_is_review: bool,
+}
+
+/// The identity a card's next review is replayed under.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct AnswerIdentity {
+    note_id: i64,
+    deck_id: i64,
+    preset_id: Option<i64>,
+}
+
+fn answer_identity(backend: &Backend, card_id: i64) -> Result<AnswerIdentity> {
+    let card = get_card(backend, card_id)?;
+    let deck_id = current_deck_id(&card);
+    let config = deck_config_for_deck(backend, deck_id)?;
+    Ok(AnswerIdentity {
+        note_id: card.note_id,
+        deck_id,
+        preset_id: preset_id_for_card(backend, card_id, config.as_ref())?,
+    })
+}
+
+enum CanonicalAnswer {
+    /// The written row isn't an eligible answer; the history skips it.
+    NotInHistory,
+    /// A new learning start after earlier history: the canonical history
+    /// drops the earlier reviews, so the state must be rebuilt.
+    RestartsHistory,
+    Input {
+        review_id: i64,
+        input: ReviewInput,
+    },
+}
+
+/// The card's newest revlog row as the canonical history encodes it
+/// (`RwkvHistoricalReviewInputs`): state from the revlog type, elapsed time
+/// from the previous retained answer, the stored duration. Identity fields
+/// are filled in by the caller.
+fn canonical_answer_input(backend: &Backend, card_id: i64) -> Result<CanonicalAnswer> {
+    let rows = db_query::<(i64, i64, i64, i64, i64)>(
+        backend,
+        "select id, ease, type, factor, time from revlog where cid = ? order by id",
+        vec![serde_json::json!(card_id)],
+    )?;
+    let Some(&(review_id, ease, kind, factor, time)) = rows.last() else {
+        return Ok(CanonicalAnswer::NotInHistory);
+    };
+    let eligible = |ease: i64, kind: i64, factor: i64| {
+        (1..=4).contains(&ease) && (0..=5).contains(&kind) && !(kind == 3 && factor == 0)
+    };
+    if !eligible(ease, kind, factor) {
+        return Ok(CanonicalAnswer::NotInHistory);
+    }
+    // Answers after the latest reset (`type = 4, ease = 0, factor = 0`).
+    let after_reset = rows
+        .iter()
+        .rposition(|&(_, ease, kind, factor, _)| kind == 4 && ease == 0 && factor == 0)
+        .map_or(0, |i| i + 1);
+    let previous = rows[after_reset..rows.len() - 1]
+        .iter()
+        .rev()
+        .find(|&&(_, ease, kind, factor, _)| eligible(ease, kind, factor))
+        .copied();
+    let state = if kind == 0 && previous.is_none_or(|p| p.2 != 0) {
+        LEARN_START
+    } else {
+        kind + 1
+    };
+    if state == LEARN_START && previous.is_some() {
+        return Ok(CanonicalAnswer::RestartsHistory);
+    }
+    let timing = backend.with_col(SchedulerService::sched_timing_today)?;
+    let timing = Timing {
+        days_elapsed: timing.days_elapsed.into(),
+        next_day_at: timing.next_day_at,
+    };
+    let (day_offset, elapsed_days, elapsed_seconds) = answer_elapsed(
+        timing,
+        review_id,
+        state,
+        previous.map(|(id, ease, kind, _, _)| PreviousReview { id, ease, kind }),
+    );
+    Ok(CanonicalAnswer::Input {
+        review_id,
+        input: ReviewInput {
+            card_id,
+            note_id: None,
+            deck_id: None,
+            preset_id: None,
+            is_query: false,
+            ease: Some(ease as u8),
+            duration_millis: Some(time),
+            card_type: Some(state),
+            day_offset: Some(day_offset),
+            current_elapsed_days: Some(elapsed_days),
+            current_elapsed_seconds: Some(elapsed_seconds),
+            target_retentions: [None; 4],
+            enforce_grade_order: true,
+        },
+    })
+}
+
+fn clear_card_info_score(backend: &Backend, card_id: i64) -> Result<()> {
+    Ok(backend.with_col(|col| {
+        SchedulerService::set_rwkv_card_info_score(
+            col,
+            pb::RwkvCardInfoScoreRequest {
+                card_id,
+                ..Default::default()
+            },
+        )
+    })?)
 }
 
 impl Identity {
@@ -1251,7 +1622,7 @@ impl LiveContext {
         backend: &Backend,
         card: &Card,
         config: &DeckConfig,
-        session: &Session,
+        synthetic: &HashMap<i64, SyntheticAnswer>,
     ) -> Result<Self> {
         let timing = backend.with_col(SchedulerService::sched_timing_today)?;
         let preset = fsrs_preset_for_card(backend, card.id)?;
@@ -1262,7 +1633,7 @@ impl LiveContext {
             },
             now_secs: now_millis().div_euclid(1000),
             previous: latest_eligible_review(backend, card.id)?,
-            synthetic: session.synthetic.get(&card.id).copied(),
+            synthetic: synthetic.get(&card.id).copied(),
             preset_id: preset
                 .as_ref()
                 .filter(|p| !p.id.is_empty())
@@ -1311,41 +1682,6 @@ impl LiveContext {
             current_elapsed_days: elapsed_days,
             current_elapsed_seconds: elapsed_seconds,
             target_retentions: self.target_retentions(config, Some(states)),
-            enforce_grade_order: config_inner(config).rwkv_review_enforce_grade_order,
-        }
-    }
-
-    /// `_rwkv_pending_answer_review_input`.
-    #[allow(clippy::too_many_arguments)]
-    fn answer_input(
-        &self,
-        card: &Card,
-        config: &DeckConfig,
-        shown_states: Option<&pb::SchedulingStates>,
-        rating: u8,
-        milliseconds_taken: u32,
-        state: i64,
-        answered_at_millis: i64,
-    ) -> ReviewInput {
-        let (day_offset, elapsed_days, elapsed_seconds) =
-            answer_elapsed(self.timing, answered_at_millis, state, self.previous);
-        let limit_millis = i64::from(config_inner(config).cap_answer_time_to_secs) * 1000;
-        let duration = i64::from(milliseconds_taken)
-            .max(0)
-            .min(limit_millis.max(0));
-        ReviewInput {
-            card_id: card.id,
-            note_id: Some(card.note_id),
-            deck_id: Some(current_deck_id(card)),
-            preset_id: self.preset_id,
-            is_query: false,
-            ease: Some(rating),
-            duration_millis: Some(duration),
-            card_type: Some(state),
-            day_offset: Some(day_offset),
-            current_elapsed_days: Some(elapsed_days),
-            current_elapsed_seconds: Some(elapsed_seconds),
-            target_retentions: self.target_retentions(config, shown_states),
             enforce_grade_order: config_inner(config).rwkv_review_enforce_grade_order,
         }
     }
@@ -1661,7 +1997,7 @@ fn history_params(backend: &Backend, precision: &str) -> Result<HistoryParams> {
             "statePrecision": precision,
             "dynamicPresetReplay": dynamic_preset_replay,
             "stablePresetIds": sorted_ids,
-            "overlay": overlay,
+            "overlay": if dynamic_preset_replay { overlay.clone() } else { None },
         })
         .to_string()
         .as_bytes(),
@@ -1690,21 +2026,66 @@ fn fingerprint(
         .with_col(|col| SchedulerService::rwkv_historical_review_fingerprint(col, request))?)
 }
 
+fn history_request(params: &HistoryParams) -> pb::RwkvHistoricalReviewInputsRequest {
+    pb::RwkvHistoricalReviewInputsRequest {
+        history: Some(params.request.clone()),
+        // Each deck's policy, as the desktop's DECK_CONFIG source.
+        first_review_uses_creation: None,
+        ..Default::default()
+    }
+}
+
 fn history_inputs(
     backend: &Backend,
     params: &HistoryParams,
 ) -> Result<pb::RwkvHistoricalReviewInputsResponse> {
     Ok(backend.with_col(|col| {
-        SchedulerService::rwkv_historical_review_inputs(
-            col,
-            pb::RwkvHistoricalReviewInputsRequest {
-                history: Some(params.request.clone()),
-                // Each deck's policy, as the desktop's DECK_CONFIG source.
-                first_review_uses_creation: None,
-                ..Default::default()
-            },
-        )
+        SchedulerService::rwkv_historical_review_inputs(col, history_request(params))
     })?)
+}
+
+/// The open collection's file, to notice another collection being opened on
+/// the same backend. Must start with SELECT: the DB proxy treats anything
+/// else as a write, which clears the study queues and undo.
+fn collection_path(backend: &Backend) -> Result<String> {
+    Ok(db_query::<(String,)>(
+        backend,
+        "select file from pragma_database_list where name = 'main'",
+        vec![],
+    )?
+    .into_iter()
+    .next()
+    .map(|(file,)| file)
+    .unwrap_or_default())
+}
+
+/// The collection's modification time; every operation bumps it, and undo
+/// restores it.
+fn collection_mod(backend: &Backend) -> Result<i64> {
+    Ok(db_query::<(i64,)>(backend, "select mod from col", vec![])?
+        .into_iter()
+        .next()
+        .map_or(0, |(m,)| m))
+}
+
+/// Set while a history replay or cache restore runs, so the deck list,
+/// graphs and card info answer without waiting for the engine, as the
+/// desktop does while its state cache loads.
+static REPLAYING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+struct ReplayGuard;
+
+impl ReplayGuard {
+    fn start() -> Self {
+        REPLAYING.store(true, std::sync::atomic::Ordering::SeqCst);
+        ReplayGuard
+    }
+}
+
+impl Drop for ReplayGuard {
+    fn drop(&mut self) {
+        REPLAYING.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 /// `_latest_eligible_review_for_card`.
@@ -1721,17 +2102,6 @@ fn latest_eligible_review(backend: &Backend, card_id: i64) -> Result<Option<Prev
     )
 }
 
-fn latest_review_id(backend: &Backend, card_id: i64) -> Result<Option<i64>> {
-    Ok(db_query::<(i64,)>(
-        backend,
-        "select id from revlog where cid = ? order by id desc limit 1",
-        vec![serde_json::json!(card_id)],
-    )?
-    .into_iter()
-    .next()
-    .map(|(id,)| id))
-}
-
 fn review_exists(backend: &Backend, review_id: i64) -> Result<bool> {
     Ok(!db_query::<(i64,)>(
         backend,
@@ -1739,33 +2109,6 @@ fn review_exists(backend: &Backend, review_id: i64) -> Result<bool> {
         vec![serde_json::json!(review_id)],
     )?
     .is_empty())
-}
-
-/// `_historical_rwkv_review_rows(card_ids=[card_id])` count: eligible answers
-/// after the card's latest Forget, from its latest learning start.
-fn retained_history_rows(backend: &Backend, card_id: i64) -> Result<usize> {
-    let rows = db_query::<(i64, i64, i64, i64)>(
-        backend,
-        "select id, ease, type, factor from revlog where cid = ? order by id",
-        vec![serde_json::json!(card_id)],
-    )?;
-    let after_forget = rows
-        .iter()
-        .rposition(|(_, ease, kind, factor)| *kind == 4 && *ease == 0 && *factor == 0)
-        .map_or(0, |i| i + 1);
-    let eligible: Vec<_> = rows[after_forget..]
-        .iter()
-        .filter(|(_, ease, kind, factor)| {
-            (1..=4).contains(ease) && (0..=5).contains(kind) && !(*kind == 3 && *factor == 0)
-        })
-        .collect();
-    // `_benchmark_retained_historical_review_starts`: from the latest type-0
-    // answer not preceded by another type-0 answer.
-    let start = (0..eligible.len())
-        .rev()
-        .find(|&i| eligible[i].2 == 0 && (i == 0 || eligible[i - 1].2 != 0))
-        .unwrap_or(0);
-    Ok(eligible.len() - start)
 }
 
 fn overlay_has_routing_rules(backend: &Backend) -> Result<bool> {
