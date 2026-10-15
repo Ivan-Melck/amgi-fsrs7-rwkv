@@ -200,6 +200,17 @@ extension Request where Response == Void {
         )
     }
 
+    /// Stops a running `rwkvSimulateWorkload`, which then throws.
+    public static var rwkvCancelWorkload: Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvCancelWorkload,
+            bypassesCallLock: true,
+            encode: { Data("{}".utf8) },
+            decode: { _ in () }
+        )
+    }
+
     /// The collection changed in a way that may touch review history.
     public static var rwkvInvalidate: Self {
         Self(
@@ -362,6 +373,69 @@ extension Request where Response == RwkvRescheduleResult {
                     built: response.built,
                     predicted: response.predicted,
                     updated: response.updated
+                )
+            }
+        )
+    }
+}
+
+// MARK: - workload
+
+private struct WorkloadBody: Encodable {
+    let search: String
+    let daysToSimulate: UInt32
+    let reviewLimit: UInt32
+    let newLimit: UInt32
+    let newCardsIgnoreReviewLimit: Bool
+    let maxInterval: UInt32
+    let reviewOrder: Int
+    let suspendAfterLapseCount: UInt32?
+    let sampleLimit: UInt32
+    let targetStep: UInt32
+    let stateUpdateInterval: UInt32
+}
+
+private struct WorkloadResponse: Decodable {
+    struct Point: Decodable {
+        let dr: Int
+        let memorized: Float
+        let cost: Float
+        let reviewCount: Int
+    }
+
+    let points: [Point]
+}
+
+extension Request where Response == FsrsWorkloadSimulation {
+    /// The RWKV workload for desired retentions 30–99%, simulated on the
+    /// resident state (which it leaves unchanged). Long-running.
+    public static func rwkvSimulateWorkload(_ input: RwkvWorkloadRequest) -> Self {
+        Self(
+            serviceId: ServiceID.aux,
+            methodId: AuxMethod.rwkvSimulateWorkload,
+            bypassesCallLock: true,
+            encode: {
+                func count(_ value: Int) -> UInt32 { UInt32(clamping: max(0, value)) }
+                return try encoder.encode(WorkloadBody(
+                    search: input.search,
+                    daysToSimulate: count(input.daysToSimulate),
+                    reviewLimit: count(input.reviewLimit),
+                    newLimit: count(input.newLimit),
+                    newCardsIgnoreReviewLimit: input.newCardsIgnoreReviewLimit,
+                    maxInterval: count(input.maxInterval),
+                    reviewOrder: Anki_DeckConfig_DeckConfig.Config.ReviewCardOrder(input.reviewOrder).rawValue,
+                    suspendAfterLapseCount: input.suspendAfterLapseCount.map(count),
+                    sampleLimit: count(input.sampleLimit),
+                    targetStep: count(input.targetStep),
+                    stateUpdateInterval: count(input.stateUpdateInterval)
+                ))
+            },
+            decode: { data in
+                let response = try decoder.decode(WorkloadResponse.self, from: data)
+                return FsrsWorkloadSimulation(
+                    cost: Dictionary(response.points.map { ($0.dr, $0.cost) }, uniquingKeysWith: { _, last in last }),
+                    memorized: Dictionary(response.points.map { ($0.dr, $0.memorized) }, uniquingKeysWith: { _, last in last }),
+                    reviewCount: Dictionary(response.points.map { ($0.dr, $0.reviewCount) }, uniquingKeysWith: { _, last in last })
                 )
             }
         )

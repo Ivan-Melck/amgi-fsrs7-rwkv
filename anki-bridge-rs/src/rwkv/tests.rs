@@ -1354,3 +1354,87 @@ fn rebuilding_replays_the_whole_history_and_saves_it() {
         "restored"
     );
 }
+
+#[test]
+fn fallback_grade_probabilities_match_the_desktop() {
+    // `_fallback_rwkv_grade_probabilities(0.9)` and `(0.3)` on the desktop.
+    let high = workload::fallback_grade_probabilities(0.9);
+    let expected_high = [
+        0.09999999999999998,
+        0.09999999999999987,
+        0.48500000000000015,
+        0.315,
+    ];
+    let low = workload::fallback_grade_probabilities(0.3);
+    let expected_low = [0.7, 0.13500000000000004, 0.15, 0.015000000000000003];
+    for (got, want) in high
+        .iter()
+        .chain(&low)
+        .zip(expected_high.iter().chain(&expected_low))
+    {
+        assert!((got - want).abs() < 1e-12, "{got} != {want}");
+    }
+}
+
+#[test]
+fn review_model_smooths_grades_per_bucket() {
+    // Two Good answers at r = 0.92 (bucket 18) taking 4s and 6s, one Again
+    // with an implausible time.
+    let model = workload::review_model(&[(0.92, 3, 4_000), (0.93, 3, 6_000), (0.5, 1, 700_000)]);
+    assert_eq!(model.grade_seconds, [8.0, 8.0, 5.0, 8.0]);
+    let buckets: Vec<u32> = model.bucket_probabilities.iter().map(|(b, _)| *b).collect();
+    assert_eq!(buckets, vec![10, 18]);
+    let (_, p) = model.bucket_probabilities[1];
+    let prior = workload::fallback_grade_probabilities(18.5 / 20.0);
+    let total = 2.0 + 4.0;
+    let expected = [
+        prior[0] * 4.0 / total,
+        prior[1] * 4.0 / total,
+        (2.0 + prior[2] * 4.0) / total,
+        prior[3] * 4.0 / total,
+    ];
+    for (got, want) in p.iter().zip(expected) {
+        assert!((f64::from(*got) - want).abs() < 1e-6);
+    }
+}
+
+#[test]
+fn rwkv_workload_runs_on_the_resident_state() {
+    let Some(fx) = fixture_with_new("workload", 8, 4) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let queries = all_queries(&fx);
+    let before = engine.predict_many(&queries).unwrap();
+    let request = |sample_limit| workload::WorkloadRequest {
+        search: "deck:current".into(),
+        days_to_simulate: 30,
+        review_limit: 100,
+        new_limit: 2,
+        max_interval: 36500,
+        sample_limit,
+        target_step: 10,
+        state_update_interval: 1,
+        ..Default::default()
+    };
+    let full = engine.simulate_workload(&fx.backend, request(0)).unwrap();
+    let drs: Vec<u32> = full.points.iter().map(|p| p.dr).collect();
+    assert_eq!(drs.first(), Some(&30));
+    assert!(drs.windows(2).all(|w| w[0] < w[1]));
+    assert!(full
+        .points
+        .iter()
+        .all(|p| p.cost >= 0.0 && p.memorized >= 0.0));
+    assert!(full
+        .points
+        .windows(2)
+        .all(|w| w[0].review_count <= w[1].review_count));
+    assert!(full.points.iter().any(|p| p.review_count > 0));
+    // The resident state is unchanged.
+    assert_same_predictions(&before, &engine.predict_many(&queries).unwrap());
+
+    // Sampling scales the result back up to the whole deck.
+    let sampled = engine.simulate_workload(&fx.backend, request(6)).unwrap();
+    assert_eq!(sampled.points.len(), full.points.len());
+}

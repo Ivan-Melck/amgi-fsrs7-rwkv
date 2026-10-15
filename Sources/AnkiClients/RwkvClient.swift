@@ -23,6 +23,10 @@ public struct RwkvClient: Sendable {
     public var reschedule: @Sendable (_ deckId: DeckID?) async throws -> RwkvRescheduleResult
     /// Rebuilds the RWKV state from the whole review history and saves it.
     public var rebuildState: @Sendable () async throws -> RwkvPrepareResult
+    /// "Compare RWKV with FSRS": the RWKV workload sweep.
+    public var simulateWorkload: @Sendable (_ request: RwkvWorkloadRequest) async throws -> FsrsWorkloadSimulation
+    /// Stops a running `simulateWorkload`.
+    public var cancelWorkload: @Sendable () async -> Void
 }
 
 extension RwkvClient: TestDependencyKey {
@@ -31,7 +35,9 @@ extension RwkvClient: TestDependencyKey {
         isAvailable: { false },
         cardInfo: { _ in [] },
         reschedule: { _ in RwkvRescheduleResult(built: true, predicted: 0, updated: 0) },
-        rebuildState: { RwkvPrepareResult(active: true, ready: true, source: "replayed") }
+        rebuildState: { RwkvPrepareResult(active: true, ready: true, source: "replayed") },
+        simulateWorkload: { _ in FsrsWorkloadSimulation(cost: [:], memorized: [:], reviewCount: [:]) },
+        cancelWorkload: {}
     )
 }
 

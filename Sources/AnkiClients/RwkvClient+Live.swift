@@ -7,6 +7,7 @@ import AnkiBackend
 import AnkiKit
 import AnkiProtoBridge
 import AnkiServices
+import Foundation
 public import Dependencies
 
 extension RwkvClient: DependencyKey {
@@ -44,7 +45,27 @@ extension RwkvClient: DependencyKey {
                         precision: RwkvEnvironment.precision
                     ))
                 }
+            },
+            simulateWorkload: { request in
+                guard let modelPath = RwkvEnvironment.modelPath else {
+                    throw RwkvUnavailableError()
+                }
+                return try await backendOffload {
+                    _ = try backend.invoke(.rwkvPrepare(
+                        modelPath: modelPath,
+                        cacheDir: RwkvEnvironment.cacheDir(backend),
+                        precision: RwkvEnvironment.precision
+                    ))
+                    return try backend.invoke(.rwkvSimulateWorkload(request))
+                }
+            },
+            cancelWorkload: {
+                _ = try? await backendOffload { try backend.invoke(Request<Void>.rwkvCancelWorkload) }
             }
         )
     }()
+}
+
+private struct RwkvUnavailableError: LocalizedError {
+    var errorDescription: String? { "RWKV isn't available in this build." }
 }

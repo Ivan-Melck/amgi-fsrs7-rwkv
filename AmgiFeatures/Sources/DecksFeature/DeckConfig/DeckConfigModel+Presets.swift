@@ -339,7 +339,7 @@ extension DeckConfigModel {
 
     // MARK: - FSRS simulator entry
 
-    func openSimulator(mode: FsrsSimulatorMode) {
+    func openSimulator(mode: FsrsSimulatorMode, compareWithRwkv: Bool = false) {
         guard let loaded else { return }
         // The preset as edited, like the desktop's simulator.
         let edited = editedConfig(from: loaded.config).config
@@ -369,7 +369,9 @@ extension DeckConfigModel {
             reviewOrder: edited.reviewOrder,
             reviewFuzz: editedSchedulingSettings,
             dynamicDesiredRetention: edited.fsrsDynamicDesiredRetention,
-            dynamicDesiredRetentionClamp: edited.fsrsDynamicDesiredRetentionClamp
+            dynamicDesiredRetentionClamp: edited.fsrsDynamicDesiredRetentionClamp,
+            rwkvAvailable: rwkvClient.isAvailable(),
+            compareWithRwkv: compareWithRwkv && rwkvClient.isAvailable()
         )
         destination = .route(.simulator(context))
     }

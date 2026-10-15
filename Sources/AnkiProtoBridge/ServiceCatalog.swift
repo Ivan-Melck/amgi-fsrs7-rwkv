@@ -48,6 +48,8 @@ enum AuxMethod {
     static let rwkvSearchNoteIds: UInt32 = 112
     static let rwkvRebuildFilteredDeck: UInt32 = 113
     static let rwkvRebuildState: UInt32 = 114
+    static let rwkvSimulateWorkload: UInt32 = 115
+    static let rwkvCancelWorkload: UInt32 = 116
 }
 
 enum CollectionOpsMethod {

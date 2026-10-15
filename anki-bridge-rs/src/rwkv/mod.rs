@@ -19,6 +19,7 @@
 mod cache;
 pub mod inputs;
 mod views;
+mod workload;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -65,9 +66,12 @@ pub const RESCHEDULE: u32 = 111;
 pub const SEARCH_NOTE_IDS: u32 = 112;
 pub const REBUILD_FILTERED_DECK: u32 = 113;
 pub const REBUILD_STATE: u32 = 114;
+pub const SIMULATE_WORKLOAD: u32 = 115;
+pub const CANCEL_WORKLOAD: u32 = 116;
+pub const WORKLOAD_PROGRESS: u32 = 117;
 
 pub fn handles(method: u32) -> bool {
-    (PREPARE..=REBUILD_STATE).contains(&method)
+    (PREPARE..=WORKLOAD_PROGRESS).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -85,6 +89,19 @@ const OVERLAY_KEY: &str = "fsrsPresetOverlay";
 const DYNAMIC_PRESET_REPLAY_KEY: &str = "rwkvDynamicPresetReplay";
 
 pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
+    // A running workload simulation holds the engine; these must not wait.
+    match method {
+        CANCEL_WORKLOAD => {
+            workload::CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+            return call(input, |_: Empty| Ok(Empty {}))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        WORKLOAD_PROGRESS => {
+            return call(input, |_: Empty| Ok(workload::progress()))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        _ => {}
+    }
     // The deck list, graphs and card info must not wait behind a history
     // replay; like the desktop while its state cache loads, they show
     // due-date / FSRS values until the model is ready. Searches whose
@@ -111,6 +128,7 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         SEARCH_NOTE_IDS => call(input, |req| engine.search_note_ids(backend, req)),
         REBUILD_FILTERED_DECK => call(input, |req| engine.rebuild_filtered_deck(backend, req)),
         REBUILD_STATE => call(input, |req| engine.rebuild_state(backend, req)),
+        SIMULATE_WORKLOAD => call(input, |req| engine.simulate_workload(backend, req)),
         other => Err(Error(format!("unknown rwkv method {other}"))),
     };
     result.map_err(|err| {

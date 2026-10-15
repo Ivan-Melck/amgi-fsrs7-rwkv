@@ -48,3 +48,40 @@ public struct RwkvRescheduleResult: Sendable, Hashable {
         self.updated = updated
     }
 }
+
+/// The deck options' "Compare RWKV with FSRS": the RWKV side of a workload
+/// sweep, from the same settings as the FSRS simulator's.
+public struct RwkvWorkloadRequest: Sendable, Hashable {
+    public var search: String
+    public var daysToSimulate: Int
+    public var reviewLimit: Int
+    public var newLimit: Int
+    public var newCardsIgnoreReviewLimit: Bool
+    public var maxInterval: Int
+    public var reviewOrder: ReviewCardOrder
+    public var suspendAfterLapseCount: Int?
+    /// 0 simulates every card; the comparison does, as on the desktop.
+    public var sampleLimit = 0
+    public var targetStep = 1
+    public var stateUpdateInterval = 1
+
+    public init(
+        search: String,
+        daysToSimulate: Int,
+        reviewLimit: Int,
+        newLimit: Int,
+        newCardsIgnoreReviewLimit: Bool,
+        maxInterval: Int,
+        reviewOrder: ReviewCardOrder,
+        suspendAfterLapseCount: Int?
+    ) {
+        self.search = search
+        self.daysToSimulate = daysToSimulate
+        self.reviewLimit = reviewLimit
+        self.newLimit = newLimit
+        self.newCardsIgnoreReviewLimit = newCardsIgnoreReviewLimit
+        self.maxInterval = maxInterval
+        self.reviewOrder = reviewOrder
+        self.suspendAfterLapseCount = suspendAfterLapseCount
+    }
+}

@@ -427,6 +427,7 @@ struct RwkvSection: View {
     let canRebuildState: Bool
     let isRebuildingState: Bool
     let onRebuildState: () -> Void
+    let onCompareWithFsrs: () -> Void
 
     var body: some View {
         if instantEnabled {
@@ -465,6 +466,10 @@ struct RwkvSection: View {
                     } else {
                         Text("Rebuild RWKV State")
                     }
+                }
+                .disabled(isRebuildingState)
+                Button(action: onCompareWithFsrs) {
+                    Label("Compare RWKV with FSRS", systemImage: "chart.line.uptrend.xyaxis")
                 }
                 .disabled(isRebuildingState)
             } header: {

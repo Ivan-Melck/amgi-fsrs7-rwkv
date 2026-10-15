@@ -134,7 +134,8 @@ struct DeckConfigView: View {
                 enforceGradeOrder: $model.rwkvEnforceGradeOrder,
                 canRebuildState: model.canRebuildRwkvState,
                 isRebuildingState: model.isRebuildingRwkvState,
-                onRebuildState: { Task { await model.rebuildRwkvState() } }
+                onRebuildState: { Task { await model.rebuildRwkvState() } },
+                onCompareWithFsrs: { model.openSimulator(mode: .workload, compareWithRwkv: true) }
             )
         }
         DailyLimitsSection(

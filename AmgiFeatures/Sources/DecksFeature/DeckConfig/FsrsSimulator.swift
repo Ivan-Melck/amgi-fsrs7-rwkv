@@ -38,6 +38,9 @@ struct FsrsSimulatorContext: Identifiable, Hashable {
     var reviewFuzz: CollectionSchedulingSettings?
     var dynamicDesiredRetention: FsrsDynamicDesiredRetention?
     var dynamicDesiredRetentionClamp = false
+    /// "Compare RWKV with FSRS": the workload sweep also runs RWKV.
+    var rwkvAvailable = false
+    var compareWithRwkv = false
 }
 
 // MARK: - Container
@@ -58,6 +61,13 @@ struct FsrsSimulatorView: View {
     private var formBody: some View {
         Form {
             FsrsSimulatorModeSection(mode: $context.mode)
+            if context.mode == .workload && context.rwkvAvailable {
+                Section {
+                    Toggle("Compare RWKV with FSRS", isOn: $context.compareWithRwkv)
+                } footer: {
+                    Text("Also simulates RWKV on this device from the same settings, for every card. This can take several minutes.")
+                }
+            }
             FsrsSimulatorSettingsSection(
                 daysToSimulate: $daysToSimulate,
                 additionalCards: $additionalCards,
