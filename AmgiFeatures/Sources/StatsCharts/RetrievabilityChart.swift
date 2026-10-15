@@ -24,31 +24,65 @@ public struct RetrievabilityChart: View {
     private struct Bucket: Identifiable {
         let start: Int
         let end: Int
-        let count: Int
+        /// Cards per series, in `series` order.
+        let counts: [Int]
 
         var id: Int { start }
+        var count: Int { counts.reduce(0, +) }
         var center: Double { Double(start + end) / 2.0 }
         var label: String { "\(start)-\(end)%" }
     }
 
+    /// A model's buckets. The desktop shows FSRS and RWKV separately when
+    /// the backend reports them, else the combined buckets.
+    private struct Series {
+        let name: String
+        let color: Color?
+        let retrievability: [Int: Int]
+        let average: Float
+    }
+
+    private var series: [Series] {
+        let explicit = [
+            retrievability.fsrs.map {
+                Series(name: "FSRS", color: Color(red: 0x2f / 255, green: 0x9e / 255, blue: 0x44 / 255),
+                       retrievability: $0.retrievability, average: $0.average)
+            },
+            retrievability.rwkv.map {
+                Series(name: "RWKV", color: Color(red: 0xd6 / 255, green: 0xa2 / 255, blue: 0x1d / 255),
+                       retrievability: $0.retrievability, average: $0.average)
+            },
+        ].compactMap { $0 }
+        if !explicit.isEmpty { return explicit }
+        return [Series(name: "", color: nil, retrievability: retrievability.retrievability, average: retrievability.average)]
+    }
+
+    private var isSplit: Bool { series.count > 1 || series.first?.color != nil }
+
     private var chartData: [Bucket] {
-        guard !retrievability.retrievability.isEmpty else { return [] }
+        let series = series
+        guard series.contains(where: { !$0.retrievability.isEmpty }) else { return [] }
 
         return stride(from: 0, through: 95, by: 5).map { start in
             let end = start == 95 ? 100 : start + 4
-            let count = retrievability.retrievability.reduce(into: 0) { partial, entry in
-                let value = min(Int(entry.key), 100)
-                if value >= start && value <= end {
-                    partial += Int(entry.value)
+            let counts = series.map { item in
+                item.retrievability.reduce(into: 0) { partial, entry in
+                    let value = min(Int(entry.key), 100)
+                    if value >= start && value <= end {
+                        partial += Int(entry.value)
+                    }
                 }
             }
-            return Bucket(start: start, end: end, count: count)
+            return Bucket(start: start, end: end, counts: counts)
         }
     }
 
     private var averageLabel: String {
-        guard retrievability.average > 0 else { return "---" }
-        return String(format: "%.0f%%", retrievability.average)
+        let labels = series.map { item -> String in
+            let value = item.average > 0 ? String(format: "%.0f%%", item.average) : "---"
+            return item.name.isEmpty ? value : "\(item.name) \(value)"
+        }
+        return labels.joined(separator: " · ")
     }
 
     private var selectedBucket: Bucket? {
@@ -56,7 +90,9 @@ public struct RetrievabilityChart: View {
         return chartData.min { abs($0.center - selectedX) < abs($1.center - selectedX) }
     }
 
-    private var maxCount: Int { chartData.map(\.count).max() ?? 0 }
+    private var maxCount: Int {
+        isSplit ? chartData.flatMap(\.counts).max() ?? 0 : chartData.map(\.count).max() ?? 0
+    }
     private var yAxisMax: Double {
         StatsDualAxisSupport.niceUpperBound(Double(maxCount))
     }
@@ -125,10 +161,34 @@ public struct RetrievabilityChart: View {
             .frame(height: 180)
     }
 
+    @ViewBuilder
     private var baseRetrievabilityChart: some View {
-        Chart(chartData) { item in
-            retrievabilityBarMark(for: item)
-            selectedRetrievabilityRuleMark(for: item)
+        if isSplit {
+            let series = series
+            Chart(chartData) { item in
+                ForEach(Array(series.enumerated()), id: \.offset) { index, model in
+                    BarMark(
+                        x: .value("Retrievability", item.center),
+                        y: .value("Cards", item.counts[index]),
+                        width: .fixed(6)
+                    )
+                    .foregroundStyle(by: .value("Model", model.name))
+                    .position(by: .value("Model", model.name))
+                    .accessibilityLabel("\(model.name) \(item.label)")
+                    .accessibilityValue(ChartSpeech.count(item.counts[index], "card"))
+                }
+                selectedRetrievabilityRuleMark(for: item)
+            }
+            .chartForegroundStyleScale(
+                domain: series.map(\.name),
+                range: series.map { $0.color ?? palette.accent }
+            )
+            .chartLegend(position: .bottom)
+        } else {
+            Chart(chartData) { item in
+                retrievabilityBarMark(for: item)
+                selectedRetrievabilityRuleMark(for: item)
+            }
         }
     }
 }
@@ -156,7 +216,9 @@ private extension RetrievabilityChart {
                 .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit, y: .fit)) {
                     StatsChartTooltip(
                         title: selectedBucket.label,
-                        lines: ["\(countLabel): \(selectedBucket.count)"]
+                        lines: isSplit
+                            ? zip(series, selectedBucket.counts).map { "\($0.name): \($1)" }
+                            : ["\(countLabel): \(selectedBucket.count)"]
                     )
                 }
         }

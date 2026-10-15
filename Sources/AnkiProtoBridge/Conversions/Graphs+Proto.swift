@@ -41,6 +41,21 @@ package extension RetrievabilityBuckets {
             retrievability: Dictionary(uniqueKeysWithValues: proto.retrievability.map { (Int($0.key), Int($0.value)) }),
             average: proto.average,
             sumByCard: proto.sumByCard,
+            sumByNote: proto.sumByNote,
+            fsrs: proto.hasFsrs ? RetrievabilitySeries(nonEmpty: proto.fsrs) : nil,
+            rwkv: proto.hasRwkv ? RetrievabilitySeries(nonEmpty: proto.rwkv) : nil
+        )
+    }
+}
+
+package extension RetrievabilitySeries {
+    /// `gatherOptionalSeries`: a series without buckets is absent.
+    init?(nonEmpty proto: Anki_Stats_GraphsResponse.Retrievability.Series) {
+        guard !proto.retrievability.isEmpty else { return nil }
+        self.init(
+            retrievability: Dictionary(uniqueKeysWithValues: proto.retrievability.map { (Int($0.key), Int($0.value)) }),
+            average: proto.average,
+            sumByCard: proto.sumByCard,
             sumByNote: proto.sumByNote
         )
     }

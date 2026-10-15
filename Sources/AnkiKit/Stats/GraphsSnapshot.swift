@@ -94,6 +94,34 @@ public struct RetrievabilityBuckets: Sendable, Hashable {
     public var average: Float
     public var sumByCard: Float
     public var sumByNote: Float
+    /// The fork's per-model series (`Retrievability.fsrs` / `.rwkv`); nil
+    /// when the model scored no card. When either is set the graph shows
+    /// them instead of the combined buckets, as the desktop does.
+    public var fsrs: RetrievabilitySeries?
+    public var rwkv: RetrievabilitySeries?
+    public init(
+        retrievability: [Int: Int] = [:],
+        average: Float = 0,
+        sumByCard: Float = 0,
+        sumByNote: Float = 0,
+        fsrs: RetrievabilitySeries? = nil,
+        rwkv: RetrievabilitySeries? = nil
+    ) {
+        self.retrievability = retrievability
+        self.average = average
+        self.sumByCard = sumByCard
+        self.sumByNote = sumByNote
+        self.fsrs = fsrs
+        self.rwkv = rwkv
+    }
+}
+
+/// One model's retrievability buckets.
+public struct RetrievabilitySeries: Sendable, Hashable {
+    public var retrievability: [Int: Int]
+    public var average: Float
+    public var sumByCard: Float
+    public var sumByNote: Float
     public init(
         retrievability: [Int: Int] = [:],
         average: Float = 0,
