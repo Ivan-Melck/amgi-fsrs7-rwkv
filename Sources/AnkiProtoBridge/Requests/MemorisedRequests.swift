@@ -39,6 +39,19 @@ private struct FsrsMemorisedResponse: Decodable {
     let stableRetrievability: [Double]
     let burdenFirstDay: Int
     let burden: [Double]
+    let bwMatrix: [BwRow]
+
+    struct BwRow: Decodable {
+        let rBin: Double
+        let cells: [Cell]
+    }
+
+    struct Cell: Decodable {
+        let dBin: Int
+        let predicted: Double
+        let real: Double
+        let count: Int
+    }
 }
 
 private struct HistoryBody: Encodable {
@@ -100,7 +113,15 @@ extension Request where Response == FsrsMemorisedHistory {
                     noteRetrievability: series(response.noteRetrievability),
                     cardCount: series(response.cardCount),
                     stableRetrievability: series(response.stableRetrievability),
-                    burden: MemorisedDaySeries(firstDay: response.burdenFirstDay, values: response.burden)
+                    burden: MemorisedDaySeries(firstDay: response.burdenFirstDay, values: response.burden),
+                    bwMatrix: response.bwMatrix.map { row in
+                        MemorisedBwRow(
+                            rBin: row.rBin,
+                            cells: row.cells.map {
+                                MemorisedBwCell(dBin: $0.dBin, predicted: $0.predicted, real: $0.real, count: $0.count)
+                            }
+                        )
+                    }
                 )
             }
         )

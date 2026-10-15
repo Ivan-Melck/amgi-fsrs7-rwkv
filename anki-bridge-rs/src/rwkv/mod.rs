@@ -21,6 +21,7 @@ mod calibration;
 mod fsrs_memorised;
 pub mod inputs;
 mod memorised;
+mod ts_fsrs;
 mod views;
 mod workload;
 

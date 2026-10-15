@@ -42,6 +42,8 @@ public struct FsrsMemorisedHistory: Sendable, Hashable {
     public var cardCount: MemorisedDaySeries
     public var stableRetrievability: MemorisedDaySeries
     public var burden: MemorisedDaySeries
+    /// `bw_matrix`: stability rows of difficulty cells.
+    public var bwMatrix: [MemorisedBwRow]
 
     public init(
         today: Int,
@@ -50,7 +52,8 @@ public struct FsrsMemorisedHistory: Sendable, Hashable {
         noteRetrievability: MemorisedDaySeries = .init(),
         cardCount: MemorisedDaySeries = .init(),
         stableRetrievability: MemorisedDaySeries = .init(),
-        burden: MemorisedDaySeries = .init()
+        burden: MemorisedDaySeries = .init(),
+        bwMatrix: [MemorisedBwRow] = []
     ) {
         self.today = today
         self.rollover = rollover
@@ -59,6 +62,7 @@ public struct FsrsMemorisedHistory: Sendable, Hashable {
         self.cardCount = cardCount
         self.stableRetrievability = stableRetrievability
         self.burden = burden
+        self.bwMatrix = bwMatrix
     }
 }
 
