@@ -40,6 +40,7 @@ public struct DeckClient: Sendable {
         _ fsrsReschedule: Bool
     ) async throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) async throws -> FsrsOptimizeResult
+    public var evaluateFsrsParams: @Sendable (_ request: FsrsEvaluateRequest) async throws -> FsrsEvaluation
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsReviewSimulation
     public var simulateFsrsWorkload: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsWorkloadSimulation
     public var optimizeFsrsPresets: @Sendable (_ deckId: DeckID, _ config: DeckConfig) async throws -> Void

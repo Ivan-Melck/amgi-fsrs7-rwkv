@@ -495,6 +495,8 @@ struct FsrsSection: View {
     @Binding var dynamicDesiredRetentionEnabled: Bool
     @Binding var dynamicDesiredRetentionClamp: Bool
     let isOptimizingFsrs: Bool
+    let isCheckingHealth: Bool
+    let onCheckHealth: () -> Void
     let onOptimizeCurrent: () -> Void
     let onCancelOptimize: () -> Void
     let onOpenSimulatorReview: () -> Void
@@ -603,6 +605,14 @@ struct FsrsSection: View {
                 if isOptimizingFsrs {
                     Button("Cancel", role: .cancel, action: onCancelOptimize)
                 }
+
+                Button(action: onCheckHealth) {
+                    HStack {
+                        if isCheckingHealth { ProgressView().controlSize(.small) }
+                        Text(isCheckingHealth ? "Checking Health…" : "Check Health")
+                    }
+                }
+                .disabled(isOptimizingFsrs || isCheckingHealth)
 
                 Button(action: onOpenSimulatorReview) {
                     Label("Open FSRS Simulator", systemImage: "chart.line.uptrend.xyaxis")

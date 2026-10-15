@@ -221,6 +221,38 @@ extension Request where Response == QueuedCardsResult {
     }
 }
 
+// MARK: - evaluateParams
+
+extension Request where Response == FsrsEvaluation {
+    /// The deck options' Check Health, as the fork's desktop sends it.
+    public static func evaluateFsrsParams(_ input: FsrsEvaluateRequest) -> Self {
+        Self(
+            serviceId: ServiceID.scheduler,
+            methodId: SchedulerMethod.evaluateParams,
+            encode: {
+                var proto = Anki_Scheduler_EvaluateParamsRequest()
+                proto.search = input.search
+                proto.searchForTraining = input.searchForTraining
+                if let cutoff = input.ignoreRevlogsBefore {
+                    proto.ignoreRevlogsBeforeMs = cutoff.ankiMillis
+                }
+                proto.numOfRelearningSteps = UInt32(max(0, input.relearningStepsPerDay))
+                proto.fsrsVersion = .init(input.fsrsVersion)
+                if let includeSameDayReviews = input.includeSameDayReviews {
+                    proto.includeSameDayReviews = includeSameDayReviews
+                    proto.includeSameDayReviewsForTraining = includeSameDayReviews
+                }
+                proto.enableSchedulingPenalties = input.enableSchedulingPenalties
+                return try proto.serializedData()
+            },
+            decode: { bytes in
+                let resp = try Anki_Scheduler_EvaluateParamsResponse(serializedBytes: bytes)
+                return FsrsEvaluation(logLoss: resp.logLoss, rmseBins: resp.rmseBins)
+            }
+        )
+    }
+}
+
 // MARK: - computeFsrsParams
 
 extension Request where Response == FsrsOptimizeResult {

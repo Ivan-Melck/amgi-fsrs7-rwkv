@@ -113,6 +113,7 @@ final class DeckConfigModel {
     // (Presentation state itself lives in `destination`.)
     var isPresetMutating = false
     var isRebuildingRwkvState = false
+    var isCheckingFsrsHealth = false
     var newPresetName = ""
     var renamePresetDraft = ""
 

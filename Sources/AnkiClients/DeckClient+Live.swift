@@ -79,6 +79,9 @@ extension DeckClient: DependencyKey {
             computeFsrsParams: { request in
                 try await backendOffload { try decks.computeFsrsParams(request) }
             },
+            evaluateFsrsParams: { request in
+                try await backendOffload { try decks.evaluateFsrsParams(request) }
+            },
             simulateFsrsReview: { request in
                 try await backendOffload { try decks.simulateFsrsReview(request) }
             },

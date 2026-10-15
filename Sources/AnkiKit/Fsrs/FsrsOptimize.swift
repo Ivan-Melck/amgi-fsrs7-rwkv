@@ -90,3 +90,46 @@ public struct FsrsOptimizeResult: Sendable, Hashable {
         self.dynamicDesiredRetention = dynamicDesiredRetention
     }
 }
+
+/// Inputs for `Request.evaluateFsrsParams` (the deck options' Check
+/// Health): parameters are trained on `searchForTraining` and scored on
+/// `search`.
+public struct FsrsEvaluateRequest: Sendable, Hashable {
+    public var search: String
+    public var searchForTraining: String
+    public var ignoreRevlogsBefore: Date?
+    public var relearningStepsPerDay: Int
+    public var fsrsVersion: FsrsVersion
+    /// FSRS-7 only; `nil` uses the backend's default.
+    public var includeSameDayReviews: Bool?
+    public var enableSchedulingPenalties: Bool
+
+    public init(
+        search: String,
+        searchForTraining: String,
+        ignoreRevlogsBefore: Date?,
+        relearningStepsPerDay: Int,
+        fsrsVersion: FsrsVersion,
+        includeSameDayReviews: Bool?,
+        enableSchedulingPenalties: Bool
+    ) {
+        self.search = search
+        self.searchForTraining = searchForTraining
+        self.ignoreRevlogsBefore = ignoreRevlogsBefore
+        self.relearningStepsPerDay = relearningStepsPerDay
+        self.fsrsVersion = fsrsVersion
+        self.includeSameDayReviews = includeSameDayReviews
+        self.enableSchedulingPenalties = enableSchedulingPenalties
+    }
+}
+
+/// How well FSRS fits the review history; smaller is better.
+public struct FsrsEvaluation: Sendable, Hashable {
+    public let logLoss: Float
+    public let rmseBins: Float
+
+    public init(logLoss: Float, rmseBins: Float) {
+        self.logLoss = logLoss
+        self.rmseBins = rmseBins
+    }
+}

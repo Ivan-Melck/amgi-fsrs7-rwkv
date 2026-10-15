@@ -211,6 +211,8 @@ struct DeckConfigView: View {
             dynamicDesiredRetentionEnabled: $model.dynamicDesiredRetentionEnabled,
             dynamicDesiredRetentionClamp: $model.dynamicDesiredRetentionClamp,
             isOptimizingFsrs: model.isOptimizingFsrs,
+            isCheckingHealth: model.isCheckingFsrsHealth,
+            onCheckHealth: { Task { await model.checkFsrsHealth() } },
             onOptimizeCurrent: { Task { await model.optimizeCurrentPreset() } },
             onCancelOptimize: { model.cancelOptimize() },
             onOpenSimulatorReview: { model.openSimulator(mode: .review) },

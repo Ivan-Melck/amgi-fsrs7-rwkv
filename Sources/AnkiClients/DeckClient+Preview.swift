@@ -32,6 +32,9 @@ extension DeckClient {
         computeFsrsParams: { _ in
             throw PreviewClientError.notImplementedInPreview("computeFsrsParams")
         },
+        evaluateFsrsParams: { _ in
+            throw PreviewClientError.notImplementedInPreview("evaluateFsrsParams")
+        },
         simulateFsrsReview: { _ in
             throw PreviewClientError.notImplementedInPreview("simulateFsrsReview")
         },
