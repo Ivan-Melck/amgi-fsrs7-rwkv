@@ -425,6 +425,23 @@ private struct WorkloadResponse: Decodable {
     }
 
     let points: [Point]
+    // `review_time_*`, as `_apply_rwkv_review_time_model` fills them.
+    let reviewTimeRBucketCount: Int
+    let reviewTimeSBucketCount: Int
+    let reviewTimeAgainSeconds: [Float]
+    let reviewTimeHardSeconds: [Float]
+    let reviewTimeGoodSeconds: [Float]
+    let reviewTimeEasySeconds: [Float]
+    let reviewTimeSampleCounts: [Int]
+    let reviewTimeAgainCoeffs: [Float]
+    let reviewTimeHardCoeffs: [Float]
+    let reviewTimeGoodCoeffs: [Float]
+    let reviewTimeEasyCoeffs: [Float]
+    let reviewTimeGradeWeights: [Float]
+    let reviewTimeTransitionProbs: [Float]
+    let reviewTimeTransitionCounts: [Int]
+    let reviewTimeSuccessGradeProbs: [Float]
+    let reviewTimeSuccessGradeCounts: [Int]
 }
 
 extension Request where Response == FsrsWorkloadSimulation {
@@ -456,7 +473,25 @@ extension Request where Response == FsrsWorkloadSimulation {
                 return FsrsWorkloadSimulation(
                     cost: Dictionary(response.points.map { ($0.dr, $0.cost) }, uniquingKeysWith: { _, last in last }),
                     memorized: Dictionary(response.points.map { ($0.dr, $0.memorized) }, uniquingKeysWith: { _, last in last }),
-                    reviewCount: Dictionary(response.points.map { ($0.dr, $0.reviewCount) }, uniquingKeysWith: { _, last in last })
+                    reviewCount: Dictionary(response.points.map { ($0.dr, $0.reviewCount) }, uniquingKeysWith: { _, last in last }),
+                    reviewTime: FsrsReviewTime(
+                        rBucketCount: response.reviewTimeRBucketCount,
+                        sBucketCount: response.reviewTimeSBucketCount,
+                        againSeconds: response.reviewTimeAgainSeconds,
+                        hardSeconds: response.reviewTimeHardSeconds,
+                        goodSeconds: response.reviewTimeGoodSeconds,
+                        easySeconds: response.reviewTimeEasySeconds,
+                        sampleCounts: response.reviewTimeSampleCounts,
+                        againCoeffs: response.reviewTimeAgainCoeffs,
+                        hardCoeffs: response.reviewTimeHardCoeffs,
+                        goodCoeffs: response.reviewTimeGoodCoeffs,
+                        easyCoeffs: response.reviewTimeEasyCoeffs,
+                        gradeWeights: response.reviewTimeGradeWeights,
+                        transitionProbs: response.reviewTimeTransitionProbs,
+                        transitionCounts: response.reviewTimeTransitionCounts,
+                        successGradeProbs: response.reviewTimeSuccessGradeProbs,
+                        successGradeCounts: response.reviewTimeSuccessGradeCounts
+                    )
                 )
             }
         )

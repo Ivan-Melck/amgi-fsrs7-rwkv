@@ -58,6 +58,24 @@ pub struct WorkloadResponse {
     pub reviewless_end_memorized: f32,
     pub reviewless_end_weighted_memorized: f32,
     pub points: Vec<WorkloadPoint>,
+    // `SimulateFsrsWorkloadResponse.review_time_*`, as the desktop fills
+    // them (floats are the proto's).
+    pub review_time_r_bucket_count: u32,
+    pub review_time_s_bucket_count: u32,
+    pub review_time_again_seconds: Vec<f32>,
+    pub review_time_hard_seconds: Vec<f32>,
+    pub review_time_good_seconds: Vec<f32>,
+    pub review_time_easy_seconds: Vec<f32>,
+    pub review_time_sample_counts: Vec<u32>,
+    pub review_time_again_coeffs: Vec<f32>,
+    pub review_time_hard_coeffs: Vec<f32>,
+    pub review_time_good_coeffs: Vec<f32>,
+    pub review_time_easy_coeffs: Vec<f32>,
+    pub review_time_grade_weights: Vec<f32>,
+    pub review_time_transition_probs: Vec<f32>,
+    pub review_time_transition_counts: Vec<u32>,
+    pub review_time_success_grade_probs: Vec<f32>,
+    pub review_time_success_grade_counts: Vec<u32>,
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -119,7 +137,7 @@ impl Engine {
             return Ok(WorkloadResponse::default());
         }
 
-        let review_model = review_model(&review_model_rows(backend));
+        let (review_model, review_time) = review_model(&review_model_rows(backend));
         let review_limit = req.review_limit;
         let new_limit = req.new_limit;
         let config = RwkvWorkloadSimulationConfig {
@@ -178,7 +196,9 @@ impl Engine {
                     review_count: point.review_count,
                 })
                 .collect(),
+            ..Default::default()
         };
+        apply_review_time(&mut response, &review_time);
         scale_response(&mut response, input_scale, review_count_cap);
         Ok(response)
     }
@@ -287,11 +307,15 @@ fn review_model_rows(backend: &Backend) -> Vec<(f64, i64, i64)> {
 }
 
 /// `_rwkv_simulator_review_model`: answer-grade probabilities per
-/// retrievability bucket and seconds per grade, in Python's doubles.
-pub(super) fn review_model(rows: &[(f64, i64, i64)]) -> RwkvWorkloadReviewModel {
+/// retrievability bucket and seconds per grade, plus the review-time
+/// breakdown the simulator shows, in Python's doubles.
+pub(super) fn review_model(
+    rows: &[(f64, i64, i64)],
+) -> (RwkvWorkloadReviewModel, ReviewTimeFields) {
     let mut bucket_counts: std::collections::BTreeMap<u32, [f64; 4]> = Default::default();
     let mut seconds_sum = [0.0f64; 4];
     let mut seconds_count = [0u32; 4];
+    let mut timed_samples = vec![];
     for &(retrievability, ease, taken_millis) in rows {
         // `_valid_probability`; NaN and infinities fall outside the range.
         if !(1..=4).contains(&ease) || !(0.0..=1.0).contains(&retrievability) {
@@ -300,32 +324,230 @@ pub(super) fn review_model(rows: &[(f64, i64, i64)]) -> RwkvWorkloadReviewModel 
         let grade = (ease - 1) as usize;
         bucket_counts.entry(bucket(retrievability)).or_default()[grade] += 1.0;
         if 0 < taken_millis && taken_millis < MAX_TAKEN_MILLIS {
-            seconds_sum[grade] += taken_millis as f64 / 1000.0;
+            let seconds = taken_millis as f64 / 1000.0;
+            seconds_sum[grade] += seconds;
             seconds_count[grade] += 1;
+            timed_samples.push((retrievability, grade, seconds));
         }
     }
     let bucket_probabilities = bucket_counts
-        .into_iter()
-        .filter_map(|(bucket, counts)| {
+        .iter()
+        .filter_map(|(&bucket, counts)| {
             let center = (bucket as f64 + 0.5) / BUCKET_COUNT as f64;
             let fallback = fallback_grade_probabilities(center);
             let smoothed: [f64; 4] =
                 std::array::from_fn(|i| counts[i] + fallback[i] * PRIOR_WEIGHT);
-            let total: f64 = smoothed.iter().sum();
+            let total = py_sum(smoothed);
             (total > 0.0).then(|| (bucket, smoothed.map(|value| (value / total) as f32)))
         })
         .collect();
-    let grade_seconds = std::array::from_fn(|i| {
+    let grade_seconds: [f64; 4] = std::array::from_fn(|i| {
         if seconds_count[i] > 0 {
-            (seconds_sum[i] / seconds_count[i] as f64) as f32
+            seconds_sum[i] / seconds_count[i] as f64
         } else {
-            DEFAULT_GRADE_SECONDS as f32
+            DEFAULT_GRADE_SECONDS
         }
     });
-    RwkvWorkloadReviewModel {
-        grade_seconds,
+    let review_time = review_time_fields(&timed_samples, &bucket_counts, grade_seconds);
+    let model = RwkvWorkloadReviewModel {
+        grade_seconds: grade_seconds.map(|seconds| seconds as f32),
         bucket_probabilities,
+    };
+    (model, review_time)
+}
+
+/// `_RwkvSimulatorReviewTimeFields`.
+#[derive(Debug, PartialEq)]
+pub(super) struct ReviewTimeFields {
+    pub r_bucket_count: u32,
+    pub s_bucket_count: u32,
+    /// Again, Hard, Good, Easy seconds per UI bucket.
+    pub seconds: [Vec<f64>; 4],
+    pub sample_counts: Vec<u32>,
+    /// Again, Hard, Good, Easy `(a, b, c, d, e)`.
+    pub coeffs: [[f64; 5]; 4],
+    pub grade_weights: [f64; 4],
+    pub transition_probs: Vec<f64>,
+    pub transition_counts: Vec<u32>,
+    pub success_grade_probs: Vec<f64>,
+    pub success_grade_counts: Vec<u32>,
+}
+
+/// `_rwkv_simulator_review_time_fields`: per-grade linear time models over
+/// 5% retrievability buckets (highest first), with one stability bucket.
+pub(super) fn review_time_fields(
+    timed_samples: &[(f64, usize, f64)],
+    bucket_counts: &std::collections::BTreeMap<u32, [f64; 4]>,
+    grade_seconds: [f64; 4],
+) -> ReviewTimeFields {
+    let mut samples_by_grade: [Vec<(f64, f64)>; 4] = Default::default();
+    let mut sample_counts = vec![0u32; BUCKET_COUNT];
+    let mut success_grade_counts = vec![[0.0f64; 3]; BUCKET_COUNT];
+    for &(retrievability, grade, seconds) in timed_samples {
+        let bucket = ui_bucket(retrievability);
+        sample_counts[bucket] += 1;
+        samples_by_grade[grade].push((retrievability, seconds));
+        if grade > 0 {
+            success_grade_counts[bucket][grade - 1] += 1.0;
+        }
     }
+    let coeffs: [[f64; 5]; 4] =
+        std::array::from_fn(|i| review_time_coeffs(&samples_by_grade[i], grade_seconds[i]));
+    let seconds = std::array::from_fn(|i| {
+        (0..BUCKET_COUNT)
+            .map(|bucket| review_time_for_bucket(bucket, &coeffs[i], grade_seconds[i]))
+            .collect()
+    });
+    let grade_weights = grade_weights(bucket_counts);
+    ReviewTimeFields {
+        r_bucket_count: BUCKET_COUNT as u32,
+        s_bucket_count: 1,
+        seconds,
+        sample_counts,
+        coeffs,
+        grade_weights,
+        transition_probs: grade_weights.repeat(4),
+        transition_counts: vec![0; 16],
+        success_grade_probs: success_grade_counts
+            .iter()
+            .enumerate()
+            .flat_map(|(bucket, counts)| success_grade_probabilities(bucket, counts))
+            .collect(),
+        success_grade_counts: success_grade_counts
+            .iter()
+            .map(|counts| py_sum(*counts) as u32)
+            .collect(),
+    }
+}
+
+/// `_rwkv_simulator_review_time_coeffs`: least squares of seconds on 1 - R.
+fn review_time_coeffs(samples: &[(f64, f64)], fallback_seconds: f64) -> [f64; 5] {
+    if samples.len() < 2 {
+        return [fallback_seconds, 0.0, 0.0, 0.0, 0.0];
+    }
+    let xs: Vec<f64> = samples
+        .iter()
+        .map(|&(retrievability, _)| 1.0 - retrievability.clamp(0.0, 1.0))
+        .collect();
+    let ys: Vec<f64> = samples.iter().map(|&(_, seconds)| seconds).collect();
+    let mean_x = py_sum(xs.iter().copied()) / xs.len() as f64;
+    let mean_y = py_sum(ys.iter().copied()) / ys.len() as f64;
+    let denominator = py_sum(xs.iter().map(|x| (x - mean_x) * (x - mean_x)));
+    if denominator <= 1e-9 {
+        return [mean_y, 0.0, 0.0, 0.0, 0.0];
+    }
+    let mut slope = py_sum(xs.iter().zip(&ys).map(|(x, y)| (x - mean_x) * (y - mean_y)));
+    slope /= denominator;
+    let intercept = mean_y - slope * mean_x;
+    if intercept.is_finite() && slope.is_finite() {
+        [intercept, slope, 0.0, 0.0, 0.0]
+    } else {
+        [fallback_seconds, 0.0, 0.0, 0.0, 0.0]
+    }
+}
+
+/// `_rwkv_simulator_review_time_for_bucket`: the model at the bucket's
+/// midpoint, or the grade's mean when not positive.
+fn review_time_for_bucket(bucket: usize, coeffs: &[f64; 5], fallback_seconds: f64) -> f64 {
+    let retrievability = ui_bucket_retrievability(bucket);
+    let predicted = coeffs[0] + coeffs[1] * (1.0 - retrievability);
+    if predicted.is_finite() && predicted > 0.0 {
+        predicted
+    } else {
+        fallback_seconds
+    }
+}
+
+/// `_rwkv_simulator_grade_weights`: overall answer-grade shares.
+fn grade_weights(bucket_counts: &std::collections::BTreeMap<u32, [f64; 4]>) -> [f64; 4] {
+    let mut counts = [0.0f64; 4];
+    for bucket in bucket_counts.values() {
+        for (total, count) in counts.iter_mut().zip(bucket) {
+            *total += count;
+        }
+    }
+    let total = py_sum(counts);
+    if total <= 0.0 {
+        return [0.25; 4];
+    }
+    counts.map(|count| count / total)
+}
+
+/// `_rwkv_simulator_success_grade_probabilities`: Hard/Good/Easy shares of
+/// the bucket's successes, smoothed toward the fallback's.
+fn success_grade_probabilities(bucket: usize, counts: &[f64; 3]) -> [f64; 3] {
+    let fallback = fallback_grade_probabilities(ui_bucket_retrievability(bucket));
+    let fallback_success = [fallback[1], fallback[2], fallback[3]];
+    let fallback_total = py_sum(fallback_success);
+    let prior = if fallback_total > 0.0 {
+        fallback_success.map(|value| value / fallback_total)
+    } else {
+        [1.0 / 3.0; 3]
+    };
+    let smoothed: [f64; 3] = std::array::from_fn(|i| counts[i] + prior[i] * PRIOR_WEIGHT);
+    let total = py_sum(smoothed);
+    if total <= 0.0 {
+        return prior;
+    }
+    smoothed.map(|value| value / total)
+}
+
+/// `max(0.0, min(1.0, 1.0 - (bucket + 0.5) * 0.05))`.
+fn ui_bucket_retrievability(bucket: usize) -> f64 {
+    (1.0 - (bucket as f64 + 0.5) * 0.05).clamp(0.0, 1.0)
+}
+
+/// `_rwkv_simulator_ui_bucket`: 5% retrievability buckets, highest first.
+fn ui_bucket(retrievability: f64) -> usize {
+    if !retrievability.is_finite() {
+        return BUCKET_COUNT - 1;
+    }
+    let clamped = retrievability.clamp(0.0, 1.0);
+    let base_index = ((clamped * 100.0).min(99.9999) / 5.0) as usize;
+    BUCKET_COUNT - 1 - base_index
+}
+
+/// `_apply_rwkv_review_time_model`.
+fn apply_review_time(response: &mut WorkloadResponse, fields: &ReviewTimeFields) {
+    let floats =
+        |values: &[f64]| -> Vec<f32> { values.iter().map(|&value| value as f32).collect() };
+    let [again, hard, good, easy] = &fields.seconds;
+    let [again_coeffs, hard_coeffs, good_coeffs, easy_coeffs] = &fields.coeffs;
+    response.review_time_r_bucket_count = fields.r_bucket_count;
+    response.review_time_s_bucket_count = fields.s_bucket_count;
+    response.review_time_again_seconds = floats(again);
+    response.review_time_hard_seconds = floats(hard);
+    response.review_time_good_seconds = floats(good);
+    response.review_time_easy_seconds = floats(easy);
+    response.review_time_sample_counts = fields.sample_counts.clone();
+    response.review_time_again_coeffs = floats(again_coeffs);
+    response.review_time_hard_coeffs = floats(hard_coeffs);
+    response.review_time_good_coeffs = floats(good_coeffs);
+    response.review_time_easy_coeffs = floats(easy_coeffs);
+    response.review_time_grade_weights = floats(&fields.grade_weights);
+    response.review_time_transition_probs = floats(&fields.transition_probs);
+    response.review_time_transition_counts = fields.transition_counts.clone();
+    response.review_time_success_grade_probs = floats(&fields.success_grade_probs);
+    response.review_time_success_grade_counts = fields.success_grade_counts.clone();
+}
+
+/// Python's `sum()` of floats (3.12+): Neumaier compensated summation.
+pub(super) fn py_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+    let mut sum = 0.0f64;
+    let mut compensation = 0.0f64;
+    for value in values {
+        let total = sum + value;
+        if sum.abs() >= value.abs() {
+            compensation += (sum - total) + value;
+        } else {
+            compensation += (value - total) + sum;
+        }
+        sum = total;
+    }
+    if compensation != 0.0 && compensation.is_finite() {
+        sum += compensation;
+    }
+    sum
 }
 
 /// `_rwkv_simulator_bucket`.

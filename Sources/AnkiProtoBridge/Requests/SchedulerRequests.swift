@@ -371,7 +371,25 @@ extension Request where Response == FsrsWorkloadSimulation {
                 return FsrsWorkloadSimulation(
                     cost: Dictionary(uniqueKeysWithValues: resp.cost.map { (Int($0.key), $0.value) }),
                     memorized: Dictionary(uniqueKeysWithValues: resp.memorized.map { (Int($0.key), $0.value) }),
-                    reviewCount: Dictionary(uniqueKeysWithValues: resp.reviewCount.map { (Int($0.key), Int($0.value)) })
+                    reviewCount: Dictionary(uniqueKeysWithValues: resp.reviewCount.map { (Int($0.key), Int($0.value)) }),
+                    reviewTime: FsrsReviewTime(
+                        rBucketCount: Int(resp.reviewTimeRBucketCount),
+                        sBucketCount: Int(resp.reviewTimeSBucketCount),
+                        againSeconds: resp.reviewTimeAgainSeconds,
+                        hardSeconds: resp.reviewTimeHardSeconds,
+                        goodSeconds: resp.reviewTimeGoodSeconds,
+                        easySeconds: resp.reviewTimeEasySeconds,
+                        sampleCounts: resp.reviewTimeSampleCounts.map(Int.init),
+                        againCoeffs: resp.reviewTimeAgainCoeffs,
+                        hardCoeffs: resp.reviewTimeHardCoeffs,
+                        goodCoeffs: resp.reviewTimeGoodCoeffs,
+                        easyCoeffs: resp.reviewTimeEasyCoeffs,
+                        gradeWeights: resp.reviewTimeGradeWeights,
+                        transitionProbs: resp.reviewTimeTransitionProbs,
+                        transitionCounts: resp.reviewTimeTransitionCounts.map(Int.init),
+                        successGradeProbs: resp.reviewTimeSuccessGradeProbs,
+                        successGradeCounts: resp.reviewTimeSuccessGradeCounts.map(Int.init)
+                    )
                 )
             }
         )

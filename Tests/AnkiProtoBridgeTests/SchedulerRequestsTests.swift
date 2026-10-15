@@ -335,6 +335,49 @@ private import SwiftProtobuf
         #expect(result.memorized[85] == 100)
         #expect(result.reviewCount[85] == 50)
         #expect(result.reviewCount[90] == 80)
+        #expect(result.reviewTime == FsrsReviewTime())
+    }
+
+    @Test func simulateFsrsWorkload_decodes_review_time() throws {
+        var resp = Anki_Scheduler_SimulateFsrsWorkloadResponse()
+        resp.reviewTimeRBucketCount = 2
+        resp.reviewTimeSBucketCount = 1
+        resp.reviewTimeAgainSeconds = [20, 18]
+        resp.reviewTimeHardSeconds = [12, 11]
+        resp.reviewTimeGoodSeconds = [6, 5]
+        resp.reviewTimeEasySeconds = [3, 2.5]
+        resp.reviewTimeSampleCounts = [7, 9]
+        resp.reviewTimeAgainCoeffs = [1, 2, 3, 4, 5]
+        resp.reviewTimeHardCoeffs = [6, 7, 8, 9, 10]
+        resp.reviewTimeGoodCoeffs = [11, 12, 13, 14, 15]
+        resp.reviewTimeEasyCoeffs = [16, 17, 18, 19, 20]
+        resp.reviewTimeGradeWeights = [0.1, 0.2, 0.5, 0.2]
+        resp.reviewTimeTransitionProbs = Array(repeating: 0.25, count: 16)
+        resp.reviewTimeTransitionCounts = Array(0..<16)
+        resp.reviewTimeSuccessGradeProbs = [0.2, 0.7, 0.1, 0.3, 0.3, 0.4]
+        resp.reviewTimeSuccessGradeCounts = [4, 0]
+        let bytes = try resp.serializedData()
+
+        let result = try Request<FsrsWorkloadSimulation>.simulateFsrsWorkload(makeSimulationRequest()).decode(bytes)
+
+        #expect(result.reviewTime == FsrsReviewTime(
+            rBucketCount: 2,
+            sBucketCount: 1,
+            againSeconds: [20, 18],
+            hardSeconds: [12, 11],
+            goodSeconds: [6, 5],
+            easySeconds: [3, 2.5],
+            sampleCounts: [7, 9],
+            againCoeffs: [1, 2, 3, 4, 5],
+            hardCoeffs: [6, 7, 8, 9, 10],
+            goodCoeffs: [11, 12, 13, 14, 15],
+            easyCoeffs: [16, 17, 18, 19, 20],
+            gradeWeights: [0.1, 0.2, 0.5, 0.2],
+            transitionProbs: Array(repeating: 0.25, count: 16),
+            transitionCounts: Array(0..<16),
+            successGradeProbs: [0.2, 0.7, 0.1, 0.3, 0.3, 0.4],
+            successGradeCounts: [4, 0]
+        ))
     }
 
     // MARK: - Helpers
