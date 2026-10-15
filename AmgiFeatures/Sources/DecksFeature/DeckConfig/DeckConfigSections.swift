@@ -499,6 +499,8 @@ struct FsrsSection: View {
     @Binding var fsrs7SchedulingPenaltiesEnabled: Bool
     @Binding var dynamicDesiredRetentionEnabled: Bool
     @Binding var dynamicDesiredRetentionClamp: Bool
+    let dynamicDesiredRetentionStatus: DynamicDesiredRetentionPolicy.Status
+    let onOpenDynamicDesiredRetentionPlot: () -> Void
     let isOptimizingFsrs: Bool
     let isCheckingHealth: Bool
     let onCheckHealth: () -> Void
@@ -596,6 +598,7 @@ struct FsrsSection: View {
                         Text("Optimize the parameters to fit the dynamic DR model.")
                             .amgiFont(.caption)
                             .foregroundStyle(palette.textSecondary)
+                        dynamicDesiredRetentionActions
                     }
                 }
 
@@ -781,6 +784,26 @@ struct LabeledSlider: View {
 }
 
 private extension FsrsSection {
+    /// The desktop's `dynamic-dr-actions` row and its warning.
+    @ViewBuilder
+    var dynamicDesiredRetentionActions: some View {
+        let status = dynamicDesiredRetentionStatus
+        let bounds = [status.retentionMin, status.retentionMax]
+            .map(DynamicDesiredRetentionPolicy.Status.formatBound)
+            .joined(separator: " - ")
+        LabeledContent("Weight", value: DynamicDesiredRetentionPlot.formatWeight(status.weight))
+        LabeledContent("Bounds", value: bounds)
+        Button(action: onOpenDynamicDesiredRetentionPlot) {
+            Label("Visualize DR plot", systemImage: "cube")
+        }
+        .disabled(!status.ready)
+        if !status.warning.isEmpty {
+            Text(status.warning)
+                .amgiFont(.caption)
+                .foregroundStyle(palette.warning)
+        }
+    }
+
     static let commonMinimumIntervals = [1, 60, 600, 3600, 86_400]
 
     /// Common choices, plus the preset's value when it is something else.

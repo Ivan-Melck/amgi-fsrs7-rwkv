@@ -27,6 +27,10 @@ struct DeckConfigPresentations: ViewModifier {
     let onSaveThen: (DeckConfigPresetAction) -> Void
     let onDiscardThen: (DeckConfigPresetAction) -> Void
     let onApplySchedule: (ScheduleCopyOptions) async -> String?
+    /// The Dynamic DR plot's model and target (the effective DR).
+    let dynamicDesiredRetentionPlot: DynamicDesiredRetentionPlot
+    let effectiveDesiredRetention: Double
+    let onSaveDynamicDesiredRetentionTarget: (Double) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -86,6 +90,12 @@ struct DeckConfigPresentations: ViewModifier {
             )
         case .applySchedule:
             ApplyScheduleSheet(onApply: onApplySchedule)
+        case .dynamicDesiredRetentionPlot:
+            DynamicDesiredRetentionPlotView(
+                plot: dynamicDesiredRetentionPlot,
+                targetAverageDr: effectiveDesiredRetention,
+                onSaveTarget: onSaveDynamicDesiredRetentionTarget
+            )
         case .renamePreset:
             TextPromptSheet(
                 title: "Rename Preset",

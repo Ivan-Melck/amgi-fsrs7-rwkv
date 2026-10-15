@@ -57,7 +57,10 @@ struct DeckConfigView: View {
                 onDiscard: onDismiss,
                 onSaveThen: { action in Task { await model.saveThenPerform(action) } },
                 onDiscardThen: { action in Task { await model.discardThenPerform(action) } },
-                onApplySchedule: { await model.applyScheduleToAllPresets($0) }
+                onApplySchedule: { await model.applyScheduleToAllPresets($0) },
+                dynamicDesiredRetentionPlot: model.dynamicDesiredRetentionPlot,
+                effectiveDesiredRetention: model.effectiveDesiredRetention,
+                onSaveDynamicDesiredRetentionTarget: { model.saveDynamicDesiredRetentionPlotTarget($0) }
             ))
             .task { await model.loadConfig() }
     }
@@ -211,6 +214,8 @@ struct DeckConfigView: View {
             fsrs7SchedulingPenaltiesEnabled: $model.fsrs7SchedulingPenaltiesEnabled,
             dynamicDesiredRetentionEnabled: $model.dynamicDesiredRetentionEnabled,
             dynamicDesiredRetentionClamp: $model.dynamicDesiredRetentionClamp,
+            dynamicDesiredRetentionStatus: model.dynamicDesiredRetentionStatus,
+            onOpenDynamicDesiredRetentionPlot: { model.openDynamicDesiredRetentionPlot() },
             isOptimizingFsrs: model.isOptimizingFsrs,
             isCheckingHealth: model.isCheckingFsrsHealth,
             onCheckHealth: { Task { await model.checkFsrsHealth() } },
