@@ -21,6 +21,8 @@ public struct RwkvClient: Sendable {
     /// Reschedules review cards of RWKV-Curve presets in `deckId` and its
     /// subdecks, or in every deck when nil.
     public var reschedule: @Sendable (_ deckId: DeckID?) async throws -> RwkvRescheduleResult
+    /// Rebuilds the RWKV state from the whole review history and saves it.
+    public var rebuildState: @Sendable () async throws -> RwkvPrepareResult
 }
 
 extension RwkvClient: TestDependencyKey {
@@ -28,7 +30,8 @@ extension RwkvClient: TestDependencyKey {
     public static let previewValue = RwkvClient(
         isAvailable: { false },
         cardInfo: { _ in [] },
-        reschedule: { _ in RwkvRescheduleResult(built: true, predicted: 0, updated: 0) }
+        reschedule: { _ in RwkvRescheduleResult(built: true, predicted: 0, updated: 0) },
+        rebuildState: { RwkvPrepareResult(active: true, ready: true, source: "replayed") }
     )
 }
 

@@ -68,9 +68,19 @@ extension Request where Response == RwkvPrepareResult {
     /// review history: revalidated, restored from `cacheDir`, or replayed.
     /// Long-running on first use, so it bypasses the global call lock.
     public static func rwkvPrepare(modelPath: String, cacheDir: String?, precision: String) -> Self {
+        prepare(AuxMethod.rwkvPrepare, modelPath: modelPath, cacheDir: cacheDir, precision: precision)
+    }
+
+    /// The deck options' "Build Cache": replays the whole review history,
+    /// ignoring the resident and saved states, and saves the result.
+    public static func rwkvRebuildState(modelPath: String, cacheDir: String?, precision: String) -> Self {
+        prepare(AuxMethod.rwkvRebuildState, modelPath: modelPath, cacheDir: cacheDir, precision: precision)
+    }
+
+    private static func prepare(_ methodId: UInt32, modelPath: String, cacheDir: String?, precision: String) -> Self {
         Self(
             serviceId: ServiceID.aux,
-            methodId: AuxMethod.rwkvPrepare,
+            methodId: methodId,
             bypassesCallLock: true,
             encode: {
                 try encoder.encode(PrepareBody(modelPath: modelPath, cacheDir: cacheDir, precision: precision))

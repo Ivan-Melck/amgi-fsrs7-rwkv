@@ -415,6 +415,9 @@ struct RwkvSection: View {
     @Binding var minInterveningReviews: Int32
     @Binding var minElapsedSecs: Int32
     @Binding var enforceGradeOrder: Bool
+    let canRebuildState: Bool
+    let isRebuildingState: Bool
+    let onRebuildState: () -> Void
 
     var body: some View {
         if instantEnabled {
@@ -443,6 +446,22 @@ struct RwkvSection: View {
                 Text("RWKV-Curve")
             } footer: {
                 Text("Curve replaces FSRS answer intervals with RWKV ones, computed on this device.")
+            }
+        }
+        if canRebuildState, instantEnabled || curveEnabled {
+            Section {
+                Button(action: onRebuildState) {
+                    if isRebuildingState {
+                        HStack { ProgressView().controlSize(.small); Text("Rebuilding RWKV state…") }
+                    } else {
+                        Text("Rebuild RWKV State")
+                    }
+                }
+                .disabled(isRebuildingState)
+            } header: {
+                Text("RWKV maintenance")
+            } footer: {
+                Text("Replays your whole review history, ignoring the saved state. Saves these options first. This can take a while on large collections.")
             }
         }
     }

@@ -1323,3 +1323,34 @@ fn candidate_refresh_drops_new_cards_like_the_desktop() {
     assert!(new_cards.iter().all(|id| !after.contains_key(id)));
     assert_eq!(after.len(), 4);
 }
+
+#[test]
+fn rebuilding_replays_the_whole_history_and_saves_it() {
+    let Some(fx) = fixture("rebuild", 6) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("rebuild-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    answer_next(&mut engine, &fx, 3).unwrap();
+    let queries = all_queries(&fx);
+    let live = engine.predict_many(&queries).unwrap();
+
+    let request = PrepareRequest {
+        model_path: fx.model.clone(),
+        cache_dir: Some(cache.0.to_string_lossy().into_owned()),
+        precision: None,
+    };
+    let rebuilt = engine.rebuild_state(&fx.backend, request).unwrap();
+    assert_eq!(rebuilt.source, "replayed");
+    assert!(rebuilt.ready);
+    assert_same_predictions(&live, &engine.predict_many(&queries).unwrap());
+    // Back to normal: the next prepare keeps the resident state.
+    assert_eq!(prepare(&mut engine, &fx, Some(&cache.0)).source, "resident");
+    // And the rebuilt state was saved.
+    let mut restored = Engine::default();
+    assert_eq!(
+        prepare(&mut restored, &fx, Some(&cache.0)).source,
+        "restored"
+    );
+}

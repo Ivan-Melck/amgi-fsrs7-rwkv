@@ -26,6 +26,7 @@ final class DeckConfigModel {
     // Internal rather than private: the preset/FSRS methods live in
     // DeckConfigModel+Presets.swift now, and `private` is file-scoped.
     @ObservationIgnored @Dependency(\.deckClient) var deckClient
+    @ObservationIgnored @Dependency(\.rwkvClient) var rwkvClient
 
     var loaded: LoadedConfig?
     var baseline: DeckConfig?
@@ -111,6 +112,7 @@ final class DeckConfigModel {
     // Preset CRUD — text-field draft state for the create/rename alerts.
     // (Presentation state itself lives in `destination`.)
     var isPresetMutating = false
+    var isRebuildingRwkvState = false
     var newPresetName = ""
     var renamePresetDraft = ""
 
@@ -170,7 +172,7 @@ final class DeckConfigModel {
     var alertTitle: String {
         switch currentAlert {
         case .saveFailed: "Couldn't save deck options"
-        case .fsrsError(let title, _): title
+        case .fsrsError(let title, _), .notice(let title, _): title
         case .presetError: "Couldn't change preset"
         case .deletePresetConfirm: "Delete \"\(currentPresetName ?? "this preset")\"?"
         case .discardChanges, .unsavedBeforePresetChange: "Unsaved changes"

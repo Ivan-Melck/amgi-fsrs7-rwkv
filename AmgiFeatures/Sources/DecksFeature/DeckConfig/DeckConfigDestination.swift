@@ -20,6 +20,7 @@ enum DeckConfigAlert {
     case saveFailed(String)
     case fsrsError(title: String, message: String)
     case presetError(String)
+    case notice(title: String, message: String)
     case deletePresetConfirm
     case discardChanges
     /// A preset change would reload the page over unsaved edits.

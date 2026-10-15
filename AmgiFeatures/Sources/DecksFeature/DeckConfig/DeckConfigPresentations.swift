@@ -105,7 +105,7 @@ struct DeckConfigAlertActions: View {
 
     var body: some View {
         switch alert {
-        case .saveFailed, .fsrsError, .presetError:
+        case .saveFailed, .fsrsError, .presetError, .notice:
             Button("OK", role: .cancel) {}
         case .deletePresetConfirm:
             Button("Delete", role: .destructive) { onDelete() }
@@ -129,7 +129,7 @@ struct DeckConfigAlertMessage: View {
 
     var body: some View {
         switch alert {
-        case .saveFailed(let msg), .presetError(let msg), .fsrsError(_, let msg):
+        case .saveFailed(let msg), .presetError(let msg), .fsrsError(_, let msg), .notice(_, let msg):
             Text(msg)
         case .deletePresetConfirm:
             Text(deleteMessage)

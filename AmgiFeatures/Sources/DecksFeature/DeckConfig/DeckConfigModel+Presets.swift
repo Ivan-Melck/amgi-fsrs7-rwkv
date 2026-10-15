@@ -124,6 +124,34 @@ extension DeckConfigModel {
         return "\(base) \(n)"
     }
 
+    // MARK: - RWKV maintenance
+
+    var canRebuildRwkvState: Bool { rwkvClient.isAvailable() }
+
+    /// The RWKV options' "Build Cache", which saves the options first.
+    func rebuildRwkvState() async {
+        if hasUnsavedChanges {
+            guard !isFallbackContext, await saveConfig() else { return }
+            await loadConfig()
+        }
+        isRebuildingRwkvState = true
+        defer { isRebuildingRwkvState = false }
+        do {
+            let result = try await rwkvClient.rebuildState()
+            destination = .alert(.notice(
+                title: "RWKV state rebuilt",
+                message: result.ready
+                    ? "The RWKV state was rebuilt from your review history and saved."
+                    : "No preset uses RWKV, so there was nothing to rebuild."
+            ))
+        } catch {
+            destination = .alert(.fsrsError(
+                title: "Couldn't rebuild the RWKV state",
+                message: error.localizedDescription
+            ))
+        }
+    }
+
     // MARK: - FSRS optimize
 
     func cancelOptimize() {

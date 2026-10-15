@@ -64,9 +64,10 @@ pub const CARD_INFO: u32 = 110;
 pub const RESCHEDULE: u32 = 111;
 pub const SEARCH_NOTE_IDS: u32 = 112;
 pub const REBUILD_FILTERED_DECK: u32 = 113;
+pub const REBUILD_STATE: u32 = 114;
 
 pub fn handles(method: u32) -> bool {
-    (PREPARE..=REBUILD_FILTERED_DECK).contains(&method)
+    (PREPARE..=REBUILD_STATE).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -109,6 +110,7 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         RESCHEDULE => call(input, |req| engine.reschedule(backend, req)),
         SEARCH_NOTE_IDS => call(input, |req| engine.search_note_ids(backend, req)),
         REBUILD_FILTERED_DECK => call(input, |req| engine.rebuild_filtered_deck(backend, req)),
+        REBUILD_STATE => call(input, |req| engine.rebuild_state(backend, req)),
         other => Err(Error(format!("unknown rwkv method {other}"))),
     };
     result.map_err(|err| {
@@ -404,6 +406,9 @@ struct Engine {
     deferred_refresh: Option<i64>,
     /// The queue scores installed in the backend.
     installed_scores: Option<InstalledScores>,
+    /// Set by `rebuild_state`: replay the whole history, ignoring the
+    /// resident and saved states.
+    force_replay: bool,
     undo: Vec<UndoFrame>,
 }
 
@@ -463,6 +468,16 @@ impl Engine {
             replayed_reviews,
             elapsed_ms: started.elapsed().as_millis() as u64,
         })
+    }
+
+    /// The deck options' "Build Cache" (`force_build_rwkv_state_cache`):
+    /// the state replayed from the whole review history (which saves it).
+    fn rebuild_state(&mut self, backend: &Backend, req: PrepareRequest) -> Result<PrepareResponse> {
+        self.installed_scores = None;
+        self.force_replay = true;
+        let prepared = self.prepare(backend, req);
+        self.force_replay = false;
+        prepared
     }
 
     /// Drops everything tied to the resident state's history.
@@ -549,6 +564,11 @@ impl Engine {
             return Err(Error("model not loaded; call prepare first".into()));
         }
         let was_trusted = self.trusted;
+        if self.force_replay {
+            let params = history_params(backend, self.model_precision_name())?;
+            let replayed = self.replay_full(backend, &params)?;
+            return Ok(("replayed", replayed));
+        }
         if self.current(backend)? {
             return Ok((
                 if was_trusted {

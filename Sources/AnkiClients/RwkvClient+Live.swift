@@ -32,6 +32,18 @@ extension RwkvClient: DependencyKey {
                     ))
                     return try backend.invoke(.rwkvReschedule(deckId: deckId))
                 }
+            },
+            rebuildState: {
+                guard let modelPath = RwkvEnvironment.modelPath else {
+                    return RwkvPrepareResult(active: false, ready: false, source: "inactive")
+                }
+                return try await backendOffload {
+                    try backend.invoke(.rwkvRebuildState(
+                        modelPath: modelPath,
+                        cacheDir: RwkvEnvironment.cacheDir(backend),
+                        precision: RwkvEnvironment.precision
+                    ))
+                }
             }
         )
     }()

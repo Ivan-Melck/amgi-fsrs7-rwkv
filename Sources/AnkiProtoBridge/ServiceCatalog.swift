@@ -47,6 +47,7 @@ enum AuxMethod {
     static let rwkvReschedule: UInt32 = 111
     static let rwkvSearchNoteIds: UInt32 = 112
     static let rwkvRebuildFilteredDeck: UInt32 = 113
+    static let rwkvRebuildState: UInt32 = 114
 }
 
 enum CollectionOpsMethod {

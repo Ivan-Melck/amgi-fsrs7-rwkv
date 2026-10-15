@@ -128,7 +128,10 @@ struct DeckConfigView: View {
                 refreshInterval: $model.rwkvRefreshInterval,
                 minInterveningReviews: $model.rwkvMinInterveningReviews,
                 minElapsedSecs: $model.rwkvMinElapsedSecs,
-                enforceGradeOrder: $model.rwkvEnforceGradeOrder
+                enforceGradeOrder: $model.rwkvEnforceGradeOrder,
+                canRebuildState: model.canRebuildRwkvState,
+                isRebuildingState: model.isRebuildingRwkvState,
+                onRebuildState: { Task { await model.rebuildRwkvState() } }
             )
         }
         DailyLimitsSection(
