@@ -331,6 +331,20 @@ impl Engine {
 
     fn prepare(&mut self, backend: &Backend, req: PrepareRequest) -> Result<PrepareResponse> {
         let started = Instant::now();
+        self.cache_dir = req.cache_dir.map(PathBuf::from);
+        let configs = all_deck_configs(backend)?;
+        let active = configs.iter().any(rwkv_active);
+        if !active {
+            // Nothing to schedule: don't load the model at all.
+            return Ok(PrepareResponse {
+                active,
+                ready: false,
+                source: "inactive",
+                replayed_reviews: 0,
+                elapsed_ms: started.elapsed().as_millis() as u64,
+            });
+        }
+
         let precision_name = req.precision.unwrap_or_else(|| "int8".into());
         let precision = StatePrecision::parse(&precision_name).map_err(|e| Error(e.to_string()))?;
         let path = PathBuf::from(&req.model_path);
@@ -354,19 +368,6 @@ impl Engine {
                 digest,
             });
             self.base = None;
-        }
-        self.cache_dir = req.cache_dir.map(PathBuf::from);
-
-        let configs = all_deck_configs(backend)?;
-        let active = configs.iter().any(rwkv_active);
-        if !active {
-            return Ok(PrepareResponse {
-                active,
-                ready: false,
-                source: "inactive",
-                replayed_reviews: 0,
-                elapsed_ms: started.elapsed().as_millis() as u64,
-            });
         }
         // Sessions start here, so revalidate against the collection: syncs,
         // browser edits and preset changes since the last session all show
@@ -1607,17 +1608,17 @@ fn history_params(backend: &Backend, precision: &str) -> Result<HistoryParams> {
     let first_review_uses_creation_by_config_id: HashMap<i64, bool> =
         configs.iter().map(|c| (c.id, true)).collect();
 
+    // The history hash already covers every replayed input (presets,
+    // routing, elapsed times); the key adds what it cannot see: how the
+    // state is stored, and the replay settings themselves.
     let mut sorted_ids: Vec<_> = stable_preset_ids.iter().collect();
     sorted_ids.sort();
-    let mut sorted_configs: Vec<_> = first_review_uses_creation_by_config_id.keys().collect();
-    sorted_configs.sort();
     let replay_key = hex_sha256(
         serde_json::json!({
             "version": REPLAY_VERSION,
             "statePrecision": precision,
             "dynamicPresetReplay": dynamic_preset_replay,
             "stablePresetIds": sorted_ids,
-            "configs": sorted_configs,
             "overlay": overlay,
         })
         .to_string()
