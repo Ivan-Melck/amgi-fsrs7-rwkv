@@ -42,6 +42,7 @@ enum DeckConfigPrompt: String, Identifiable {
     case clonePreset
     case renamePreset
     case applySchedule
+    case dynamicDesiredRetentionPlot
 
     var id: String { rawValue }
 }

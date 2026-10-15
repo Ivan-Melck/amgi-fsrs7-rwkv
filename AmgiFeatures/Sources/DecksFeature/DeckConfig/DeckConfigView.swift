@@ -60,7 +60,10 @@ struct DeckConfigView: View {
                 onApplySchedule: { await model.applyScheduleToAllPresets($0) },
                 onLoadCustomDecayTable: { try await model.loadCustomDecayRows($0) },
                 onKeepCurrentParams: { model.keepCurrentParams() },
-                onApplyOptimizedParams: { model.applyOptimizedParams($0) }
+                onApplyOptimizedParams: { model.applyOptimizedParams($0) },
+                dynamicDesiredRetentionPlot: model.dynamicDesiredRetentionPlot,
+                effectiveDesiredRetention: model.effectiveDesiredRetention,
+                onSaveDynamicDesiredRetentionTarget: { model.saveDynamicDesiredRetentionPlotTarget($0) }
             ))
             .task { await model.loadConfig() }
     }
@@ -214,6 +217,8 @@ struct DeckConfigView: View {
             fsrs7SchedulingPenaltiesEnabled: $model.fsrs7SchedulingPenaltiesEnabled,
             dynamicDesiredRetentionEnabled: $model.dynamicDesiredRetentionEnabled,
             dynamicDesiredRetentionClamp: $model.dynamicDesiredRetentionClamp,
+            dynamicDesiredRetentionStatus: model.dynamicDesiredRetentionStatus,
+            onOpenDynamicDesiredRetentionPlot: { model.openDynamicDesiredRetentionPlot() },
             isOptimizingFsrs: model.isOptimizingFsrs,
             isCheckingHealth: model.isCheckingFsrsHealth,
             isCheckingSameDayDecision: model.isCheckingSameDayDecision,

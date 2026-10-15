@@ -30,6 +30,10 @@ struct DeckConfigPresentations: ViewModifier {
     let onLoadCustomDecayTable: (FsrsOptimizationComparison) async throws -> [FsrsDecayRow]
     let onKeepCurrentParams: () -> Void
     let onApplyOptimizedParams: (FsrsOptimizationComparison) -> Void
+    /// The Dynamic DR plot's model and target (the effective DR).
+    let dynamicDesiredRetentionPlot: DynamicDesiredRetentionPlot
+    let effectiveDesiredRetention: Double
+    let onSaveDynamicDesiredRetentionTarget: (Double) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -102,6 +106,12 @@ struct DeckConfigPresentations: ViewModifier {
             )
         case .applySchedule:
             ApplyScheduleSheet(onApply: onApplySchedule)
+        case .dynamicDesiredRetentionPlot:
+            DynamicDesiredRetentionPlotView(
+                plot: dynamicDesiredRetentionPlot,
+                targetAverageDr: effectiveDesiredRetention,
+                onSaveTarget: onSaveDynamicDesiredRetentionTarget
+            )
         case .renamePreset:
             TextPromptSheet(
                 title: "Rename Preset",
