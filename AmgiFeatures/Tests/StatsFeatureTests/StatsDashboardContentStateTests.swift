@@ -34,10 +34,15 @@ struct StatsDashboardContentStateTests {
     ) -> StatsDashboardModel {
         var model: StatsDashboardModel?
         let built = withDependencies {
-            $0.statsClient = StatsClient { _, _ in
-                await MainActor.run { probe.stateDuringFetch = model?.state }
-                return try result()
-            }
+            $0.statsClient = StatsClient(
+                fetchGraphs: { _, _ in
+                    await MainActor.run { probe.stateDuringFetch = model?.state }
+                    return try result()
+                },
+                fetchCalibration: { _, _, _ in
+                    CalibrationReport(samples: [], fsrsPredictions: [:], rwkvPredictions: [:])
+                }
+            )
         } operation: {
             StatsDashboardModel()
         }

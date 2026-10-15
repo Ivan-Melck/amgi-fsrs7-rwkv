@@ -79,7 +79,7 @@ final class DeckListLoadPerformanceTests: XCTestCase {
         deckClient.fetchTree = { tree }
         return withDependencies {
             $0.deckClient = deckClient
-            $0.statsClient = StatsClient { _, _ in snapshot }
+            $0.statsClient = StatsClient.graphsOnly { _, _ in snapshot }
         } operation: {
             // Built *inside* the scope, not while assembling DependencyValues:
             // `@Dependency` captures the ambient context when the property
@@ -137,5 +137,17 @@ final class DeckListLoadPerformanceTests: XCTestCase {
         XCTAssertEqual(rows.count, 7, "top-level rows")
         XCTAssertEqual(hero.deckCount, 7)
         XCTAssertEqual(heatmap?.counts.count, 365, "a full year of activity")
+    }
+}
+
+extension StatsClient {
+    /// A client whose graphs come from `fetch`; the other endpoints are
+    /// unimplemented.
+    static func graphsOnly(
+        _ fetch: @escaping @Sendable (_ search: String, _ days: Int) async throws -> GraphsSnapshot
+    ) -> Self {
+        var client = StatsClient()
+        client.fetchGraphs = fetch
+        return client
     }
 }

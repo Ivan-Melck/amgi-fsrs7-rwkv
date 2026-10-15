@@ -40,7 +40,7 @@ struct StreakSummaryTests {
     func streakFetchIgnoresThePeriod() async {
         let requested = LockIsolated<[Int]>([])
         let model = withDependencies {
-            $0.statsClient = StatsClient { _, days in
+            $0.statsClient = StatsClient.graphsOnly { _, days in
                 requested.withValue { $0.append(days) }
                 return GraphsSnapshot()
             }
@@ -58,7 +58,7 @@ struct StreakSummaryTests {
     func failedFetchClearsTheStreak() async {
         let shouldThrow = LockIsolated(false)
         let model = withDependencies {
-            $0.statsClient = StatsClient { _, _ in
+            $0.statsClient = StatsClient.graphsOnly { _, _ in
                 if shouldThrow.value { throw Boom() }
                 return GraphsSnapshot(reviews: ReviewCountsAndTimes(
                     count: [0: ReviewCountsAndTimes.Reviews(learn: 4)]
@@ -74,5 +74,17 @@ struct StreakSummaryTests {
         shouldThrow.setValue(true)
         await model.loadStreak(search: "")
         #expect(model.streak == nil)
+    }
+}
+
+extension StatsClient {
+    /// A client whose graphs come from `fetch`; the other endpoints are
+    /// unimplemented.
+    static func graphsOnly(
+        _ fetch: @escaping @Sendable (_ search: String, _ days: Int) async throws -> GraphsSnapshot
+    ) -> Self {
+        var client = StatsClient()
+        client.fetchGraphs = fetch
+        return client
     }
 }
