@@ -364,6 +364,18 @@ struct UndoFrame {
     runtime: RwkvInferenceState,
 }
 
+/// `_rwkv_review_queue_score_maps` for one deck: card id to retrievability
+/// and target retention. Like the desktop's, the map is only reused on the
+/// day it was made and until the study queue changes; the collection's
+/// modification time stands in for the desktop's study-queue generation, as
+/// every operation but our own answers bumps it.
+struct InstalledScores {
+    deck_id: i64,
+    scores: HashMap<i64, (f32, Option<f32>)>,
+    days_elapsed: u32,
+    collection_mod: i64,
+}
+
 #[derive(Default)]
 struct Engine {
     model: Option<Model>,
@@ -390,8 +402,8 @@ struct Engine {
     synthetic: HashMap<i64, SyntheticAnswer>,
     /// A refresh the desktop runs after showing the next card.
     deferred_refresh: Option<i64>,
-    /// The deck and cards of the queue scores installed in the backend.
-    installed_scores: Option<(i64, std::collections::HashSet<i64>)>,
+    /// The queue scores installed in the backend.
+    installed_scores: Option<InstalledScores>,
     undo: Vec<UndoFrame>,
 }
 
@@ -806,11 +818,18 @@ impl Engine {
             };
             self.deferred_refresh = None;
         }
-        self.score_deck(backend, req.deck_id)
+        self.score_deck(backend, req.deck_id, None)
     }
 
-    /// `_prepare_rwkv_review_scores_for_deck` (full deck scoring).
-    fn score_deck(&mut self, backend: &Backend, deck_id: i64) -> Result<ScoreDeckResponse> {
+    /// `_prepare_rwkv_review_scores_for_deck`: the whole deck, or with
+    /// candidate refresh only the cards next in line. `current_card` is the
+    /// reviewer's card, always rescored by a candidate refresh.
+    fn score_deck(
+        &mut self,
+        backend: &Backend,
+        deck_id: i64,
+        current_card: Option<i64>,
+    ) -> Result<ScoreDeckResponse> {
         let config = deck_config_for_deck(backend, deck_id)?;
         let instant = config.as_ref().is_some_and(instant_enabled);
         if !instant || !self.current(backend)? {
@@ -819,15 +838,28 @@ impl Engine {
         }
         let config = config.ok_or_else(|| Error("missing deck config".into()))?;
         let include_new_cards = new_gather_uses_retrievability(&config);
-        let rows = backend.with_col(|col| {
-            SchedulerService::rwkv_review_input_rows_for_deck_review_queue(
+        let candidates = self.refresh_candidates(backend, deck_id, &config, current_card)?;
+        let rows = backend.with_col(|col| match &candidates {
+            // `_rwkv_review_queue_score_result`, which (unlike a full
+            // rescore) leaves new cards out, so new candidates drop out of
+            // the map, and keeps cards in learning.
+            Some(card_ids) => SchedulerService::rwkv_review_input_rows_for_cards(
+                col,
+                pb::RwkvReviewInputRowsForCardsRequest {
+                    card_ids: card_ids.clone(),
+                    include_suspended_review: false,
+                    include_disabled_decks: false,
+                    include_new_cards: false,
+                },
+            ),
+            None => SchedulerService::rwkv_review_input_rows_for_deck_review_queue(
                 col,
                 pb::RwkvReviewInputRowsForDeckReviewQueueRequest {
                     deck_id,
                     include_disabled_decks: false,
                     include_new_cards,
                 },
-            )
+            ),
         })?;
         let inputs: Vec<ReviewInput> = rows.rows.iter().map(query_input_from_row).collect();
         let scores = match self.predict_many(&inputs) {
@@ -837,23 +869,91 @@ impl Engine {
                 return Err(err);
             }
         };
-        let intervening = self.intervening_reviews(backend, deck_id, &config)?;
-        let request: Vec<pb::rwkv_review_queue_scores_request::Score> = inputs
+        let fresh: HashMap<i64, (f32, Option<f32>)> = inputs
             .iter()
             .zip(scores)
-            .map(
-                |(input, retrievability)| pb::rwkv_review_queue_scores_request::Score {
-                    card_id: input.card_id,
-                    retrievability,
-                    intervening_reviews: intervening.get(&input.card_id).copied(),
-                    target_retention: input_target_retention(input),
-                },
-            )
+            .map(|(input, r)| (input.card_id, (r, input_target_retention(input))))
             .collect();
-        let scored = request.len() as u32;
-        self.installed_scores = Some((deck_id, request.iter().map(|s| s.card_id).collect()));
+        let scored = fresh.len() as u32;
+        let merged = match (candidates, self.installed_scores.take()) {
+            // `_candidate_refreshed_rwkv_review_queue_scores_for_deck`.
+            (Some(card_ids), Some(mut installed)) => {
+                for card_id in card_ids {
+                    match fresh.get(&card_id) {
+                        Some(score) => installed.scores.insert(card_id, *score),
+                        None => installed.scores.remove(&card_id),
+                    };
+                }
+                installed.scores
+            }
+            _ => fresh,
+        };
+        let intervening = self.intervening_reviews(backend, deck_id, &config)?;
+        let mut request: Vec<pb::rwkv_review_queue_scores_request::Score> = merged
+            .iter()
+            .map(|(card_id, (retrievability, target_retention))| {
+                pb::rwkv_review_queue_scores_request::Score {
+                    card_id: *card_id,
+                    retrievability: *retrievability,
+                    intervening_reviews: intervening.get(card_id).copied(),
+                    target_retention: *target_retention,
+                }
+            })
+            .collect();
+        request.sort_by_key(|score| score.card_id);
         set_queue_scores(backend, deck_id, request)?;
+        self.installed_scores = Some(InstalledScores {
+            deck_id,
+            scores: merged,
+            days_elapsed: backend
+                .with_col(SchedulerService::sched_timing_today)?
+                .days_elapsed,
+            collection_mod: collection_mod(backend)?,
+        });
         Ok(ScoreDeckResponse { instant, scored })
+    }
+
+    /// `_rwkv_review_candidate_refresh_card_ids`: with candidate refresh on
+    /// and the deck's scores still current, the first `batch_size` cards in
+    /// review order, plus the current card; otherwise None (score it all).
+    fn refresh_candidates(
+        &self,
+        backend: &Backend,
+        deck_id: i64,
+        config: &DeckConfig,
+        current_card: Option<i64>,
+    ) -> Result<Option<Vec<i64>>> {
+        let inner = config_inner(config);
+        if !inner.rwkv_review_candidate_refresh_enabled {
+            return Ok(None);
+        }
+        let Some(installed) = self
+            .installed_scores
+            .as_ref()
+            .filter(|s| s.deck_id == deck_id && !s.scores.is_empty())
+        else {
+            return Ok(None);
+        };
+        let days_elapsed = backend
+            .with_col(SchedulerService::sched_timing_today)?
+            .days_elapsed;
+        if installed.days_elapsed != days_elapsed
+            || installed.collection_mod != collection_mod(backend)?
+        {
+            return Ok(None);
+        }
+        let batch_size =
+            if (MIN_BATCH_SIZE..=MAX_BATCH_SIZE).contains(&inner.rwkv_review_batch_size) {
+                inner.rwkv_review_batch_size as usize
+            } else {
+                DEFAULT_BATCH_SIZE
+            };
+        Ok(Some(candidate_card_ids(
+            &installed.scores,
+            inner.review_order,
+            batch_size,
+            current_card,
+        )))
     }
 
     /// `_clear_rwkv_review_queue_scores`; a no-op when none are installed, so
@@ -929,7 +1029,7 @@ impl Engine {
         // The reviewer's deferred refresh runs once the next card is chosen,
         // and keeps that card in front (`rebuild_queued_cards_preserving_current_card`).
         if let Some(deck_id) = self.deferred_refresh.take() {
-            if self.score_deck(backend, deck_id).is_ok() {
+            if self.score_deck(backend, deck_id, Some(req.card_id)).is_ok() {
                 let _ = backend.with_col(|col| {
                     SchedulerService::rebuild_queued_cards_preserving_current_card(
                         col,
@@ -1117,7 +1217,18 @@ impl Engine {
             }
         }
 
+        // Our own answer doesn't make the installed scores stale; anything
+        // else that changed the collection since they were made does.
+        let scores_current = self.installed_scores.as_ref().is_some_and(|scores| {
+            collection_mod(backend).is_ok_and(|m| m == scores.collection_mod)
+        });
         let _changes = backend.with_col(|col| SchedulerService::answer_card(col, answer))?;
+        if scores_current {
+            if let (Some(scores), Ok(m)) = (self.installed_scores.as_mut(), collection_mod(backend))
+            {
+                scores.collection_mod = m;
+            }
+        }
         self.session.prediction = None;
         self.session.shown_states = None;
         self.answered_ids.push(card.id);
@@ -1295,7 +1406,7 @@ impl Engine {
                 || last_review
                 || (refresh_due && new_gather_uses_retrievability(&config));
             if before_next_card {
-                self.score_deck(backend, deck_id)?;
+                self.score_deck(backend, deck_id, Some(card.id))?;
             } else {
                 self.update_intervening_reviews(backend, deck_id, card, min_intervening)?;
                 self.deferred_refresh = Some(deck_id);
@@ -1317,7 +1428,7 @@ impl Engine {
         if self
             .installed_scores
             .as_ref()
-            .is_none_or(|(d, _)| *d != deck_id)
+            .is_none_or(|s| s.deck_id != deck_id)
         {
             return Ok(());
         }
@@ -1345,12 +1456,13 @@ impl Engine {
             }
             _ => None,
         };
-        if let Some((_, ids)) = self.installed_scores.as_mut() {
-            if score.is_some() {
-                ids.insert(card.id);
-            } else {
-                ids.remove(&card.id);
-            }
+        if let Some(installed) = self.installed_scores.as_mut() {
+            match &score {
+                Some(s) => installed
+                    .scores
+                    .insert(card.id, (s.retrievability, s.target_retention)),
+                None => installed.scores.remove(&card.id),
+            };
         }
         backend.with_col(|col| {
             SchedulerService::patch_answered_card_rwkv_review_queue_score(
@@ -1378,10 +1490,14 @@ impl Engine {
             return Ok(());
         }
         let card_deck_id = current_deck_id(card);
-        let Some((deck_id, scored)) = self
+        let Some(InstalledScores {
+            deck_id,
+            scores: scored,
+            ..
+        }) = self
             .installed_scores
             .as_ref()
-            .filter(|(d, _)| *d == card_deck_id || *d == session_deck_id)
+            .filter(|s| s.deck_id == card_deck_id || s.deck_id == session_deck_id)
         else {
             return Ok(());
         };
@@ -1393,7 +1509,7 @@ impl Engine {
         let mut items: Vec<_> = last_index
             .into_iter()
             .map(|(card_id, index)| (card_id, (window.len() - index - 1) as u32))
-            .filter(|(card_id, reviews)| scored.contains(card_id) && *reviews <= min)
+            .filter(|(card_id, reviews)| scored.contains_key(card_id) && *reviews <= min)
             .map(
                 |(card_id, reviews)| pb::rwkv_review_queue_intervening_reviews_request::Item {
                     card_id,
@@ -1920,6 +2036,43 @@ fn preset_id_for_card(
         .filter(|p| !p.id.is_empty())
         .map(|p| stable_preset_id(&p.id))
         .or(config.map(|c| c.id)))
+}
+
+/// `_DEFAULT_RWKV_REVIEW_BATCH_SIZE` and its valid range.
+const DEFAULT_BATCH_SIZE: usize = 512;
+const MIN_BATCH_SIZE: u32 = 64;
+const MAX_BATCH_SIZE: u32 = 8192;
+
+/// `_rwkv_review_candidate_refresh_card_ids` and
+/// `_unique_rwkv_candidate_card_ids`: the cards the review order would show
+/// first, ties by card id, then the current card.
+fn candidate_card_ids(
+    scores: &HashMap<i64, (f32, Option<f32>)>,
+    review_order: i32,
+    limit: usize,
+    current_card: Option<i64>,
+) -> Vec<i64> {
+    use anki_proto::deck_config::deck_config::config::ReviewCardOrder;
+    let mut ordered: Vec<(i64, f32)> = match ReviewCardOrder::try_from(review_order) {
+        Ok(ReviewCardOrder::RetrievabilityDescending) => {
+            scores.iter().map(|(id, (r, _))| (*id, -r)).collect()
+        }
+        Ok(ReviewCardOrder::RelativeOverdueness) => scores
+            .iter()
+            .map(|(id, (r, target))| {
+                // `_rwkv_relative_overdueness`.
+                let target = target.filter(|t| valid_probability(*t)).unwrap_or(1.0);
+                (*id, r / target.max(0.0001))
+            })
+            .collect(),
+        _ => scores.iter().map(|(id, (r, _))| (*id, *r)).collect(),
+    };
+    ordered.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
+    let mut card_ids: Vec<i64> = ordered.into_iter().take(limit).map(|(id, _)| id).collect();
+    if let Some(card_id) = current_card.filter(|id| !card_ids.contains(id)) {
+        card_ids.push(card_id);
+    }
+    card_ids
 }
 
 fn set_queue_scores(

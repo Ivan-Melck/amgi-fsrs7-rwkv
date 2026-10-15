@@ -946,8 +946,11 @@ fn reviewer_bookkeeping_survives_a_new_session() {
             },
         )
         .unwrap();
+    // Stop while a synthesised state is held: a later plain answer of the
+    // same card drops it again, and the queue order (so whether that
+    // happens within the loop) varies from run to run.
     for rating in [3, 1, 3, 4, 2, 1, 3, 3, 1, 4, 3, 2].iter().cycle().take(60) {
-        if answer_next(&mut engine, &fx, *rating).is_none() {
+        if answer_next(&mut engine, &fx, *rating).is_none() || !engine.synthetic.is_empty() {
             break;
         }
     }
@@ -1152,4 +1155,171 @@ fn another_collection_on_the_same_backend_is_not_trusted() {
         .unwrap();
     assert!(!engine.current(&fx.backend).unwrap());
     assert!(engine.base.is_none() && engine.answered_ids.is_empty());
+}
+
+#[test]
+fn candidates_follow_the_review_order() {
+    use anki_proto::deck_config::deck_config::config::ReviewCardOrder;
+    let scores: HashMap<i64, (f32, Option<f32>)> = [
+        (1, (0.9, Some(0.9))),
+        (2, (0.5, Some(0.5))),
+        (3, (0.7, None)),
+        (4, (0.5, Some(0.95))),
+    ]
+    .into();
+    let order =
+        |o: ReviewCardOrder, limit, current| candidate_card_ids(&scores, o as i32, limit, current);
+    // Lowest retrievability first, ties by card id.
+    assert_eq!(order(ReviewCardOrder::Day, 3, None), vec![2, 4, 3]);
+    assert_eq!(
+        order(ReviewCardOrder::RetrievabilityDescending, 2, None),
+        vec![1, 3]
+    );
+    // Retrievability over target; a missing target counts as 1.
+    assert_eq!(
+        order(ReviewCardOrder::RelativeOverdueness, 4, None),
+        vec![4, 3, 1, 2]
+    );
+    // The current card is appended once.
+    assert_eq!(order(ReviewCardOrder::Day, 1, Some(9)), vec![2, 9]);
+    assert_eq!(order(ReviewCardOrder::Day, 1, Some(2)), vec![2]);
+}
+
+fn set_candidate_refresh(fx: &Fixture, enabled: bool) {
+    edit_config(fx, |config| {
+        config.rwkv_review_candidate_refresh_enabled = enabled
+    });
+}
+
+fn edit_config(fx: &Fixture, edit: impl FnOnce(&mut anki_proto::deck_config::deck_config::Config)) {
+    fx.backend
+        .with_col(|col| {
+            let mut config = DeckConfigService::get_deck_config(
+                col,
+                anki_proto::deck_config::DeckConfigId { dcid: 1 },
+            )?;
+            edit(config.config.as_mut().unwrap());
+            let _ = DeckConfigService::update_deck_configs(
+                col,
+                anki_proto::deck_config::UpdateDeckConfigsRequest {
+                    target_deck_id: 1,
+                    configs: vec![config],
+                    fsrs: true,
+                    fsrs_short_term_with_steps_enabled: true,
+                    ..Default::default()
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
+fn candidate_refresh_reuses_scores_only_while_they_are_current() {
+    let Some(fx) = fixture("candidates", 8) else {
+        return;
+    };
+    set_candidate_refresh(&fx, true);
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let request = ScoreDeckRequest {
+        deck_id: 1,
+        new_session: true,
+    };
+    engine.score_deck_request(&fx.backend, request).unwrap();
+    let config = deck_config_for_deck(&fx.backend, 1).unwrap().unwrap();
+    let candidates = |engine: &Engine| {
+        engine
+            .refresh_candidates(&fx.backend, 1, &config, None)
+            .unwrap()
+    };
+    assert!(candidates(&engine).is_some());
+
+    // Our own answers keep the scores current.
+    answer_next(&mut engine, &fx, 3).unwrap();
+    answer_next(&mut engine, &fx, 1).unwrap();
+    assert!(
+        candidates(&engine).is_some(),
+        "own answers made the scores stale"
+    );
+
+    // A candidate refresh (every card fits in one batch here) agrees with
+    // scoring the whole deck.
+    engine.score_deck(&fx.backend, 1, None).unwrap();
+    let partial = engine.installed_scores.as_ref().unwrap().scores.clone();
+    engine.installed_scores = None;
+    engine.score_deck(&fx.backend, 1, None).unwrap();
+    let full = engine.installed_scores.as_ref().unwrap().scores.clone();
+    for (card_id, (r, target)) in &full {
+        let (pr, ptarget) = partial[card_id];
+        assert!(
+            (pr - r).abs() <= 1e-6 && ptarget == *target,
+            "card {card_id}"
+        );
+    }
+    // As on the desktop, the per-card rows also keep the card relearning
+    // after Again, which the deck's review-queue rows leave out.
+    for card_id in partial.keys().filter(|id| !full.contains_key(id)) {
+        let queue = sql(
+            &fx.backend,
+            "select queue from cards where id = ?",
+            vec![(*card_id).into()],
+        );
+        assert_eq!(queue[0][0].as_i64(), Some(1), "card {card_id}");
+    }
+
+    // Anything else that changes the collection means a full rescore.
+    let _ = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::bury_or_suspend_cards(
+                col,
+                pb::BuryOrSuspendCardsRequest {
+                    card_ids: vec![fx.card_ids[0]],
+                    note_ids: vec![],
+                    mode: pb::bury_or_suspend_cards_request::Mode::Suspend as i32,
+                },
+            )
+        })
+        .unwrap();
+    assert!(candidates(&engine).is_none(), "stale scores were reused");
+    engine.score_deck(&fx.backend, 1, None).unwrap();
+    assert!(candidates(&engine).is_some());
+    assert!(!engine
+        .installed_scores
+        .as_ref()
+        .unwrap()
+        .scores
+        .contains_key(&fx.card_ids[0]));
+}
+
+#[test]
+fn candidate_refresh_drops_new_cards_like_the_desktop() {
+    let Some(fx) = fixture_with_new("candidates-new", 4, 3) else {
+        return;
+    };
+    edit_config(&fx, |config| {
+        config.rwkv_review_candidate_refresh_enabled = true;
+        config.set_new_card_gather_priority(
+            anki_proto::deck_config::deck_config::config::NewCardGatherPriority::DescendingRetrievability,
+        );
+    });
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let new_cards: Vec<i64> = sql(&fx.backend, "select id from cards where type = 0", vec![])
+        .iter()
+        .map(|r| r[0].as_i64().unwrap())
+        .collect();
+    assert_eq!(new_cards.len(), 3);
+    let scored = |engine: &Engine| engine.installed_scores.as_ref().unwrap().scores.clone();
+
+    // A full scoring includes the new cards the gather order ranks...
+    engine.score_deck(&fx.backend, 1, None).unwrap();
+    assert!(new_cards.iter().all(|id| scored(&engine).contains_key(id)));
+    // ...but the per-card rows of a candidate refresh leave them out, so
+    // they drop out of the map.
+    engine.score_deck(&fx.backend, 1, None).unwrap();
+    let after = scored(&engine);
+    assert!(new_cards.iter().all(|id| !after.contains_key(id)));
+    assert_eq!(after.len(), 4);
 }
