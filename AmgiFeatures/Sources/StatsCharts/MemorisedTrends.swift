@@ -332,7 +332,7 @@ struct MemorisedCandlestickChart: View {
     }
 
     @ChartContentBuilder
-    private func trendMarks(_ line: MemorisedTrendLine) -> some ChartContent {
+    private func trendMarks(_ line: MemorisedTrendStroke) -> some ChartContent {
         if let start = bar(containing: line.drawn.drawStartX), let end = bar(containing: line.drawn.drawEndX) {
             let series = "trend-\(line.id)"
             LineMark(
@@ -371,7 +371,7 @@ struct MemorisedCandlestickChart: View {
                 )
                 .foregroundStyle(bar.positive ? Color.green : Color.red)
             }
-            ForEach(MemorisedTrendLine.lines(trends, preview: preview)) { line in
+            ForEach(MemorisedTrendStroke.lines(trends, preview: preview)) { line in
                 trendMarks(line)
             }
             if let selected {
@@ -495,7 +495,7 @@ struct MemorisedBwMatrixView: View {
 }
 
 /// A trend (or the pending one, dashed) as the charts draw it.
-struct MemorisedTrendLine: Identifiable {
+struct MemorisedTrendStroke: Identifiable {
     let id: Int
     let color: Color
     let drawn: MemorisedTrend.Drawn

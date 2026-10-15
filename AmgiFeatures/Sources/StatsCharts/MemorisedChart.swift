@@ -289,7 +289,7 @@ struct MemorisedLineChart: View {
     }
 
     @ChartContentBuilder
-    private func trendMarks(_ line: MemorisedTrendLine) -> some ChartContent {
+    private func trendMarks(_ line: MemorisedTrendStroke) -> some ChartContent {
         let series = "trend-\(line.id)"
         LineMark(
             x: .value("Date", dates.date(for: Int(line.drawn.drawStartX)), unit: .day),
@@ -319,7 +319,7 @@ struct MemorisedLineChart: View {
                 .lineStyle(StrokeStyle(lineWidth: 1.5))
                 .interpolationMethod(.linear)
             }
-            ForEach(MemorisedTrendLine.lines(trends, preview: preview)) { line in
+            ForEach(MemorisedTrendStroke.lines(trends, preview: preview)) { line in
                 trendMarks(line)
             }
             if let selectedDay {
