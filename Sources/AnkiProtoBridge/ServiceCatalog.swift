@@ -55,6 +55,11 @@ enum AuxMethod {
     static let rwkvRebuildFsrsCalibration: UInt32 = 121
     static let rwkvCalibrationData: UInt32 = 122
     static let rwkvCalibrationProgress: UInt32 = 123
+    // The stats screen's Memorised chart.
+    static let statsFsrsMemorised: UInt32 = 124
+    static let rwkvMemorisedHistory: UInt32 = 125
+    static let rwkvMemorisedProgress: UInt32 = 126
+    static let rwkvCancelMemorised: UInt32 = 127
 }
 
 enum CollectionOpsMethod {

@@ -31,6 +31,8 @@ struct StatsDashboardContent: View {
     var calibration: CalibrationLoadState = .notRequested
     var onShowCalibration: () -> Void = {}
     var onCancelCalibration: () -> Void = {}
+    /// The Memorised graph; nil in previews.
+    var memorised: MemorisedModel?
 
     var body: some View {
         ScrollView {
@@ -152,6 +154,13 @@ struct StatsDashboardContent: View {
             onIncreaseDateRange: { onSelectPeriod(.all) },
             onCancel: onCancelCalibration
         )
+        if let memorised {
+            MemorisedSection(
+                model: memorised,
+                truncated: period != .all,
+                onIncreaseRange: { onSelectPeriod(.all) }
+            )
+        }
     }
 }
 

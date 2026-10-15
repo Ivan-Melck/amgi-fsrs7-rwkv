@@ -19,6 +19,7 @@ package struct StatsDashboardView: View {
     private let refreshID: UUID?
 
     @State private var model = StatsDashboardModel()
+    @State private var memorised = MemorisedModel()
     @State private var period: StatsPeriod = .month
     @State private var selectedDeck: DeckInfo?
 
@@ -39,7 +40,8 @@ package struct StatsDashboardView: View {
             isRefreshing: model.isRefreshing,
             calibration: model.calibration,
             onShowCalibration: { Task { await model.showCalibration(search: search, days: period.days) } },
-            onCancelCalibration: { model.cancelCalibration() }
+            onCancelCalibration: { model.cancelCalibration() },
+            memorised: memorised
         )
         .scrollContentBackground(.hidden)
         .background(palette.background)
@@ -85,6 +87,8 @@ private extension StatsDashboardView {
     func reloadStats() async {
         await model.loadStats(search: search, days: period.days)
         await model.loadCalibration(search: search, days: period.days)
+        // The add-on's whole history is a period of 0.
+        await memorised.update(search: search, days: period == .all ? 0 : period.days)
     }
 }
 
