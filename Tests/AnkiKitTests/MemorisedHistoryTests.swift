@@ -36,12 +36,12 @@ struct MemorisedHistoryTests {
         cardCount: [0, 1, 2, 2]
     )
 
-    private func chart(_ kind: MemorisedKind, _ source: MemorisedSource) -> MemorisedChart? {
+    private func makeChart(_ kind: MemorisedKind, _ source: MemorisedSource) -> MemorisedChart? {
         MemorisedChart.make(fsrs: fsrs, rwkv: rwkv, kind: kind, source: source)
     }
 
     @Test func fsrsCardsStartAtTheFirstNonZeroDay() throws {
-        let chart = try #require(chart(.cards, .fsrs))
+        let chart = try #require(makeChart(.cards, .fsrs))
         #expect(chart.startDay == 10)
         #expect(chart.endDay == 13)
         #expect(chart.lines.count == 1)
@@ -53,13 +53,13 @@ struct MemorisedHistoryTests {
     }
 
     @Test func notesUseTheNoteSeries() throws {
-        let chart = try #require(chart(.notes, .fsrs))
+        let chart = try #require(makeChart(.notes, .fsrs))
         #expect(chart.lines[0].label == "Notes")
         #expect(chart.lines[0].values == [1, 0.9, 0.8, 0.75])
     }
 
     @Test func cardsByBurdenDivideByTheDaysLoad() throws {
-        let chart = try #require(chart(.cardsByBurden, .fsrs))
+        let chart = try #require(makeChart(.cardsByBurden, .fsrs))
         #expect(chart.lines[0].label == "Cards/Load")
         #expect(chart.startDay == 10)
         // Day 12 has no load: 1.6 / 0 is infinite, drawn as a gap.
@@ -70,14 +70,14 @@ struct MemorisedHistoryTests {
     }
 
     @Test func averageDividesByTheCardCount() throws {
-        let chart = try #require(chart(.average, .fsrs))
+        let chart = try #require(makeChart(.average, .fsrs))
         #expect(chart.lines[0].label == "Retrievability")
         #expect(chart.lines[0].values == [1, 0.9, 0.8, 0.75])
         #expect(chart.tooltip(day: 13) == ["Retrievability: 0.75"])
     }
 
     @Test func stableRetrievabilityIsFsrsOnly() throws {
-        let chart = try #require(chart(.stable, .both))
+        let chart = try #require(makeChart(.stable, .both))
         #expect(chart.lines.count == 1)
         #expect(chart.lines[0].label == "Stable cards")
         // Days nobody had stability are holes: drawn at 0, not in tooltips.
@@ -88,7 +88,7 @@ struct MemorisedHistoryTests {
     }
 
     @Test func rwkvIsAnchoredAtItsFirstDay() throws {
-        let chart = try #require(chart(.cards, .rwkv))
+        let chart = try #require(makeChart(.cards, .rwkv))
         #expect(chart.startDay == 9)
         #expect(chart.lines.map(\.label) == ["RWKV"])
         #expect(chart.lines[0].color == .seaGreen)
@@ -97,7 +97,7 @@ struct MemorisedHistoryTests {
     }
 
     @Test func bothSourcesShareTheStartDay() throws {
-        let chart = try #require(chart(.cards, .both))
+        let chart = try #require(makeChart(.cards, .both))
         #expect(chart.startDay == 9)
         #expect(chart.lines.map(\.label) == ["FSRS", "RWKV"])
         // FSRS has no value on day 9: a hole, drawn at 0, not in tooltips.
@@ -111,7 +111,7 @@ struct MemorisedHistoryTests {
     }
 
     @Test func rwkvAverageIsZeroBeforeItsCards() throws {
-        let chart = try #require(chart(.average, .both))
+        let chart = try #require(makeChart(.average, .both))
         #expect(chart.startDay == 9)
         // `_.zip` is dense: FSRS averages 0 on day 9; RWKV is 0 / 0 on day 8.
         #expect(chart.lines[0].values == [0, 1, 0.9, 0.8, 0.75])
@@ -122,7 +122,7 @@ struct MemorisedHistoryTests {
     }
 
     @Test func rwkvCardsByBurdenKeepsItsHoles() throws {
-        let chart = try #require(chart(.cardsByBurden, .both))
+        let chart = try #require(makeChart(.cardsByBurden, .both))
         #expect(chart.startDay == 9)
         // FSRS: (undefined ?? 0) / 1 on day 9; RWKV: 1 / 1, 1.9 / 0.5, 1.7 / 0.25.
         #expect(chart.lines[0].values == [0, 4, 7.2, .infinity, 7.5])
