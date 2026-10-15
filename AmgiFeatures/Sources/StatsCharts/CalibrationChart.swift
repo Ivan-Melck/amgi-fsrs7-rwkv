@@ -557,52 +557,81 @@ private struct UmPlusPlot: View {
         }
     }
 
+    @ChartContentBuilder
+    private var volumeBars: some ChartContent {
+        ForEach(visible) { bin in
+            let bounds = UmPlus.binBounds(bin, domain: xDomain)
+            RectangleMark(
+                xStart: .value("Disagreement", bounds.lowerBound),
+                xEnd: .value("Disagreement", bounds.upperBound),
+                yStart: .value("Error", yDomain.lowerBound),
+                yEnd: .value("Error", volumeY(Double(bin.count)))
+            )
+            .foregroundStyle(palette.textPrimary.opacity(UmPlus.isSmall(bin) ? 0.04 : 0.12))
+        }
+    }
+
+    @ChartContentBuilder
+    private var axisRules: some ChartContent {
+        RuleMark(y: .value("Error", 0.0))
+            .foregroundStyle(palette.textPrimary)
+            .lineStyle(StrokeStyle(lineWidth: 1.5))
+        if xDomain.contains(0) {
+            RuleMark(x: .value("Disagreement", 0.0))
+                .foregroundStyle(palette.textPrimary.opacity(0.35))
+        }
+    }
+
+    @ChartContentBuilder
+    private func seriesMarks(_ item: Series) -> some ChartContent {
+        ForEach(Array(UmPlus.segments(visible).enumerated()), id: \.offset) { index, segment in
+            segmentLine(item, index: index, segment: segment)
+        }
+        ForEach(visible) { bin in
+            PointMark(x: .value("Disagreement", bin.disagreement), y: .value("Error", item.error(bin)))
+                .foregroundStyle(item.color.opacity(UmPlus.isSmall(bin) ? 0.2 : 0.45))
+                .symbolSize(symbolSize(bin))
+        }
+    }
+
+    @ChartContentBuilder
+    private func segmentLine(_ item: Series, index: Int, segment: UmPlus.Segment) -> some ChartContent {
+        let seriesName = "\(item.model.rawValue)-\(index)"
+        let color = item.color.opacity(segment.small ? 0.35 : 1)
+        let style = StrokeStyle(lineWidth: 1.5, dash: segment.small ? [3, 3] : [])
+        ForEach([segment.from, segment.to]) { bin in
+            LineMark(
+                x: .value("Disagreement", bin.disagreement),
+                y: .value("Error", item.error(bin)),
+                series: .value("Segment", seriesName)
+            )
+            .foregroundStyle(color)
+            .lineStyle(style)
+        }
+    }
+
+    @ChartContentBuilder
+    private var selectionMark: some ChartContent {
+        if let selected {
+            let lines = UmPlus.tooltip(selected, total: data.count)
+            RuleMark(x: .value("Selected", selected.disagreement))
+                .foregroundStyle(palette.accent.opacity(0.35))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit, y: .fit)) {
+                    StatsChartTooltip(title: lines.first ?? "", lines: Array(lines.dropFirst()))
+                }
+        }
+    }
+
     private var chart: some View {
+        // Split into builders: one expression is too much for the type checker.
         Chart {
-            ForEach(visible) { bin in
-                let bounds = UmPlus.binBounds(bin, domain: xDomain)
-                RectangleMark(
-                    xStart: .value("Disagreement", bounds.lowerBound),
-                    xEnd: .value("Disagreement", bounds.upperBound),
-                    yStart: .value("Error", yDomain.lowerBound),
-                    yEnd: .value("Error", volumeY(Double(bin.count)))
-                )
-                .foregroundStyle(palette.textPrimary.opacity(UmPlus.isSmall(bin) ? 0.04 : 0.12))
-            }
-            RuleMark(y: .value("Error", 0))
-                .foregroundStyle(palette.textPrimary)
-                .lineStyle(StrokeStyle(lineWidth: 1.5))
-            if xDomain.contains(0) {
-                RuleMark(x: .value("Disagreement", 0))
-                    .foregroundStyle(palette.textPrimary.opacity(0.35))
-            }
+            volumeBars
+            axisRules
             ForEach(series) { item in
-                ForEach(Array(UmPlus.segments(visible).enumerated()), id: \.offset) { index, segment in
-                    ForEach([segment.from, segment.to]) { bin in
-                        LineMark(
-                            x: .value("Disagreement", bin.disagreement),
-                            y: .value("Error", item.error(bin)),
-                            series: .value("Segment", "\(item.model.rawValue)-\(index)")
-                        )
-                        .foregroundStyle(item.color.opacity(segment.small ? 0.35 : 1))
-                        .lineStyle(StrokeStyle(lineWidth: 1.5, dash: segment.small ? [3, 3] : []))
-                    }
-                }
-                ForEach(visible) { bin in
-                    PointMark(x: .value("Disagreement", bin.disagreement), y: .value("Error", item.error(bin)))
-                        .foregroundStyle(item.color.opacity(UmPlus.isSmall(bin) ? 0.2 : 0.45))
-                        .symbolSize(symbolSize(bin))
-                }
+                seriesMarks(item)
             }
-            if let selected {
-                RuleMark(x: .value("Selected", selected.disagreement))
-                    .foregroundStyle(palette.accent.opacity(0.35))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit, y: .fit)) {
-                        let lines = UmPlus.tooltip(selected, total: data.count)
-                        StatsChartTooltip(title: lines.first ?? "", lines: Array(lines.dropFirst()))
-                    }
-            }
+            selectionMark
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: yDomain)
