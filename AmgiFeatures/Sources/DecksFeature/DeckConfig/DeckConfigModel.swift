@@ -29,13 +29,19 @@ final class DeckConfigModel {
 
     var loaded: LoadedConfig?
     var baseline: DeckConfig?
+    /// `editedLimits` as loaded, so an untouched page isn't "changed".
+    var baselineLimits: DeckConfigsForUpdate.CurrentDeck.Limits?
     var isLoading = true
     var isSaving = false
     var loadError: String?
     var destination: DeckConfigDestination?
 
+    /// The preset's limits; `newLimitTabs`/`reviewLimitTabs` say whether
+    /// this deck or today overrides them.
     var newCardsPerDay: Int32 = 20
     var reviewsPerDay: Int32 = 200
+    var newLimitTabs = DailyLimitTabs(deck: nil, today: nil, todayActive: false)
+    var reviewLimitTabs = DailyLimitTabs(deck: nil, today: nil, todayActive: false)
     var newCardsIgnoreReviewLimit = false
     var applyAllParentLimits = false
     var sameDayReviewsIgnoreReviewLimit = false
@@ -270,6 +276,17 @@ final class DeckConfigModel {
 
         desiredRetentionPercent = cfg.desiredRetention > 0 ? Double(cfg.desiredRetention * 100) : 90
         deckDesiredRetentionPercent = context.currentDeck?.limits?.desiredRetention.map { Double($0 * 100) }
+        let limits = context.currentDeck?.limits
+        newLimitTabs = DailyLimitTabs(
+            deck: limits?.new,
+            today: limits?.newToday,
+            todayActive: limits?.newTodayActive ?? false
+        )
+        reviewLimitTabs = DailyLimitTabs(
+            deck: limits?.review,
+            today: limits?.reviewToday,
+            todayActive: limits?.reviewTodayActive ?? false
+        )
         historicalRetentionPercent = cfg.historicalRetention > 0 ? Double(cfg.historicalRetention * 100) : 90
 
         parkedFsrsParams = [:]
@@ -326,6 +343,7 @@ final class DeckConfigModel {
         }
 
         baseline = editedConfig(from: config)
+        baselineLimits = editedLimits
     }
 
     var hasUnsavedChanges: Bool {
@@ -336,20 +354,66 @@ final class DeckConfigModel {
             || fsrsHealthCheck != loaded.context.fsrsHealthCheck
             || fsrsEnabled != loaded.context.fsrs
             || editedSchedulingSettings != loaded.context.schedulingSettings
-            || editedLimits != loaded.context.currentDeck?.limits
+            || editedLimits != baselineLimits
     }
 
-    /// The deck's own limits with the edited desired retention override;
-    /// its other per-deck limits are kept as stored.
+    /// The deck's own limits as the desktop saves them: the daily-limit
+    /// tabs and the desired retention override. A today-only limit is sent
+    /// only while its tab is active, since sending one makes it today's.
     var editedLimits: DeckConfigsForUpdate.CurrentDeck.Limits? {
         guard let loaded else { return nil }
         let stored = loaded.context.currentDeck?.limits
-        if stored == nil && deckDesiredRetentionPercent == nil {
+        var limits = stored ?? DeckConfigsForUpdate.CurrentDeck.Limits()
+        (limits.new, limits.newToday) = newLimitTabs.saved
+        (limits.review, limits.reviewToday) = reviewLimitTabs.saved
+        limits.newTodayActive = limits.newToday != nil
+        limits.reviewTodayActive = limits.reviewToday != nil
+        limits.desiredRetention = deckDesiredRetentionPercent.map { Float($0 / 100) }
+        if stored == nil && limits == DeckConfigsForUpdate.CurrentDeck.Limits() {
             return nil
         }
-        var limits = stored ?? DeckConfigsForUpdate.CurrentDeck.Limits()
-        limits.desiredRetention = deckDesiredRetentionPercent.map { Float($0 / 100) }
         return limits
+    }
+
+    // MARK: - Daily limit tabs
+
+    var shownNewLimit: Int32 {
+        get { Int32(newLimitTabs.value(preset: Int(newCardsPerDay))) }
+        set {
+            var preset = Int(newCardsPerDay)
+            newLimitTabs.set(Int(newValue), preset: &preset)
+            newCardsPerDay = Int32(preset)
+        }
+    }
+
+    var shownReviewLimit: Int32 {
+        get { Int32(reviewLimitTabs.value(preset: Int(reviewsPerDay))) }
+        set {
+            var preset = Int(reviewsPerDay)
+            reviewLimitTabs.set(Int(newValue), preset: &preset)
+            reviewsPerDay = Int32(preset)
+        }
+    }
+
+    var newLimitScope: DailyLimitScope {
+        get { newLimitTabs.scope }
+        set {
+            newLimitTabs.select(newValue, showing: Int(shownNewLimit))
+            // An obscured preset tab keeps its saved value, as on the desktop.
+            if newValue != .preset, let loaded {
+                newCardsPerDay = Int32(loaded.config.config.newPerDay)
+            }
+        }
+    }
+
+    var reviewLimitScope: DailyLimitScope {
+        get { reviewLimitTabs.scope }
+        set {
+            reviewLimitTabs.select(newValue, showing: Int(shownReviewLimit))
+            if newValue != .preset, let loaded {
+                reviewsPerDay = Int32(loaded.config.config.reviewsPerDay)
+            }
+        }
     }
 
     func editedConfig(from base: DeckConfig) -> DeckConfig {

@@ -134,8 +134,10 @@ struct DeckConfigView: View {
             )
         }
         DailyLimitsSection(
-            newCardsPerDay: $model.newCardsPerDay,
-            reviewsPerDay: $model.reviewsPerDay,
+            newLimitScope: $model.newLimitScope,
+            newCardsPerDay: $model.shownNewLimit,
+            reviewLimitScope: $model.reviewLimitScope,
+            reviewsPerDay: $model.shownReviewLimit,
             newCardsIgnoreReviewLimit: $model.newCardsIgnoreReviewLimit,
             sameDayReviewsIgnoreReviewLimit: $model.sameDayReviewsIgnoreReviewLimit,
             applyAllParentLimits: $model.applyAllParentLimits

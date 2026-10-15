@@ -88,7 +88,9 @@ struct PresetSection: View {
 }
 
 struct DailyLimitsSection: View {
+    @Binding var newLimitScope: DailyLimitScope
     @Binding var newCardsPerDay: Int32
+    @Binding var reviewLimitScope: DailyLimitScope
     @Binding var reviewsPerDay: Int32
     @Binding var newCardsIgnoreReviewLimit: Bool
     @Binding var sameDayReviewsIgnoreReviewLimit: Bool
@@ -96,12 +98,23 @@ struct DailyLimitsSection: View {
 
     var body: some View {
         Section("Daily Limits") {
+            scopePicker("New cards limit", selection: $newLimitScope)
             Stepper("New cards/day: \(newCardsPerDay)", value: $newCardsPerDay, in: 0...9999)
+            scopePicker("Reviews limit", selection: $reviewLimitScope)
             Stepper("Reviews/day: \(reviewsPerDay)", value: $reviewsPerDay, in: 0...9999)
             Toggle("New cards ignore review limit", isOn: $newCardsIgnoreReviewLimit)
             Toggle("Same-day reviews ignore review limit", isOn: $sameDayReviewsIgnoreReviewLimit)
             Toggle("Apply all parent limits", isOn: $applyAllParentLimits)
         }
+    }
+
+    private func scopePicker(_ title: String, selection: Binding<DailyLimitScope>) -> some View {
+        Picker(title, selection: selection) {
+            ForEach(DailyLimitScope.allCases, id: \.self) { scope in
+                Text(scope.title).tag(scope)
+            }
+        }
+        .pickerStyle(.segmented)
     }
 }
 
