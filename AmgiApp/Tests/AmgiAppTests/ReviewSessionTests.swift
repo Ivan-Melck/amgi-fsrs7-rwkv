@@ -102,6 +102,11 @@ import AnkiServices
                 "canUndo should be false before any card is answered")
     }
 
+    @Test func canRedoInitiallyFalse() {
+        #expect(!session.canRedo,
+                "canRedo should be false before anything is undone")
+    }
+
     @Test func frontHTMLInitiallyEmpty() {
         #expect(session.frontHTML.isEmpty,
                 "frontHTML should be empty before session starts")

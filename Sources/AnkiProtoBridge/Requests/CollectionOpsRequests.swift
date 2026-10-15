@@ -7,7 +7,7 @@
 
 import Foundation
 public import AnkiBackend
-import AnkiKit
+public import AnkiKit
 import AnkiProto
 import SwiftProtobuf
 
@@ -50,6 +50,63 @@ extension Request where Response == Bool {
             decode: { bytes in
                 let proto = try Anki_Collection_UndoStatus(serializedBytes: bytes)
                 return !proto.undo.isEmpty
+            }
+        )
+    }
+}
+
+// MARK: - undo status / undo / redo
+
+extension UndoStatus {
+    init(_ proto: Anki_Collection_UndoStatus) {
+        self.init(undo: proto.undo, redo: proto.redo, lastStep: proto.lastStep)
+    }
+}
+
+extension UndoOutcome {
+    init(_ proto: Anki_Collection_OpChangesAfterUndo) {
+        self.init(
+            operation: proto.operation,
+            counter: proto.counter,
+            newStatus: UndoStatus(proto.newStatus)
+        )
+    }
+}
+
+extension Request where Response == UndoStatus {
+    /// What undo and redo would revert (`col.undo_status()`).
+    public static var undoStatus: Self {
+        .empty(
+            serviceId: ServiceID.collection,
+            methodId: CollectionOpsMethod.getUndoStatus,
+            decode: { bytes in
+                UndoStatus(try Anki_Collection_UndoStatus(serializedBytes: bytes))
+            }
+        )
+    }
+}
+
+extension Request where Response == UndoOutcome {
+    /// Undoes the newest undoable step (`col.undo()`); throws `undoEmpty`
+    /// when there is none.
+    public static var undo: Self {
+        .empty(
+            serviceId: ServiceID.collection,
+            methodId: CollectionOpsMethod.undo,
+            decode: { bytes in
+                UndoOutcome(try Anki_Collection_OpChangesAfterUndo(serializedBytes: bytes))
+            }
+        )
+    }
+
+    /// Redoes the newest undone step (`col.redo()`); throws `undoEmpty`
+    /// when there is none.
+    public static var redo: Self {
+        .empty(
+            serviceId: ServiceID.collection,
+            methodId: CollectionOpsMethod.redo,
+            decode: { bytes in
+                UndoOutcome(try Anki_Collection_OpChangesAfterUndo(serializedBytes: bytes))
             }
         )
     }

@@ -12,7 +12,7 @@
 //! - RWKV-Instant queue scores (`SetRwkvReviewQueueScores`);
 //! - RWKV-Curve answer states (`SchedulingStatesWithIntervals` + S90s);
 //! - answer metadata (`rwkv_review_kind`, `rwkv_retrievability`, `rwkv_s90`)
-//!   and advancing the resident state, with undo frames.
+//!   and advancing the resident state, with undo and redo frames.
 //!
 //! Methods are app-only aux RPCs (service 200, JSON in/out); see `dispatch`.
 
@@ -37,6 +37,7 @@ use anki::rwkv::RwkvInference;
 use anki::rwkv::RwkvInferenceState;
 use anki::rwkv::StatePrecision;
 use anki::services::CardsService;
+use anki::services::CollectionService;
 use anki::services::ConfigService;
 use anki::services::DeckConfigService;
 use anki::services::DecksService;
@@ -69,9 +70,10 @@ pub const REBUILD_STATE: u32 = 114;
 pub const SIMULATE_WORKLOAD: u32 = 115;
 pub const CANCEL_WORKLOAD: u32 = 116;
 pub const WORKLOAD_PROGRESS: u32 = 117;
+pub const REDO_ANSWER: u32 = 118;
 
 pub fn handles(method: u32) -> bool {
-    (PREPARE..=WORKLOAD_PROGRESS).contains(&method)
+    (PREPARE..=REDO_ANSWER).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -117,7 +119,8 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         SCORE_DECK => call(input, |req| engine.score_deck_request(backend, req)),
         SCHEDULING_STATES => call(input, |req| engine.scheduling_states(backend, req)),
         ANSWER_CARD => call(input, |req| engine.answer_card(backend, req)),
-        UNDO_ANSWER => call(input, |_: Empty| engine.undo_answer(backend)),
+        UNDO_ANSWER => call(input, |req| engine.undo_answer(backend, req)),
+        REDO_ANSWER => call(input, |req| engine.redo_answer(backend, req)),
         INVALIDATE => call(input, |_: Empty| engine.invalidate()),
         SAVE => call(input, |_: Empty| engine.save(backend)),
         DECK_COUNTS => call(input, |_: Empty| engine.deck_counts(backend)),
@@ -300,9 +303,23 @@ struct AnswerCardResponse {
     state_invalidated: bool,
 }
 
-#[derive(Serialize)]
+/// `record_collection_undo` / `record_collection_redo`: the collection's
+/// `OpChangesAfterUndo.counter` and `new_status.last_step`. Without a
+/// counter, the most recent frame is used.
+#[derive(Deserialize)]
+struct UndoRequest {
+    #[serde(default)]
+    counter: Option<u32>,
+    #[serde(default)]
+    next_counter: Option<u32>,
+}
+
+#[derive(Serialize, Default)]
 struct UndoResponse {
+    /// The state followed the undo/redo of one of our answers.
     restored: bool,
+    /// That answer's card.
+    card_id: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -373,8 +390,12 @@ struct Prediction {
     s90s: [Option<f32>; 4],
 }
 
-/// `RwkvReviewRollbackFrame`: enough to put one answer back.
+/// `RwkvReviewRollbackFrame`: enough to take one answer back (`before`)
+/// and to apply it again (`after`).
 struct UndoFrame {
+    /// The collection's undo step (`undo_status().last_step`) that undoes
+    /// (in `undo`) or redoes (in `redo`) this answer.
+    counter: u32,
     review_id: i64,
     card_id: i64,
     note_id: Option<i64>,
@@ -382,6 +403,8 @@ struct UndoFrame {
     preset_id: Option<i64>,
     before: ReviewStateOwned,
     runtime: RwkvInferenceState,
+    after: ReviewStateOwned,
+    runtime_after: RwkvInferenceState,
 }
 
 /// `_rwkv_review_queue_score_maps` for one deck: card id to retrievability
@@ -428,6 +451,8 @@ struct Engine {
     /// resident and saved states.
     force_replay: bool,
     undo: Vec<UndoFrame>,
+    /// Frames of undone answers, newest last (`_redo_frames`).
+    redo: Vec<UndoFrame>,
 }
 
 impl Engine {
@@ -505,6 +530,7 @@ impl Engine {
         self.trusted = false;
         self.collection_mod = None;
         self.undo.clear();
+        self.redo.clear();
         self.session.prediction = None;
     }
 
@@ -1260,7 +1286,15 @@ impl Engine {
         let scores_current = self.installed_scores.as_ref().is_some_and(|scores| {
             collection_mod(backend).is_ok_and(|m| m == scores.collection_mod)
         });
-        let _changes = backend.with_col(|col| SchedulerService::answer_card(col, answer))?;
+        // The answer's undo step (`_current_undo_counter`), read with the
+        // answer so nothing can slip in between. Reading it can't fail the
+        // committed answer.
+        let undo_counter = backend.with_col(|col| {
+            let _changes = SchedulerService::answer_card(col, answer)?;
+            Ok(CollectionService::get_undo_status(col)
+                .ok()
+                .map(|status| status.last_step))
+        })?;
         if scores_current {
             if let (Some(scores), Ok(m)) = (self.installed_scores.as_mut(), collection_mod(backend))
             {
@@ -1281,6 +1315,7 @@ impl Engine {
             synthetic_state,
             answered_at_millis,
             queue_before,
+            undo_counter,
         ) {
             Ok(invalidated) => invalidated,
             Err(_) => {
@@ -1331,8 +1366,11 @@ impl Engine {
         synthetic_state: Option<(i64, i64)>,
         answered_at_millis: i64,
         queue_before: Option<QueueSnapshot>,
+        undo_counter: Option<u32>,
     ) -> Result<bool> {
         clear_card_info_score(backend, card.id)?;
+        // `_save_rollback_frame`: a new answer can't be followed by a redo.
+        self.redo.clear();
 
         let mut state_invalidated = false;
         if current {
@@ -1364,22 +1402,25 @@ impl Engine {
                         let model = self.model_mut()?;
                         let before = model.warm_up_state(&input);
                         let runtime = model.state_for_card(input.card_id);
-                        let frame = UndoFrame {
-                            review_id,
-                            card_id: input.card_id,
-                            note_id: input.note_id,
-                            deck_id: input.deck_id,
-                            preset_id: input.preset_id,
-                            before: clone_state(&before),
-                            runtime,
-                        };
+                        let answered = input.clone();
                         model.review(input, review_state(&before))?;
+                        let frame = undo_counter.map(|counter| UndoFrame {
+                            counter,
+                            review_id,
+                            card_id: answered.card_id,
+                            note_id: answered.note_id,
+                            deck_id: answered.deck_id,
+                            preset_id: answered.preset_id,
+                            before,
+                            runtime,
+                            after: model.warm_up_state(&answered),
+                            runtime_after: model.state_for_card(answered.card_id),
+                        });
                         self.own_review_ids.push(review_id);
                         self.collection_mod = Some(collection_mod(backend)?);
                         self.unsaved = true;
-                        self.undo.push(frame);
-                        if self.undo.len() > UNDO_LIMIT {
-                            self.undo.remove(0);
+                        if let Some(frame) = frame {
+                            append_bounded(&mut self.undo, frame);
                         }
                     }
                 }
@@ -1593,41 +1634,154 @@ impl Engine {
         })
     }
 
-    /// `answer_undone`, for the answer most recently applied here. Call after
-    /// the collection's undo removed it. Like the desktop, the queue isn't
-    /// rescored: the collection's undo puts the card back in front.
-    fn undo_answer(&mut self, backend: &Backend) -> Result<UndoResponse> {
+    /// `record_collection_undo` -> `answer_undone`: the collection's undo
+    /// removed the answer recorded under `req.counter` (the most recent one
+    /// when none is given). Puts the state back to before it and keeps the
+    /// frame for a redo, under the counter the redo step got. Any other undo
+    /// only makes the next check revalidate against the collection.
+    fn undo_answer(&mut self, backend: &Backend, req: UndoRequest) -> Result<UndoResponse> {
         self.session.prediction = None;
-        let Some(frame) = self.undo.pop() else {
+        let Some(index) = rollback_frame_index(&self.undo, req.counter) else {
             self.trusted = false;
-            return Ok(UndoResponse { restored: false });
+            return Ok(UndoResponse::default());
         };
-        clear_card_info_score(backend, frame.card_id)?;
-        if self.answered_ids.last() == Some(&frame.card_id) {
-            self.answered_ids.pop();
+        let mut frame = self.undo.remove(index);
+        let card_id = frame.card_id;
+        // `queue_reviewer_undo_card_ids`.
+        clear_card_info_score(backend, card_id)?;
+        if let Some(i) = self.answered_ids.iter().rposition(|id| *id == card_id) {
+            self.answered_ids.remove(i);
         }
-        self.synthetic.remove(&frame.card_id);
+        self.synthetic.remove(&card_id);
         if review_exists(backend, frame.review_id)?
             || self.own_review_ids.last() != Some(&frame.review_id)
         {
             // Whatever was undone, it was not this answer.
             self.undo.clear();
+            self.redo.clear();
             self.trusted = false;
-            return Ok(UndoResponse { restored: false });
+            return Ok(UndoResponse::default());
         }
         let model = self.model_mut()?;
         model.restore_warm_up_state(
-            frame.card_id,
+            card_id,
             frame.note_id,
             frame.deck_id,
             frame.preset_id,
-            frame.before,
+            clone_state(&frame.before),
         )?;
         model.restore_state(&frame.runtime);
         self.own_review_ids.pop();
         // Revalidate (cheaply) against the post-undo collection.
         self.collection_mod = None;
-        Ok(UndoResponse { restored: true })
+        self.unsaved = true;
+        frame.counter = req.next_counter.or(req.counter).unwrap_or(frame.counter);
+        append_bounded(&mut self.redo, frame);
+        self.show_undone_card(backend, card_id);
+        Ok(UndoResponse {
+            restored: true,
+            card_id: Some(card_id),
+        })
+    }
+
+    /// `record_collection_redo` -> `answer_redone`: the collection's redo
+    /// put back the answer whose frame `undo_answer` kept under
+    /// `req.counter`. The state becomes exactly what that answer produced;
+    /// anything else invalidates it.
+    fn redo_answer(&mut self, backend: &Backend, req: UndoRequest) -> Result<UndoResponse> {
+        self.session.prediction = None;
+        let Some(index) = rollback_frame_index(&self.redo, req.counter) else {
+            self.trusted = false;
+            return Ok(UndoResponse::default());
+        };
+        let mut frame = self.redo.remove(index);
+        let card_id = frame.card_id;
+        clear_card_info_score(backend, card_id)?;
+        // The answer must come back as the newest review on top of ours.
+        let newest = self
+            .own_review_ids
+            .last()
+            .copied()
+            .or(self.base.as_ref().map(|base| base.last_review_id));
+        if !review_exists(backend, frame.review_id)?
+            || newest.is_none_or(|newest| newest >= frame.review_id)
+        {
+            self.undo.clear();
+            self.redo.clear();
+            self.trusted = false;
+            return Ok(UndoResponse::default());
+        }
+        let model = self.model_mut()?;
+        model.restore_warm_up_state(
+            card_id,
+            frame.note_id,
+            frame.deck_id,
+            frame.preset_id,
+            clone_state(&frame.after),
+        )?;
+        model.restore_state(&frame.runtime_after);
+        self.own_review_ids.push(frame.review_id);
+        // `apply_reviewer_redo_card_ids`.
+        self.answered_ids.push(card_id);
+        self.collection_mod = None;
+        self.unsaved = true;
+        frame.counter = req.next_counter.or(req.counter).unwrap_or(frame.counter);
+        append_bounded(&mut self.undo, frame);
+        Ok(UndoResponse {
+            restored: true,
+            card_id: Some(card_id),
+        })
+    }
+
+    /// The reviewer's `_get_rwkv_undo_restored_card`: during a review
+    /// session the undone card is shown again, even when a queue refresh
+    /// since its answer rebuilt the queue without it. Best effort. Unlike
+    /// the desktop, a queue the collection's undo already put the card in
+    /// front of is kept: a rebuild would move a learning card that isn't due
+    /// yet behind the main queue, which the desktop then logs as a failure.
+    fn show_undone_card(&self, backend: &Backend, card_id: i64) {
+        if self.session.deck_id.is_none() {
+            return;
+        }
+        let _ = backend.with_col(|col| {
+            let head = SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )?;
+            if head
+                .cards
+                .first()
+                .and_then(|c| c.card.as_ref())
+                .map(|c| c.id)
+                != Some(card_id)
+            {
+                let _counts = SchedulerService::rebuild_queued_cards_preserving_current_card(
+                    col,
+                    anki_proto::cards::CardId { cid: card_id },
+                )?;
+            }
+            Ok(())
+        });
+    }
+}
+
+/// `_rollback_frame_index`: the newest frame recorded under `counter`, or
+/// the newest frame when there is no counter.
+fn rollback_frame_index(frames: &[UndoFrame], counter: Option<u32>) -> Option<usize> {
+    match counter {
+        Some(counter) => frames.iter().rposition(|frame| frame.counter == counter),
+        None => frames.len().checked_sub(1),
+    }
+}
+
+/// `_append_bounded`: keeps the newest `UNDO_LIMIT` frames.
+fn append_bounded(frames: &mut Vec<UndoFrame>, frame: UndoFrame) {
+    frames.push(frame);
+    if frames.len() > UNDO_LIMIT {
+        frames.drain(..frames.len() - UNDO_LIMIT);
     }
 }
 

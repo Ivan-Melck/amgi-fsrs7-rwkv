@@ -53,6 +53,11 @@ private struct SchedulingStatesResponse: Decodable {
     let curve: Bool
 }
 
+private struct UndoBody: Encodable {
+    let counter: UInt32
+    let nextCounter: UInt32
+}
+
 private struct AnswerCardBody: Encodable {
     let cardId: Int64
     let rating: Int16
@@ -189,13 +194,29 @@ extension Request where Response == Void {
         )
     }
 
-    /// Call after the collection's undo removed the most recent answer.
-    public static var rwkvUndoAnswer: Self {
+    /// `record_collection_undo`: call after every collection undo. When it
+    /// took back an RWKV answer, the model's state goes back to before it.
+    public static func rwkvUndoAnswer(_ outcome: UndoOutcome) -> Self {
+        undoOrRedo(AuxMethod.rwkvUndoAnswer, outcome)
+    }
+
+    /// `record_collection_redo`: call after every collection redo. When it
+    /// applied an RWKV answer again, the model's state advances as it did.
+    public static func rwkvRedoAnswer(_ outcome: UndoOutcome) -> Self {
+        undoOrRedo(AuxMethod.rwkvRedoAnswer, outcome)
+    }
+
+    private static func undoOrRedo(_ methodId: UInt32, _ outcome: UndoOutcome) -> Self {
         Self(
             serviceId: ServiceID.aux,
-            methodId: AuxMethod.rwkvUndoAnswer,
+            methodId: methodId,
             bypassesCallLock: true,
-            encode: { Data("{}".utf8) },
+            encode: {
+                try encoder.encode(UndoBody(
+                    counter: outcome.counter,
+                    nextCounter: outcome.newStatus.lastStep
+                ))
+            },
             decode: { _ in () }
         )
     }

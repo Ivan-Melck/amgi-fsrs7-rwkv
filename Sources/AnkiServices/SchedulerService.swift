@@ -27,8 +27,12 @@ public struct SchedulerService: Sendable {
     public var prepareRwkv: @Sendable () throws -> RwkvPrepareResult? = { nil }
     /// Before the first `getQueuedCards` of a review session.
     public var beginSession: @Sendable (_ deckId: DeckID) throws -> Void = { _ in }
-    /// After `undoLast()`; `wasAnswer` when the undone operation was an answer.
-    public var didUndo: @Sendable (_ wasAnswer: Bool) throws -> Void = { _ in }
+    /// After every collection undo (`record_collection_undo`): takes back
+    /// RWKV's state when the undone step was an answer.
+    public var didUndo: @Sendable (_ outcome: UndoOutcome) throws -> Void = { _ in }
+    /// After every collection redo (`record_collection_redo`): advances
+    /// RWKV's state again when the redone step was an answer.
+    public var didRedo: @Sendable (_ outcome: UndoOutcome) throws -> Void = { _ in }
     /// Persists the model state, e.g. when the app goes to the background.
     public var saveRwkvState: @Sendable () throws -> Void = {}
 }
@@ -83,13 +87,13 @@ extension SchedulerService: DependencyKey {
                 guard let result = try prepare(), result.active else { return }
                 try backend.invoke(.rwkvScoreDeck(deckId: deckId, newSession: true))
             },
-            didUndo: { wasAnswer in
+            didUndo: { outcome in
                 guard modelPath != nil else { return }
-                if wasAnswer {
-                    try backend.invoke(Request<Void>.rwkvUndoAnswer)
-                } else {
-                    try backend.invoke(Request<Void>.rwkvInvalidate)
-                }
+                try backend.invoke(Request<Void>.rwkvUndoAnswer(outcome))
+            },
+            didRedo: { outcome in
+                guard modelPath != nil else { return }
+                try backend.invoke(Request<Void>.rwkvRedoAnswer(outcome))
             },
             saveRwkvState: {
                 guard modelPath != nil else { return }

@@ -50,12 +50,14 @@ enum AuxMethod {
     static let rwkvRebuildState: UInt32 = 114
     static let rwkvSimulateWorkload: UInt32 = 115
     static let rwkvCancelWorkload: UInt32 = 116
+    static let rwkvRedoAnswer: UInt32 = 118
 }
 
 enum CollectionOpsMethod {
     static let checkDatabase: UInt32 = 6
     static let getUndoStatus: UInt32 = 7
     static let undo: UInt32 = 8
+    static let redo: UInt32 = 9
 }
 
 /// BackendCardsService (5).
