@@ -253,6 +253,35 @@ extension Request where Response == FsrsEvaluation {
     }
 }
 
+// MARK: - evaluateParamsLegacy
+
+extension Request where Response == FsrsEvaluation {
+    /// Scores fixed parameters, as the desktop's optimize comparison,
+    /// custom decay table and same-day Help Me Decide do.
+    public static func evaluateFsrsParamsLegacy(_ input: FsrsEvaluateLegacyRequest) -> Self {
+        Self(
+            serviceId: ServiceID.scheduler,
+            methodId: SchedulerMethod.evaluateParamsLegacy,
+            encode: {
+                var proto = Anki_Scheduler_EvaluateParamsLegacyRequest()
+                proto.params = input.params
+                proto.search = input.search
+                if let cutoff = input.ignoreRevlogsBefore {
+                    proto.ignoreRevlogsBeforeMs = cutoff.ankiMillis
+                }
+                if let includeSameDayReviews = input.includeSameDayReviews {
+                    proto.includeSameDayReviews = includeSameDayReviews
+                }
+                return try proto.serializedData()
+            },
+            decode: { bytes in
+                let resp = try Anki_Scheduler_EvaluateParamsResponse(serializedBytes: bytes)
+                return FsrsEvaluation(logLoss: resp.logLoss, rmseBins: resp.rmseBins)
+            }
+        )
+    }
+}
+
 // MARK: - computeFsrsParams
 
 extension Request where Response == FsrsOptimizeResult {
@@ -379,9 +408,8 @@ private func makeSimulationProto(_ input: FsrsSimulationRequest) -> Anki_Schedul
         proto.reviewFuzzFactorMid = fuzz.reviewFuzzEnabled ? fuzz.reviewFuzzFactorMid : 0
         proto.reviewFuzzFactorLong = fuzz.reviewFuzzEnabled ? fuzz.reviewFuzzFactorLong : 0
     }
-    // HELP_ME_DECIDE_*_DEFAULT (help-me-decide-defaults.ts).
-    proto.helpMeDecideTransitionBlendAlpha = 0
-    proto.helpMeDecideEnforceMonotonicSuccessGradeProbs = false
+    proto.helpMeDecideTransitionBlendAlpha = FsrsHelpMeDecideDefaults.transitionBlendAlpha
+    proto.helpMeDecideEnforceMonotonicSuccessGradeProbs = FsrsHelpMeDecideDefaults.enforceMonotonicSuccessGradeProbs
     if let model = input.dynamicDesiredRetention {
         proto.fsrsDynamicDesiredRetentionParams = model.params
         proto.fsrsDynamicDesiredRetentionWeights = model.weights

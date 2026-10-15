@@ -57,7 +57,10 @@ struct DeckConfigView: View {
                 onDiscard: onDismiss,
                 onSaveThen: { action in Task { await model.saveThenPerform(action) } },
                 onDiscardThen: { action in Task { await model.discardThenPerform(action) } },
-                onApplySchedule: { await model.applyScheduleToAllPresets($0) }
+                onApplySchedule: { await model.applyScheduleToAllPresets($0) },
+                onLoadCustomDecayTable: { try await model.loadCustomDecayRows($0) },
+                onKeepCurrentParams: { model.keepCurrentParams() },
+                onApplyOptimizedParams: { model.applyOptimizedParams($0) }
             ))
             .task { await model.loadConfig() }
     }
@@ -213,8 +216,10 @@ struct DeckConfigView: View {
             dynamicDesiredRetentionClamp: $model.dynamicDesiredRetentionClamp,
             isOptimizingFsrs: model.isOptimizingFsrs,
             isCheckingHealth: model.isCheckingFsrsHealth,
+            isCheckingSameDayDecision: model.isCheckingSameDayDecision,
             onCheckHealth: { Task { await model.checkFsrsHealth() } },
             onOptimizeCurrent: { Task { await model.optimizeCurrentPreset() } },
+            onCheckSameDayDecision: { Task { await model.checkSameDayDecision() } },
             onCancelOptimize: { model.cancelOptimize() },
             onOpenSimulatorReview: { model.openSimulator(mode: .review) },
             onOpenSimulatorWorkload: { model.openSimulator(mode: .workload) },

@@ -76,7 +76,8 @@ final class DeckConfigModel {
     var fsrsWeightsText: String = ""
     var fsrsParamSearch: String = ""
     var fsrsEvaluationSearch: String = ""
-    /// Params of FSRS versions switched away from in this session, keyed by
+    /// Params of FSRS versions switched away from in this session (or the
+    /// active version's applied optimization, at full precision), keyed by
     /// version; `fsrsWeightsText` always edits the active version.
     var parkedFsrsParams: [FsrsVersion: [Float]] = [:]
     var fsrsMinimumIntervalSecs: Int = 1
@@ -114,6 +115,7 @@ final class DeckConfigModel {
     var isPresetMutating = false
     var isRebuildingRwkvState = false
     var isCheckingFsrsHealth = false
+    var isCheckingSameDayDecision = false
     var newPresetName = ""
     var renamePresetDraft = ""
 

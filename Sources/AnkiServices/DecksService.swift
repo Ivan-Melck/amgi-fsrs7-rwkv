@@ -46,6 +46,7 @@ public struct DecksService: Sendable {
     ) throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) throws -> FsrsOptimizeResult
     public var evaluateFsrsParams: @Sendable (_ request: FsrsEvaluateRequest) throws -> FsrsEvaluation
+    public var evaluateFsrsParamsLegacy: @Sendable (_ request: FsrsEvaluateLegacyRequest) throws -> FsrsEvaluation
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsReviewSimulation
     public var simulateFsrsWorkload: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsWorkloadSimulation
     /// Re-computes parameters for every preset reachable from the deck, using
@@ -167,6 +168,9 @@ extension DecksService: DependencyKey {
             },
             evaluateFsrsParams: { request in
                 try backend.invoke(.evaluateFsrsParams(request))
+            },
+            evaluateFsrsParamsLegacy: { request in
+                try backend.invoke(.evaluateFsrsParamsLegacy(request))
             },
             simulateFsrsReview: { request in
                 try backend.invoke(.simulateFsrsReview(request))

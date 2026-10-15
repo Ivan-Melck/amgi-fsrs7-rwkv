@@ -27,6 +27,9 @@ struct DeckConfigPresentations: ViewModifier {
     let onSaveThen: (DeckConfigPresetAction) -> Void
     let onDiscardThen: (DeckConfigPresetAction) -> Void
     let onApplySchedule: (ScheduleCopyOptions) async -> String?
+    let onLoadCustomDecayTable: (FsrsOptimizationComparison) async throws -> [FsrsDecayRow]
+    let onKeepCurrentParams: () -> Void
+    let onApplyOptimizedParams: (FsrsOptimizationComparison) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -52,6 +55,19 @@ struct DeckConfigPresentations: ViewModifier {
             }
             .sheet(item: $destination.prompt) { prompt in
                 promptSheet(prompt)
+            }
+            .sheet(item: $destination.sheet) { sheet in
+                switch sheet {
+                case .optimizationComparison(let comparison):
+                    OptimizationComparisonSheet(
+                        comparison: comparison,
+                        onLoadCustomDecayTable: onLoadCustomDecayTable,
+                        onKeep: onKeepCurrentParams,
+                        onApply: { onApplyOptimizedParams(comparison) }
+                    )
+                case .sameDayDecision(let comparison):
+                    SameDayDecisionSheet(comparison: comparison)
+                }
             }
             .navigationDestination(item: $destination.route) { route in
                 switch route {

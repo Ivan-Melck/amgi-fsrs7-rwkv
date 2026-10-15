@@ -501,14 +501,21 @@ struct FsrsSection: View {
     @Binding var dynamicDesiredRetentionClamp: Bool
     let isOptimizingFsrs: Bool
     let isCheckingHealth: Bool
+    let isCheckingSameDayDecision: Bool
     let onCheckHealth: () -> Void
     let onOptimizeCurrent: () -> Void
+    let onCheckSameDayDecision: () -> Void
     let onCancelOptimize: () -> Void
     let onOpenSimulatorReview: () -> Void
     let onOpenSimulatorWorkload: () -> Void
     let onOptimizeAll: () -> Void
 
     @Environment(\.palette) private var palette
+
+    /// The desktop's `computing`: one FSRS job at a time.
+    private var isComputing: Bool {
+        isOptimizingFsrs || isCheckingHealth || isCheckingSameDayDecision
+    }
 
     var body: some View {
         Section("FSRS") {
@@ -590,6 +597,18 @@ struct FsrsSection: View {
                 if fsrsVersion == .seven {
                     Toggle("Include same-day reviews in FSRS-7", isOn: $fsrs7IncludeSameDayReviews)
                     Toggle("Use scheduling penalties in FSRS-7 optimization", isOn: $fsrs7SchedulingPenaltiesEnabled)
+                    // `checkSameDayDecision`; Cancel while it runs.
+                    if isCheckingSameDayDecision {
+                        Button(role: .cancel, action: onCancelOptimize) {
+                            HStack {
+                                ProgressView().controlSize(.small)
+                                Text("Cancel")
+                            }
+                        }
+                    } else {
+                        Button("Same-day reviews: Help Me Decide", action: onCheckSameDayDecision)
+                            .disabled(isComputing)
+                    }
                     Toggle("Dynamic DR (ADR)", isOn: $dynamicDesiredRetentionEnabled)
                     if dynamicDesiredRetentionEnabled {
                         Toggle("Clamp unsupported dynamic DR targets", isOn: $dynamicDesiredRetentionClamp)
@@ -605,7 +624,7 @@ struct FsrsSection: View {
                         Text(isOptimizingFsrs ? "Optimizing…" : "Optimize Weights")
                     }
                 }
-                .disabled(isOptimizingFsrs)
+                .disabled(isComputing)
 
                 if isOptimizingFsrs {
                     Button("Cancel", role: .cancel, action: onCancelOptimize)
@@ -617,7 +636,7 @@ struct FsrsSection: View {
                         Text(isCheckingHealth ? "Checking Health…" : "Check Health")
                     }
                 }
-                .disabled(isOptimizingFsrs || isCheckingHealth)
+                .disabled(isComputing)
 
                 Button(action: onOpenSimulatorReview) {
                     Label("Open FSRS Simulator", systemImage: "chart.line.uptrend.xyaxis")

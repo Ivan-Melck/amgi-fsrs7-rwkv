@@ -133,3 +133,25 @@ public struct FsrsEvaluation: Sendable, Hashable {
         self.rmseBins = rmseBins
     }
 }
+
+/// Inputs for `Request.evaluateFsrsParamsLegacy`: scores fixed `params`
+/// on `search` without training.
+public struct FsrsEvaluateLegacyRequest: Sendable, Hashable {
+    public var params: [Float]
+    public var search: String
+    public var ignoreRevlogsBefore: Date?
+    /// `nil` uses the backend's default for the parameters' version.
+    public var includeSameDayReviews: Bool?
+
+    public init(
+        params: [Float],
+        search: String,
+        ignoreRevlogsBefore: Date?,
+        includeSameDayReviews: Bool?
+    ) {
+        self.params = params
+        self.search = search
+        self.ignoreRevlogsBefore = ignoreRevlogsBefore
+        self.includeSameDayReviews = includeSameDayReviews
+    }
+}

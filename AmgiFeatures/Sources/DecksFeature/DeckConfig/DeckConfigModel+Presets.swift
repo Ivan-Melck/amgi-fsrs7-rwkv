@@ -209,67 +209,7 @@ extension DeckConfigModel {
         }
     }
 
-    // MARK: - FSRS optimize
-
-    func cancelOptimize() {
-        optimizeGeneration &+= 1
-        isOptimizingFsrs = false
-    }
-
-    func optimizeCurrentPreset() async {
-        guard let loaded else { return }
-        let generation = optimizeGeneration
-        isOptimizingFsrs = true
-        defer { if generation == optimizeGeneration { isOptimizingFsrs = false } }
-
-        do {
-            // Mirrors the fork's desktop request: the FSRS-7-only options
-            // are sent only when the preset is on FSRS-7.
-            let version = schedulerSelection.fsrsVersion
-            let isFsrs7 = version == .seven
-            let request = FsrsOptimizeRequest(
-                search: effectiveParamSearch(),
-                currentWeights: FsrsWeights(activeFsrsParams()),
-                ignoreRevlogsBefore: Self.ignoreRevlogsBefore(
-                    editedConfig(from: loaded.config).config.ignoreRevlogsBeforeDate
-                ),
-                relearningStepsPerDay: Int(relearningStepsInDay(parseSteps(relearningStepsText))),
-                runHealthCheck: fsrsHealthCheck,
-                fsrsVersion: version,
-                includeSameDayReviews: isFsrs7 ? fsrs7IncludeSameDayReviews : nil,
-                enableSchedulingPenalties: isFsrs7 ? fsrs7SchedulingPenaltiesEnabled : nil,
-                dynamicDesiredRetentionEnabled: isFsrs7 && dynamicDesiredRetentionEnabled
-            )
-
-            let result = try await deckClient.computeFsrsParams(request)
-            guard generation == optimizeGeneration else { return }
-            guard !result.weights.isEmpty else {
-                destination = .alert(.fsrsError(
-                    title: "Not enough review history",
-                    message: "FSRS needs more reviews before it can optimize. Try lowering historical retention or expanding the search."
-                ))
-                return
-            }
-            // The text field edits the active version's params, so the
-            // optimized values land in that version's slot on save.
-            fsrsWeightsText = formatWeights(result.weights.values)
-            if let dynamicDesiredRetention = result.dynamicDesiredRetention {
-                optimizedDynamicDesiredRetention = dynamicDesiredRetention
-            }
-            if result.healthCheck == .failed {
-                destination = .alert(.fsrsError(
-                    title: "FSRS health check failed",
-                    message: "Review history may be inconsistent. Inspect the parameters before saving."
-                ))
-            }
-        } catch {
-            guard generation == optimizeGeneration else { return }
-            destination = .alert(.fsrsError(
-                title: "Couldn't optimize FSRS parameters",
-                message: error.localizedDescription
-            ))
-        }
-    }
+    // MARK: - FSRS optimize all presets
 
     func optimizeAllPresets() async {
         guard let loaded, !isFallbackContext else { return }

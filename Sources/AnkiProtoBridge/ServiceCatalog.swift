@@ -94,6 +94,7 @@ enum SchedulerMethod {
     static let simulateFsrsReview: UInt32 = 38
     static let simulateFsrsWorkload: UInt32 = 39
     static let evaluateParams: UInt32 = 41
+    static let evaluateParamsLegacy: UInt32 = 42
 }
 
 enum DeckConfigMethod {

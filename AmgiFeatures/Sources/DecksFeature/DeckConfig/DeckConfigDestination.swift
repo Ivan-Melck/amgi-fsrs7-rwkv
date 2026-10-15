@@ -13,6 +13,7 @@ enum DeckConfigDestination {
     case alert(DeckConfigAlert)
     case prompt(DeckConfigPrompt)
     case route(DeckConfigRoute)
+    case sheet(DeckConfigSheet)
 }
 
 @CasePathable
@@ -47,4 +48,20 @@ enum DeckConfigPrompt: String, Identifiable {
 
 enum DeckConfigRoute: Hashable {
     case simulator(FsrsSimulatorContext)
+}
+
+/// The desktop's FSRS result popups.
+enum DeckConfigSheet: Identifiable {
+    /// Optimization Result: keep the current parameters or use the
+    /// optimized ones.
+    case optimizationComparison(FsrsOptimizationComparison)
+    /// Same-Day Review Comparison.
+    case sameDayDecision(FsrsSameDayDecisionComparison)
+
+    var id: String {
+        switch self {
+        case .optimizationComparison: "optimizationComparison"
+        case .sameDayDecision: "sameDayDecision"
+        }
+    }
 }
