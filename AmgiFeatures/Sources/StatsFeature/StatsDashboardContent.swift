@@ -28,6 +28,8 @@ struct StatsDashboardContent: View {
     let onRetry: () -> Void
     let streak: StreakSummary?
     let isRefreshing: Bool
+    /// The Memorised graph; nil in previews.
+    var memorised: MemorisedModel?
 
     var body: some View {
         ScrollView {
@@ -134,6 +136,13 @@ struct StatsDashboardContent: View {
     @ViewBuilder
     private func charts(_ graphs: GraphsSnapshot) -> some View {
         StatsChartStack(graphs: graphs, period: period)
+        if let memorised {
+            MemorisedSection(
+                model: memorised,
+                truncated: period != .all,
+                onIncreaseRange: { onSelectPeriod(.all) }
+            )
+        }
     }
 }
 

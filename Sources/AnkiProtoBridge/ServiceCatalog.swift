@@ -50,6 +50,11 @@ enum AuxMethod {
     static let rwkvRebuildState: UInt32 = 114
     static let rwkvSimulateWorkload: UInt32 = 115
     static let rwkvCancelWorkload: UInt32 = 116
+    // The stats screen's Memorised chart.
+    static let statsFsrsMemorised: UInt32 = 124
+    static let rwkvMemorisedHistory: UInt32 = 125
+    static let rwkvMemorisedProgress: UInt32 = 126
+    static let rwkvCancelMemorised: UInt32 = 127
 }
 
 enum CollectionOpsMethod {

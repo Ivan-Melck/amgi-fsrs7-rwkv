@@ -1438,3 +1438,333 @@ fn rwkv_workload_runs_on_the_resident_state() {
     let sampled = engine.simulate_workload(&fx.backend, request(6)).unwrap();
     assert_eq!(sampled.points.len(), full.points.len());
 }
+
+#[test]
+fn fsrs_memorised_replays_the_searched_history() {
+    let Some(fx) = fixture("fsrs-memorised", 8) else {
+        return;
+    };
+    let today = i64::from(
+        fx.backend
+            .with_col(SchedulerService::sched_timing_today)
+            .unwrap()
+            .days_elapsed,
+    );
+    let all = fsrs_memorised::fsrs_memorised(
+        &fx.backend,
+        fsrs_memorised::FsrsMemorisedRequest {
+            search: String::new(),
+            days: 0,
+        },
+    )
+    .unwrap();
+    assert_eq!(all.today, today);
+    // The history starts 30 days ago and every series runs to today.
+    assert_eq!(all.first_day, today - 30);
+    let len = (today - all.first_day + 1) as usize;
+    for series in [
+        &all.retrievability,
+        &all.note_retrievability,
+        &all.stable_retrievability,
+    ] {
+        assert_eq!(series.len(), len);
+    }
+    assert_eq!(all.card_count.len(), len);
+    assert_eq!(all.card_count.last(), Some(&8));
+    // One card per note: notes equal cards.
+    assert_eq!(all.note_retrievability, all.retrievability);
+    for (r, count) in all.retrievability.iter().zip(&all.card_count) {
+        assert!(*r > 0.0 && *r <= f64::from(*count) + 1e-9);
+    }
+    for (stable, r) in all.stable_retrievability.iter().zip(&all.retrievability) {
+        assert!(*stable < *r);
+    }
+    // Each card reviewed that day starts at R = 1 (0.99999 in FSRS-7).
+    let first = all.retrievability[0];
+    assert!((first - f64::from(all.card_count[0])).abs() < 1e-3);
+    // Every review card weighs 1/10 of a card today (interval 10).
+    assert_eq!(all.burden_first_day, today - 30);
+    assert!((all.burden.last().unwrap() - 0.8).abs() < 1e-9);
+
+    // Card 4, last reviewed 15 days ago, ends where FSRS's own batch replay
+    // of its whole-day review history ends. (The scheduler's stored state
+    // can differ: with short-term steps on, the fork replays FSRS-7 with
+    // fractional days; the add-on, and so this port, with whole days.)
+    let card_id = fx.card_ids[4];
+    let one = fsrs_memorised::fsrs_memorised(
+        &fx.backend,
+        fsrs_memorised::FsrsMemorisedRequest {
+            search: format!("cid:{card_id}"),
+            days: 0,
+        },
+    )
+    .unwrap();
+    assert!(one.card_count.iter().all(|count| *count == 1));
+    let timing = fx
+        .backend
+        .with_col(SchedulerService::sched_timing_today)
+        .unwrap();
+    let days = fsrs_memorised::Days {
+        today,
+        next_day_at: timing.next_day_at,
+    };
+    let review_days: Vec<(i64, u32)> = sql(
+        &fx.backend,
+        "select id, ease from revlog where cid = ? order by id",
+        vec![card_id.into()],
+    )
+    .iter()
+    .map(|row| {
+        (
+            days.of(row[0].as_i64().unwrap()),
+            row[1].as_u64().unwrap() as u32,
+        )
+    })
+    .collect();
+    let item = fsrs::FSRSItem {
+        reviews: review_days
+            .iter()
+            .enumerate()
+            .map(|(i, (day, rating))| fsrs::FSRSReview {
+                rating: *rating,
+                delta_t: if i == 0 {
+                    0.0
+                } else {
+                    (day - review_days[i - 1].0) as f32
+                },
+            })
+            .collect(),
+    };
+    let params = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::get_fsrs_preset_for_card(
+                col,
+                anki_proto::cards::CardId { cid: card_id },
+            )
+        })
+        .unwrap()
+        .params;
+    let model = fsrs::FSRS::new(&params).unwrap();
+    let state = model.memory_state(item, None).unwrap();
+    let last_day = review_days.last().unwrap().0;
+    assert_eq!(last_day, today - 15);
+    let expected = model.current_retrievability(state, (today - last_day) as f32);
+    let got = *one.retrievability.last().unwrap();
+    assert!(
+        (got - f64::from(expected)).abs() < 1e-6,
+        "replayed R {got}, FSRS {expected}"
+    );
+
+    // The stats period limits the replayed reviews.
+    let recent = fsrs_memorised::fsrs_memorised(
+        &fx.backend,
+        fsrs_memorised::FsrsMemorisedRequest {
+            search: String::new(),
+            days: 10,
+        },
+    )
+    .unwrap();
+    assert!(recent.first_day > all.first_day);
+    assert!(recent.first_day >= today - 10);
+
+    let none = fsrs_memorised::fsrs_memorised(
+        &fx.backend,
+        fsrs_memorised::FsrsMemorisedRequest {
+            search: "deck:nonexistent".into(),
+            days: 0,
+        },
+    )
+    .unwrap();
+    assert!(none.retrievability.is_empty() && none.burden.is_empty());
+}
+
+/// All RWKV Memorised checks share one test: a build is a process-wide job,
+/// and a second search would cancel the first.
+#[test]
+fn rwkv_memorised_history_builds_caches_and_resumes() {
+    let Some(fx) = fixture("rwkv-memorised", 6) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("rwkv-memorised-cache");
+    let request = |search: &str| memorised::HistoryRequest {
+        search: search.into(),
+        model_path: fx.model.clone(),
+        precision: None,
+        cache_dir: Some(cache.0.to_string_lossy().into_owned()),
+    };
+    let today = i64::from(
+        fx.backend
+            .with_col(SchedulerService::sched_timing_today)
+            .unwrap()
+            .days_elapsed,
+    );
+
+    let built = memorised::history(&fx.backend, request("")).unwrap();
+    assert_eq!(built.phase, "complete", "{:?}", built.error);
+    assert!(built.done);
+    assert_eq!(built.first_day, Some(today - 30));
+    assert_eq!(built.completed_through_day, Some(today));
+    let len = 31;
+    assert_eq!(built.retrievability_by_day.len(), len);
+    assert_eq!(built.card_count_by_day.last(), Some(&6));
+    assert_eq!(
+        built.note_retrievability_by_day,
+        built.retrievability_by_day
+    );
+    // Every card enters on its first review day and stays; card 3's
+    // learning restart today drops its earlier history.
+    assert!(built.card_count_by_day[..30]
+        .iter()
+        .all(|count| *count == 5));
+    assert!(built
+        .retrievability_by_day
+        .iter()
+        .all(|r| *r > 0.0 && *r <= 6.0));
+    // One prediction per card and day, all summed.
+    assert_eq!(built.total, 5 * 31 + 1);
+    assert_eq!(memorised::progress().phase, "complete");
+
+    // Today's sum is what a full replay predicts for each card's last review
+    // input queried today (within the UInt16 rounding).
+    let params = history_params(&fx.backend, "int8").unwrap();
+    let response = history_inputs(&fx.backend, &params).unwrap();
+    let mut runtime = RwkvInference::load_with_precision(
+        fx.model.clone().into(),
+        TARGET_RETENTION,
+        MAX_INTERVAL_DAYS,
+        StatePrecision::parse("int8").unwrap(),
+    )
+    .unwrap();
+    let reviews: Vec<ReviewInput> = response.reviews.iter().map(history_review_input).collect();
+    runtime.warm_up_reviews(reviews.clone(), false).unwrap();
+    let mut last: std::collections::BTreeMap<i64, ReviewInput> = Default::default();
+    for review in reviews {
+        last.insert(review.card_id, review);
+    }
+    let queries: Vec<ReviewInput> = last
+        .values()
+        .map(|previous| ReviewInput {
+            is_query: true,
+            ease: None,
+            duration_millis: None,
+            day_offset: Some(today),
+            current_elapsed_days: Some(today - previous.day_offset.unwrap()),
+            current_elapsed_seconds: Some((today - previous.day_offset.unwrap()) * 86_400),
+            ..previous.clone()
+        })
+        .collect();
+    let replayed: f64 = runtime
+        .predict_retrievability_many_from_warm_up(queries)
+        .unwrap()
+        .iter()
+        .map(|p| f64::from(*p))
+        .sum();
+    let got = *built.retrievability_by_day.last().unwrap();
+    assert!(
+        (got - replayed).abs() < 6.0 / 65_535.0,
+        "day by day {got}, full replay {replayed}"
+    );
+
+    // The finished history is cached: any search is answered from it.
+    let cached = memorised::history(&fx.backend, request("")).unwrap();
+    assert_eq!(cached, built);
+    let some = format!("cid:{},{}", fx.card_ids[0], fx.card_ids[1]);
+    let subset = memorised::history(&fx.backend, request(&some)).unwrap();
+    assert_eq!(subset.phase, "complete");
+    assert!(subset.card_count_by_day.iter().all(|count| *count == 2));
+    assert!(subset
+        .retrievability_by_day
+        .iter()
+        .zip(&built.retrievability_by_day)
+        .all(|(part, whole)| *part > 0.0 && part < whole));
+
+    // A checkpoint of this history resumes to the same result.
+    let dir = cache.0.join("memorised");
+    let full = memorised::read(&dir.join("history.bin")).unwrap();
+    let mid = today - 12;
+    let truncated = |complete: bool, identity: String| memorised::HistoryResult {
+        identity,
+        last_day: if complete { mid } else { full.last_day },
+        cards: full
+            .cards
+            .iter()
+            .filter(|card| card.start_day <= mid)
+            .map(|card| memorised::CardSeries {
+                values: card.values[..(mid - card.start_day + 1) as usize].to_vec(),
+                ..card.clone()
+            })
+            .collect(),
+        completed_through_day: Some(mid),
+        complete,
+        ..full.clone()
+    };
+    std::fs::remove_file(dir.join("history.bin")).unwrap();
+    memorised::write(
+        &dir.join("checkpoint.bin"),
+        &truncated(false, full.identity.clone()),
+    )
+    .unwrap();
+    let resumed = memorised::history(&fx.backend, request("")).unwrap();
+    assert_eq!(resumed, built);
+    assert!(!dir.join("checkpoint.bin").exists());
+    assert_eq!(memorised::read(&dir.join("history.bin")).unwrap(), full);
+
+    // So does a complete history of an earlier day with the same reviews:
+    // its days are reused.
+    let mut earlier: serde_json::Value = serde_json::from_str(&full.identity).unwrap();
+    earlier["dayOffset"] = mid.into();
+    memorised::write(
+        &dir.join("history.bin"),
+        &truncated(true, earlier.to_string()),
+    )
+    .unwrap();
+    let reused = memorised::history(&fx.backend, request("")).unwrap();
+    assert_eq!(reused, built);
+
+    // A checkpoint of another history is dropped.
+    let mut other = truncated(
+        false,
+        full.identity.replace("\"version\":3", "\"version\":2"),
+    );
+    other.cards.truncate(1);
+    std::fs::remove_file(dir.join("history.bin")).unwrap();
+    memorised::write(&dir.join("checkpoint.bin"), &other).unwrap();
+    let rebuilt = memorised::history(&fx.backend, request("")).unwrap();
+    assert_eq!(rebuilt, built);
+
+    // Cancelling saves what was computed; the next build resumes from it.
+    std::fs::remove_file(dir.join("history.bin")).unwrap();
+    memorised::TEST_DAY_DELAY_MS.store(20, std::sync::atomic::Ordering::SeqCst);
+    let canceller = std::thread::spawn(|| {
+        let started = std::time::Instant::now();
+        while started.elapsed().as_secs() < 60 {
+            let progress = memorised::progress();
+            if progress.phase == "computing"
+                && progress
+                    .completed_through_day
+                    .is_some_and(|day| day >= progress.first_day.unwrap() + 3)
+            {
+                memorised::cancel();
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    });
+    let cancelled = memorised::history(&fx.backend, request("")).unwrap();
+    canceller.join().unwrap();
+    memorised::TEST_DAY_DELAY_MS.store(0, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(cancelled.phase, "cancelled");
+    assert!(cancelled.done);
+    let completed = cancelled.completed_through_day.unwrap();
+    assert!(completed < today);
+    // The series so far is the finished history's prefix.
+    let days = (completed - today + 31) as usize;
+    assert_eq!(cancelled.card_count_by_day, built.card_count_by_day[..days]);
+    let saved = memorised::read(&dir.join("checkpoint.bin")).unwrap();
+    assert_eq!(saved.completed_through_day, Some(completed));
+    assert!(!saved.complete);
+    let after = memorised::history(&fx.backend, request("")).unwrap();
+    assert_eq!(after, built);
+    assert!(!dir.join("checkpoint.bin").exists());
+}

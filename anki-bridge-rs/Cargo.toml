@@ -21,6 +21,9 @@ serde_json = "1"
 blake2 = "0.10"
 data-encoding = "2"
 sha2 = "0.10"
+# The stats screen's FSRS Memorised replay, with the FSRS rslib schedules
+# with (keep the rev in step with anki-upstream's Cargo.toml).
+fsrs = { git = "https://github.com/open-spaced-repetition/fsrs-rs.git", rev = "0a5737406a0c5c7a5259b144738cbe4a0b649d76" }
 
 [profile.release]
 opt-level = "s"     # Optimize for size (iOS binary)

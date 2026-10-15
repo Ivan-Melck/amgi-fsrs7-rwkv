@@ -19,6 +19,7 @@ package struct StatsDashboardView: View {
     private let refreshID: UUID?
 
     @State private var model = StatsDashboardModel()
+    @State private var memorised = MemorisedModel()
     @State private var period: StatsPeriod = .month
     @State private var selectedDeck: DeckInfo?
 
@@ -36,7 +37,8 @@ package struct StatsDashboardView: View {
             onSelectPeriod: { period = $0 },
             onRetry: { Task { await reloadStats() } },
             streak: model.streak,
-            isRefreshing: model.isRefreshing
+            isRefreshing: model.isRefreshing,
+            memorised: memorised
         )
         .scrollContentBackground(.hidden)
         .background(palette.background)
@@ -81,6 +83,8 @@ private extension StatsDashboardView {
 
     func reloadStats() async {
         await model.loadStats(search: search, days: period.days)
+        // The add-on's whole history is a period of 0.
+        await memorised.update(search: search, days: period == .all ? 0 : period.days)
     }
 }
 

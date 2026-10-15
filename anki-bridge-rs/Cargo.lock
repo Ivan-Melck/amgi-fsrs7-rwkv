@@ -131,6 +131,7 @@ dependencies = [
  "anki_proto",
  "blake2",
  "data-encoding",
+ "fsrs",
  "prost",
  "serde",
  "serde_json",

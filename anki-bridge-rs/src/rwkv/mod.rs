@@ -17,7 +17,9 @@
 //! Methods are app-only aux RPCs (service 200, JSON in/out); see `dispatch`.
 
 mod cache;
+mod fsrs_memorised;
 pub mod inputs;
+mod memorised;
 mod views;
 mod workload;
 
@@ -69,9 +71,14 @@ pub const REBUILD_STATE: u32 = 114;
 pub const SIMULATE_WORKLOAD: u32 = 115;
 pub const CANCEL_WORKLOAD: u32 = 116;
 pub const WORKLOAD_PROGRESS: u32 = 117;
+pub const FSRS_MEMORISED: u32 = 124;
+pub const MEMORISED_HISTORY: u32 = 125;
+pub const MEMORISED_PROGRESS: u32 = 126;
+pub const CANCEL_MEMORISED: u32 = 127;
 
 pub fn handles(method: u32) -> bool {
     (PREPARE..=WORKLOAD_PROGRESS).contains(&method)
+        || (FSRS_MEMORISED..=CANCEL_MEMORISED).contains(&method)
 }
 
 /// `_RWKV_REVIEW_UNDO_LIMIT`.
@@ -98,6 +105,24 @@ pub fn dispatch(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>,
         }
         WORKLOAD_PROGRESS => {
             return call(input, |_: Empty| Ok(workload::progress()))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        // The stats screen's Memorised series don't use the engine.
+        FSRS_MEMORISED => {
+            return call(input, |req| fsrs_memorised::fsrs_memorised(backend, req))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        MEMORISED_HISTORY => {
+            return call(input, |req| memorised::history(backend, req))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        MEMORISED_PROGRESS => {
+            return call(input, |_: Empty| Ok(memorised::progress()))
+                .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
+        }
+        CANCEL_MEMORISED => {
+            memorised::cancel();
+            return call(input, |_: Empty| Ok(Empty {}))
                 .map_err(|err| crate::aux::error(crate::aux::ErrorKind::InvalidInput, err.0));
         }
         _ => {}
