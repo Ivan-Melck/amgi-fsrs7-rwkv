@@ -51,6 +51,10 @@ enum AuxMethod {
     static let rwkvSimulateWorkload: UInt32 = 115
     static let rwkvCancelWorkload: UInt32 = 116
     static let rwkvRedoAnswer: UInt32 = 118
+    static let rwkvRecomputeCalibration: UInt32 = 120
+    static let rwkvRebuildFsrsCalibration: UInt32 = 121
+    static let rwkvCalibrationData: UInt32 = 122
+    static let rwkvCalibrationProgress: UInt32 = 123
 }
 
 enum CollectionOpsMethod {

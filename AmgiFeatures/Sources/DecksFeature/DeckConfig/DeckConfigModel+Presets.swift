@@ -185,21 +185,36 @@ extension DeckConfigModel {
 
     var canRebuildRwkvState: Bool { rwkvClient.isAvailable() }
 
-    /// The RWKV options' "Build Cache", which saves the options first.
+    /// The RWKV options' "Build Cache" (`build_rwkv_state_cache_with_progress`
+    /// with `rebuild_retrievability_cache`): clears both historical
+    /// prediction caches and rebuilds FSRS's, rebuilds the state, then
+    /// recomputes the calibration data. Saves the options first.
     func rebuildRwkvState() async {
         if hasUnsavedChanges {
             guard !isFallbackContext, await saveConfig() else { return }
             await loadConfig()
         }
         isRebuildingRwkvState = true
-        defer { isRebuildingRwkvState = false }
+        let polling = pollRwkvCalibrationProgress()
+        defer {
+            polling.cancel()
+            rwkvCalibrationProgress = nil
+            isRebuildingRwkvState = false
+        }
         do {
+            _ = try await rwkvClient.rebuildFsrsCalibration()
             let result = try await rwkvClient.rebuildState()
+            var ready = false
+            if result.ready {
+                ready = try await rwkvClient.recomputeCalibration().recomputed
+            }
             destination = .alert(.notice(
                 title: "RWKV state rebuilt",
-                message: result.ready
-                    ? "The RWKV state was rebuilt from your review history and saved."
-                    : "No preset uses RWKV, so there was nothing to rebuild."
+                message: ready
+                    ? "RWKV state and historical prediction caches ready."
+                    : result.ready
+                        ? "Cache rebuild failed. Run Build Cache again to retry."
+                        : "No preset uses RWKV, so there was nothing to rebuild."
             ))
         } catch {
             destination = .alert(.fsrsError(

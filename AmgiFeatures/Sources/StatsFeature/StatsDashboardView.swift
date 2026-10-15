@@ -36,7 +36,10 @@ package struct StatsDashboardView: View {
             onSelectPeriod: { period = $0 },
             onRetry: { Task { await reloadStats() } },
             streak: model.streak,
-            isRefreshing: model.isRefreshing
+            isRefreshing: model.isRefreshing,
+            calibration: model.calibration,
+            onShowCalibration: { Task { await model.showCalibration(search: search, days: period.days) } },
+            onCancelCalibration: { model.cancelCalibration() }
         )
         .scrollContentBackground(.hidden)
         .background(palette.background)
@@ -81,6 +84,7 @@ private extension StatsDashboardView {
 
     func reloadStats() async {
         await model.loadStats(search: search, days: period.days)
+        await model.loadCalibration(search: search, days: period.days)
     }
 }
 

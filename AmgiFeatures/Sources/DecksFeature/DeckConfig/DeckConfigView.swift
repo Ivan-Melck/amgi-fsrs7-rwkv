@@ -140,7 +140,11 @@ struct DeckConfigView: View {
                 enforceGradeOrder: $model.rwkvEnforceGradeOrder,
                 canRebuildState: model.canRebuildRwkvState,
                 isRebuildingState: model.isRebuildingRwkvState,
+                isRecomputingCalibration: model.isRecomputingRwkvCalibration,
+                calibrationProgress: model.rwkvCalibrationProgress,
                 onRebuildState: { Task { await model.rebuildRwkvState() } },
+                onRecomputeCalibration: { Task { await model.recomputeRwkvCalibration() } },
+                onCancelCalibration: { model.cancelRwkvCalibration() },
                 onCompareWithFsrs: { model.openSimulator(mode: .workload, compareWithRwkv: true) }
             )
         }

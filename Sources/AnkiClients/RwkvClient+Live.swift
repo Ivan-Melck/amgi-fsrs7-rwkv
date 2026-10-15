@@ -61,6 +61,32 @@ extension RwkvClient: DependencyKey {
             },
             cancelWorkload: {
                 _ = try? await backendOffload { try backend.invoke(Request<Void>.rwkvCancelWorkload) }
+            },
+            recomputeCalibration: {
+                guard let modelPath = RwkvEnvironment.modelPath else {
+                    throw RwkvUnavailableError()
+                }
+                return try await backendOffload {
+                    try backend.invoke(.rwkvRecomputeCalibration(
+                        modelPath: modelPath,
+                        cacheDir: RwkvEnvironment.cacheDir(backend),
+                        precision: RwkvEnvironment.precision
+                    ))
+                }
+            },
+            rebuildFsrsCalibration: {
+                try await backendOffload {
+                    try backend.invoke(.rwkvRebuildFsrsCalibration(
+                        clear: true,
+                        cacheDir: RwkvEnvironment.cacheDir(backend)
+                    ))
+                }
+            },
+            calibrationProgress: {
+                try? await backendOffload { try backend.invoke(.rwkvCalibrationProgress(cancel: false)) }
+            },
+            cancelCalibration: {
+                _ = try? await backendOffload { try backend.invoke(.rwkvCalibrationProgress(cancel: true)) }
             }
         )
     }()

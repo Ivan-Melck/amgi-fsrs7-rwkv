@@ -114,6 +114,9 @@ final class DeckConfigModel {
     // (Presentation state itself lives in `destination`.)
     var isPresetMutating = false
     var isRebuildingRwkvState = false
+    var isRecomputingRwkvCalibration = false
+    /// The running calibration step's progress, while polled.
+    var rwkvCalibrationProgress: RwkvCalibrationProgress?
     var isCheckingFsrsHealth = false
     var isCheckingSameDayDecision = false
     var newPresetName = ""

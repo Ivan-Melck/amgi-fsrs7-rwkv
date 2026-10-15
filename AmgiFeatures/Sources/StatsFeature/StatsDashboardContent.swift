@@ -28,6 +28,9 @@ struct StatsDashboardContent: View {
     let onRetry: () -> Void
     let streak: StreakSummary?
     let isRefreshing: Bool
+    var calibration: CalibrationLoadState = .notRequested
+    var onShowCalibration: () -> Void = {}
+    var onCancelCalibration: () -> Void = {}
 
     var body: some View {
         ScrollView {
@@ -134,6 +137,21 @@ struct StatsDashboardContent: View {
     @ViewBuilder
     private func charts(_ graphs: GraphsSnapshot) -> some View {
         StatsChartStack(graphs: graphs, period: period)
+        // The desktop add-on's FSRS category: calibration, then UM+.
+        CalibrationChart(
+            state: calibration,
+            isTruncated: period != .all,
+            onShow: onShowCalibration,
+            onIncreaseDateRange: { onSelectPeriod(.all) },
+            onCancel: onCancelCalibration
+        )
+        UmPlusChart(
+            state: calibration,
+            isTruncated: period != .all,
+            onShow: onShowCalibration,
+            onIncreaseDateRange: { onSelectPeriod(.all) },
+            onCancel: onCancelCalibration
+        )
     }
 }
 

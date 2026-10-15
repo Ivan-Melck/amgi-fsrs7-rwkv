@@ -25,6 +25,19 @@ extension StatsClient: DependencyKey {
                     }
                     return try backend.invoke(.graphs(search: search, days: days))
                 }
+            },
+            fetchCalibration: { search, days, ensure in
+                try await backendOffload {
+                    // Without the model, RWKV rows are only read.
+                    try backend.invoke(.rwkvCalibrationData(
+                        search: search,
+                        days: days,
+                        modelPath: RwkvEnvironment.modelPath,
+                        cacheDir: RwkvEnvironment.cacheDir(backend),
+                        precision: RwkvEnvironment.precision,
+                        ensure: ensure
+                    ))
+                }
             }
         )
     }()
