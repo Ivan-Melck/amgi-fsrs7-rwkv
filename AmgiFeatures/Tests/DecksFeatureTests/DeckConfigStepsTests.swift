@@ -6,6 +6,7 @@
 //  save never changes a step it didn't edit.
 //
 
+import AnkiKit
 import XCTest
 @testable import DecksFeature
 
@@ -36,5 +37,14 @@ final class DeckConfigStepsTests: XCTestCase {
             let text = DeckConfigModel.stepString(minutes)
             XCTAssertEqual(DeckConfigModel.stepMinutes(text), minutes, text)
         }
+    }
+
+    func testIgnoreRevlogsBeforeIsUtcMidnightLikeTheDesktop() {
+        XCTAssertNil(DeckConfigModel.ignoreRevlogsBefore(""))
+        XCTAssertEqual(DeckConfigModel.ignoreRevlogsBefore("1970-01-01")?.ankiMillis, 0)
+        XCTAssertEqual(
+            DeckConfigModel.ignoreRevlogsBefore("2024-03-01")?.ankiMillis,
+            1_709_251_200_000
+        )
     }
 }

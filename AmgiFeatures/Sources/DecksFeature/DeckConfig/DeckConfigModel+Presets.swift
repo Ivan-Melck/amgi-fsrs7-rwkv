@@ -83,7 +83,7 @@ extension DeckConfigModel {
     }
 
     func optimizeCurrentPreset() async {
-        guard loaded != nil else { return }
+        guard let loaded else { return }
         let generation = optimizeGeneration
         isOptimizingFsrs = true
         defer { if generation == optimizeGeneration { isOptimizingFsrs = false } }
@@ -96,6 +96,9 @@ extension DeckConfigModel {
             let request = FsrsOptimizeRequest(
                 search: effectiveParamSearch(),
                 currentWeights: FsrsWeights(activeFsrsParams()),
+                ignoreRevlogsBefore: Self.ignoreRevlogsBefore(
+                    editedConfig(from: loaded.config).config.ignoreRevlogsBeforeDate
+                ),
                 relearningStepsPerDay: Int(relearningStepsInDay(parseSteps(relearningStepsText))),
                 runHealthCheck: fsrsHealthCheck,
                 fsrsVersion: version,
@@ -135,12 +138,15 @@ extension DeckConfigModel {
     }
 
     func optimizeAllPresets() async {
-        guard let loaded else { return }
+        guard let loaded, !isFallbackContext else { return }
+        // The desktop's "Optimize all presets" is a save mode, so the
+        // edits are kept: save them, then optimize from what was saved.
+        guard await saveConfig() else { return }
         isOptimizingFsrs = true
         defer { isOptimizingFsrs = false }
 
         do {
-            try await deckClient.optimizeFsrsPresets(deckId, loaded.config)
+            try await deckClient.optimizeFsrsPresets(deckId, editedConfig(from: loaded.config))
             await loadConfig()
         } catch {
             destination = .alert(.fsrsError(
@@ -150,10 +156,23 @@ extension DeckConfigModel {
         }
     }
 
+    /// As the desktop's `getIgnoreRevlogsBeforeMs`: `new Date(date)` reads
+    /// a `YYYY-MM-DD` date as UTC midnight; empty means no cutoff.
+    nonisolated static func ignoreRevlogsBefore(_ date: String) -> Date? {
+        guard !date.isEmpty else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: date)
+    }
+
     // MARK: - FSRS simulator entry
 
     func openSimulator(mode: FsrsSimulatorMode) {
-        guard loaded != nil else { return }
+        guard let loaded else { return }
+        // The preset as edited, like the desktop's simulator.
+        let edited = editedConfig(from: loaded.config).config
         let weights = activeFsrsParams()
         guard !weights.isEmpty else {
             destination = .alert(.fsrsError(
@@ -169,13 +188,18 @@ extension DeckConfigModel {
             historicalRetentionPercent: historicalRetentionPercent,
             newCardsPerDay: Int(max(0, newCardsPerDay)),
             reviewsPerDay: mode == .workload ? 9999 : Int(max(0, reviewsPerDay)),
-            maxIntervalDays: 36500,
+            maxIntervalDays: max(1, edited.maximumReviewInterval),
             search: effectiveParamSearch(),
             ignoreNewLimit: newCardsIgnoreReviewLimit,
             suspendLeeches: leechAction == .suspend,
             leechThreshold: Int(max(1, leechThreshold)),
             learningStepCount: parseSteps(learningStepsText).count,
-            relearningStepCount: parseSteps(relearningStepsText).count
+            relearningStepCount: parseSteps(relearningStepsText).count,
+            easyDaysPercentages: edited.easyDaysPercentages,
+            reviewOrder: edited.reviewOrder,
+            reviewFuzz: editedSchedulingSettings,
+            dynamicDesiredRetention: edited.fsrsDynamicDesiredRetention,
+            dynamicDesiredRetentionClamp: edited.fsrsDynamicDesiredRetentionClamp
         )
         destination = .route(.simulator(context))
     }

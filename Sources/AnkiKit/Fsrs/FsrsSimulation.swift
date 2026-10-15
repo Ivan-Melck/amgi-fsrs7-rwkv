@@ -29,6 +29,15 @@ public struct FsrsSimulationRequest: Sendable, Hashable {
     /// Suspend after this many lapses. `nil` disables suspend-on-leech.
     public let suspendAfterLapseCount: Int?
 
+    // Fork fields the desktop's `buildSimulateFsrsRequest` also sends.
+    public var easyDaysPercentages: [Float] = []
+    public var reviewOrder: ReviewCardOrder?
+    /// Collection review fuzz; nil leaves the simulator's defaults.
+    public var reviewFuzz: CollectionSchedulingSettings?
+    /// The preset's Dynamic DR model (its arrays are empty when unfitted).
+    public var dynamicDesiredRetention: FsrsDynamicDesiredRetention?
+    public var dynamicDesiredRetentionClamp = false
+
     public init(
         weights: FsrsWeights,
         desiredRetention: Float,

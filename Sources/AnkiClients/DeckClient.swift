@@ -36,7 +36,8 @@ public struct DeckClient: Sendable {
         _ applyAllParentLimits: Bool,
         _ fsrsHealthCheck: Bool,
         _ schedulingSettings: CollectionSchedulingSettings?,
-        _ limits: DeckConfigsForUpdate.CurrentDeck.Limits?
+        _ limits: DeckConfigsForUpdate.CurrentDeck.Limits?,
+        _ fsrsReschedule: Bool
     ) async throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) async throws -> FsrsOptimizeResult
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) async throws -> FsrsReviewSimulation

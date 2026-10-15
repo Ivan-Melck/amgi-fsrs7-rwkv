@@ -178,6 +178,7 @@ struct DeckConfigView: View {
             answerAction: $model.answerAction
         )
         AdvancedSection(
+            fsrsEnabled: model.fsrsEnabled,
             maximumReviewIntervalDays: $model.maximumReviewIntervalDays,
             intervalMultiplierPercent: $model.intervalMultiplierPercent,
             hardMultiplierPercent: $model.hardMultiplierPercent,
@@ -194,6 +195,7 @@ struct DeckConfigView: View {
             deckDesiredRetentionPercent: $model.deckDesiredRetentionPercent,
             historicalRetentionPercent: $model.historicalRetentionPercent,
             fsrsHealthCheck: $model.fsrsHealthCheck,
+            fsrsReschedule: $model.fsrsReschedule,
             fsrsMinimumIntervalSecs: $model.fsrsMinimumIntervalSecs,
             fsrsWeightsText: $model.fsrsWeightsText,
             fsrsParamSearch: $model.fsrsParamSearch,

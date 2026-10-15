@@ -32,6 +32,12 @@ struct FsrsSimulatorContext: Identifiable, Hashable {
     var leechThreshold: Int
     var learningStepCount: Int
     var relearningStepCount: Int
+    // Sent as the fork's desktop simulator sends them.
+    var easyDaysPercentages: [Float] = []
+    var reviewOrder: ReviewCardOrder = .day
+    var reviewFuzz: CollectionSchedulingSettings?
+    var dynamicDesiredRetention: FsrsDynamicDesiredRetention?
+    var dynamicDesiredRetentionClamp = false
 }
 
 // MARK: - Container

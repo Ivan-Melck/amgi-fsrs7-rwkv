@@ -294,6 +294,7 @@ struct AutoAdvanceSection: View {
 }
 
 struct AdvancedSection: View {
+    let fsrsEnabled: Bool
     @Binding var maximumReviewIntervalDays: Int32
     @Binding var intervalMultiplierPercent: Double
     @Binding var hardMultiplierPercent: Double
@@ -302,29 +303,32 @@ struct AdvancedSection: View {
     @Binding var waitForAudio: Bool
 
     var body: some View {
-        Section("Advanced (SM-2)") {
+        // As on the desktop, the SM-2 multipliers are hidden under FSRS.
+        Section(fsrsEnabled ? "Advanced" : "Advanced (SM-2)") {
             Stepper("Maximum review interval: \(maximumReviewIntervalDays)d", value: $maximumReviewIntervalDays, in: 1...36500, step: 30)
-            LabeledSlider(
-                label: "Interval multiplier",
-                value: $intervalMultiplierPercent,
-                in: 50...200,
-                step: 1,
-                valueText: "\(Int(intervalMultiplierPercent))%"
-            )
-            LabeledSlider(
-                label: "Hard multiplier",
-                value: $hardMultiplierPercent,
-                in: 50...130,
-                step: 1,
-                valueText: "\(Int(hardMultiplierPercent))%"
-            )
-            LabeledSlider(
-                label: "Easy multiplier",
-                value: $easyMultiplierPercent,
-                in: 100...500,
-                step: 1,
-                valueText: "\(Int(easyMultiplierPercent))%"
-            )
+            if !fsrsEnabled {
+                LabeledSlider(
+                    label: "Interval multiplier",
+                    value: $intervalMultiplierPercent,
+                    in: 50...200,
+                    step: 1,
+                    valueText: "\(Int(intervalMultiplierPercent))%"
+                )
+                LabeledSlider(
+                    label: "Hard multiplier",
+                    value: $hardMultiplierPercent,
+                    in: 50...130,
+                    step: 1,
+                    valueText: "\(Int(hardMultiplierPercent))%"
+                )
+                LabeledSlider(
+                    label: "Easy multiplier",
+                    value: $easyMultiplierPercent,
+                    in: 100...500,
+                    step: 1,
+                    valueText: "\(Int(easyMultiplierPercent))%"
+                )
+            }
             Toggle("Disable autoplay audio", isOn: $disableAutoplay)
             Toggle("Wait for audio before answering", isOn: $waitForAudio)
         }
@@ -435,6 +439,7 @@ struct FsrsSection: View {
     @Binding var deckDesiredRetentionPercent: Double?
     @Binding var historicalRetentionPercent: Double
     @Binding var fsrsHealthCheck: Bool
+    @Binding var fsrsReschedule: Bool
     @Binding var fsrsMinimumIntervalSecs: Int
     @Binding var fsrsWeightsText: String
     @Binding var fsrsParamSearch: String
@@ -485,6 +490,12 @@ struct FsrsSection: View {
                 step: 1,
                 valueText: "\(Int(historicalRetentionPercent))%"
             )
+            Toggle("Reschedule cards on change", isOn: $fsrsReschedule)
+            if fsrsReschedule {
+                Text("Depending on your desired retention, this can result in a large number of cards becoming due, so is not recommended when first switching from SM-2. Use this option sparingly, as it will add a review entry to each of your cards, and increase the size of your collection.")
+                    .amgiFont(.caption)
+                    .foregroundStyle(palette.warning)
+            }
             Toggle("Run FSRS health check on save", isOn: $fsrsHealthCheck)
 
             if fsrsEnabled {

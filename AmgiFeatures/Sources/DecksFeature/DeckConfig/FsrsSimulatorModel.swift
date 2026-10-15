@@ -36,7 +36,7 @@ final class FsrsSimulatorModel {
         defer { if generation == self.generation { isRunning = false } }
         errorMessage = nil
 
-        let request = FsrsSimulationRequest(
+        var request = FsrsSimulationRequest(
             weights: FsrsWeights(context.weights),
             desiredRetention: Float(context.desiredRetentionPercent / 100),
             additionalCards: max(0, additionalCards),
@@ -51,6 +51,11 @@ final class FsrsSimulatorModel {
             relearningStepCount: context.relearningStepCount,
             suspendAfterLapseCount: context.suspendLeeches ? max(1, context.leechThreshold) : nil
         )
+        request.easyDaysPercentages = context.easyDaysPercentages
+        request.reviewOrder = context.reviewOrder
+        request.reviewFuzz = context.reviewFuzz
+        request.dynamicDesiredRetention = context.dynamicDesiredRetention
+        request.dynamicDesiredRetentionClamp = context.dynamicDesiredRetentionClamp
 
         do {
             switch context.mode {

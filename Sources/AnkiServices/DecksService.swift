@@ -41,7 +41,8 @@ public struct DecksService: Sendable {
         _ applyAllParentLimits: Bool,
         _ fsrsHealthCheck: Bool,
         _ schedulingSettings: CollectionSchedulingSettings?,
-        _ limits: DeckConfigsForUpdate.CurrentDeck.Limits?
+        _ limits: DeckConfigsForUpdate.CurrentDeck.Limits?,
+        _ fsrsReschedule: Bool
     ) throws -> Void
     public var computeFsrsParams: @Sendable (_ request: FsrsOptimizeRequest) throws -> FsrsOptimizeResult
     public var simulateFsrsReview: @Sendable (_ request: FsrsSimulationRequest) throws -> FsrsReviewSimulation
@@ -140,7 +141,7 @@ extension DecksService: DependencyKey {
                     message: "Deck \(deckId.rawValue) has no valid config id and no defaults available"
                 )
             },
-            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, newCardsIgnoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings, limits in
+            updateDeckConfig: { deckId, config, applyToChildren, fsrsEnabled, newCardsIgnoreReviewLimit, applyAllParentLimits, fsrsHealthCheck, schedulingSettings, limits, fsrsReschedule in
                 let context = try backend.invoke(.deckConfigsForUpdate(deckId: deckId))
                 let request = UpdateDeckConfigsRequest(
                     targetDeckID: deckId,
@@ -151,6 +152,7 @@ extension DecksService: DependencyKey {
                     newCardsIgnoreReviewLimit: newCardsIgnoreReviewLimit,
                     fsrs: fsrsEnabled,
                     applyAllParentLimits: applyAllParentLimits,
+                    fsrsReschedule: fsrsReschedule,
                     fsrsHealthCheck: fsrsHealthCheck,
                     schedulingSettings: schedulingSettings ?? context.schedulingSettings
                 )

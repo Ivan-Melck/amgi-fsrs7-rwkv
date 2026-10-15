@@ -63,6 +63,9 @@ final class DeckConfigModel {
     var isFallbackContext = false
     var historicalRetentionPercent: Double = 90
     var fsrsHealthCheck = false
+    /// The desktop's "Reschedule cards on change": collection-wide and,
+    /// as there, not saved — it only applies to this save.
+    var fsrsReschedule = false
     var fsrsWeightsText: String = ""
     var fsrsParamSearch: String = ""
     var fsrsEvaluationSearch: String = ""
@@ -441,7 +444,8 @@ final class DeckConfigModel {
                 applyAllParentLimits,
                 fsrsHealthCheck,
                 editedSchedulingSettings,
-                editedLimits
+                editedLimits,
+                fsrsReschedule
             )
             return true
         } catch {

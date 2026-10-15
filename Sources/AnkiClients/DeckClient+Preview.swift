@@ -28,7 +28,7 @@ extension DeckClient {
         getDeckConfig: { _ in
             throw PreviewClientError.notImplementedInPreview("getDeckConfig")
         },
-        updateDeckConfig: { _, _, _, _, _, _, _, _, _ in },
+        updateDeckConfig: { _, _, _, _, _, _, _, _, _, _ in },
         computeFsrsParams: { _ in
             throw PreviewClientError.notImplementedInPreview("computeFsrsParams")
         },

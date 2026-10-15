@@ -336,5 +336,31 @@ private func makeSimulationProto(_ input: FsrsSimulationRequest) -> Anki_Schedul
     if let suspend = input.suspendAfterLapseCount {
         proto.suspendAfterLapseCount = UInt32(max(1, suspend))
     }
+    // As the fork's desktop `buildSimulateFsrsRequest`.
+    proto.easyDaysPercentages = input.easyDaysPercentages
+    if let reviewOrder = input.reviewOrder {
+        proto.reviewOrder = .init(reviewOrder)
+    }
+    if let fuzz = input.reviewFuzz {
+        proto.reviewFuzzBase = fuzz.reviewFuzzEnabled ? fuzz.reviewFuzzBase : 0
+        proto.reviewFuzzFactorShort = fuzz.reviewFuzzEnabled ? fuzz.reviewFuzzFactorShort : 0
+        proto.reviewFuzzFactorMid = fuzz.reviewFuzzEnabled ? fuzz.reviewFuzzFactorMid : 0
+        proto.reviewFuzzFactorLong = fuzz.reviewFuzzEnabled ? fuzz.reviewFuzzFactorLong : 0
+    }
+    // HELP_ME_DECIDE_*_DEFAULT (help-me-decide-defaults.ts).
+    proto.helpMeDecideTransitionBlendAlpha = 0
+    proto.helpMeDecideEnforceMonotonicSuccessGradeProbs = false
+    if let model = input.dynamicDesiredRetention {
+        proto.fsrsDynamicDesiredRetentionParams = model.params
+        proto.fsrsDynamicDesiredRetentionWeights = model.weights
+        proto.fsrsDynamicDesiredRetentionAvgDrs = model.avgDrs
+        proto.fsrsDynamicDesiredRetentionFsrsEqWeights = model.fsrsEqWeights
+        proto.fsrsDynamicDesiredRetentionFsrsEqDrs = model.fsrsEqDrs
+        proto.fsrsDynamicDesiredRetentionFixedTargetWeights = model.fixedTargetWeights
+        proto.fsrsDynamicDesiredRetentionFixedTargetDrs = model.fixedTargetDrs
+        proto.fsrsDynamicDesiredRetentionMin = model.minimum
+        proto.fsrsDynamicDesiredRetentionMax = model.maximum
+    }
+    proto.fsrsDynamicDesiredRetentionClamp = input.dynamicDesiredRetentionClamp
     return proto
 }
