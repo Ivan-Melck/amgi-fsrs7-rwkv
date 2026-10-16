@@ -36,8 +36,15 @@
 >   after a submodule bump; CI runs it automatically.
 > - Deck option saves keep fork-only preset fields and collection-wide
 >   settings (load balancer, learning-queue and fuzz options) intact.
-> - Unsigned IPAs are built by the "Build Unsigned IPA" workflow on every push
->   to `main`; download one from the run's artifacts and sideload it.
+> - Stats match the desktop's Search Stats Extended add-on: FSRS and RWKV
+>   Memorised, calibration and UM+ are computed the same way.
+> - The port is checked against the desktop and the add-on. The places where
+>   it deliberately differs, and why, are in
+>   [Documentation/RWKV_DESKTOP_DIFFERENCES.md](Documentation/RWKV_DESKTOP_DIFFERENCES.md).
+> - **Download:** each [release](https://github.com/Ivan-Melck/amgi-fsrs7-rwkv/releases)
+>   has an unsigned IPA (`AmgiApp-unsigned.ipa`) to sideload with AltStore or
+>   Sideloadly. The "Build Unsigned IPA" workflow builds one when a version
+>   tag such as `1.0` is pushed. Pushes to `main` don't build.
 
 <p align="center">
   <img src="https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white" alt="Swift 6.2">
