@@ -36,6 +36,91 @@ pub fn round_to(num: f64, decimals: i32) -> f64 {
     js_round(num * factor) / factor
 }
 
+/// `Math.exp`: V8's `base::ieee754::exp` (fdlibm's `e_exp.c`), which is not
+/// always the platform libm's nearest double. The add-on sums some
+/// unrounded `Math.exp` results, where an ulp shows.
+pub fn js_exp(x: f64) -> f64 {
+    // fdlibm's constants, by their bit patterns.
+    const HALF: [f64; 2] = [0.5, -0.5];
+    const O_THRESHOLD: f64 = f64::from_bits(0x4086_2E42_FEFA_39EF);
+    const U_THRESHOLD: f64 = f64::from_bits(0xC087_4910_D52D_3051);
+    const LN2_HI: f64 = f64::from_bits(0x3FE6_2E42_FEE0_0000);
+    const LN2_LO: f64 = f64::from_bits(0x3DEA_39EF_3579_3C76);
+    const INV_LN2: f64 = f64::from_bits(0x3FF7_1547_652B_82FE);
+    const P1: f64 = f64::from_bits(0x3FC5_5555_5555_553E);
+    const P2: f64 = f64::from_bits(0xBF66_C16C_16BE_BD93);
+    const P3: f64 = f64::from_bits(0x3F11_566A_AF25_DE2C);
+    const P4: f64 = f64::from_bits(0xBEBB_BD41_C5D2_6BF1);
+    const P5: f64 = f64::from_bits(0x3E66_3769_72BE_A4D0);
+    const E: f64 = std::f64::consts::E;
+    const HUGE: f64 = 1.0e+300;
+    const TWO_M1000: f64 = f64::from_bits(0x0170_0000_0000_0000);
+    const TWO_1023: f64 = f64::from_bits(0x7FE0_0000_0000_0000);
+
+    let high = (x.to_bits() >> 32) as u32;
+    let sign = (high >> 31) as usize;
+    let high = high & 0x7fff_ffff;
+    let mut x = x;
+    let (mut hi, mut lo, mut k) = (0.0, 0.0, 0i32);
+    // Non-finite and out-of-range arguments.
+    if high >= 0x4086_2E42 {
+        if high >= 0x7ff0_0000 {
+            if x.is_nan() {
+                return x + x;
+            }
+            return if sign == 0 { x } else { 0.0 };
+        }
+        if x > O_THRESHOLD {
+            return HUGE * HUGE;
+        }
+        if x < U_THRESHOLD {
+            return TWO_M1000 * TWO_M1000;
+        }
+    }
+    // Argument reduction.
+    if high > 0x3fd6_2e42 {
+        if high < 0x3FF0_A2B2 {
+            if x == 1.0 {
+                return E;
+            }
+            hi = x - [LN2_HI, -LN2_HI][sign];
+            lo = [LN2_LO, -LN2_LO][sign];
+            k = 1 - sign as i32 - sign as i32;
+        } else {
+            k = (INV_LN2 * x + HALF[sign]) as i32;
+            let t = f64::from(k);
+            hi = x - t * LN2_HI;
+            lo = t * LN2_LO;
+        }
+        x = hi - lo;
+    } else if high < 0x3e30_0000 {
+        if HUGE + x > 1.0 {
+            return 1.0 + x;
+        }
+    } else {
+        k = 0;
+    }
+    let t = x * x;
+    let two_pk = if k >= -1021 {
+        f64::from_bits(u64::from((0x3ff0_0000 + (k << 20)) as u32) << 32)
+    } else {
+        f64::from_bits(u64::from((0x3ff0_0000 + ((k + 1000) << 20)) as u32) << 32)
+    };
+    let c = x - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));
+    if k == 0 {
+        return 1.0 - ((x * c) / (c - 2.0) - x);
+    }
+    let y = 1.0 - ((lo - (x * c) / (2.0 - c)) - hi);
+    if k >= -1021 {
+        if k == 1024 {
+            return y * 2.0 * TWO_1023;
+        }
+        y * two_pk
+    } else {
+        y * two_pk * TWO_M1000
+    }
+}
+
 /// `Math.max` / `Math.min`, which propagate NaN.
 fn js_max(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
@@ -58,9 +143,45 @@ fn clamp(value: f64, min: f64, max: f64) -> f64 {
     js_min(js_max(value, min), max)
 }
 
-/// `(+value.toFixed(8))` for the migration's values.
+/// `(+value.toFixed(8))` for the migration's values. `toFixed` picks the
+/// integer `n` nearest to `value * 1e8` on the exact binary value, the larger
+/// `n` (in magnitude) on a tie; `format!("{:.8}")` would round that tie to
+/// even.
 fn to_fixed_8(value: f64) -> f64 {
-    format!("{value:.8}").parse().unwrap_or(value)
+    // `toFixed` falls back to `ToString` from 1e21.
+    if !value.is_finite() || value.abs() >= 1e21 {
+        return value;
+    }
+    let bits = value.abs().to_bits();
+    let biased = (bits >> 52) as i32;
+    let fraction = bits & ((1 << 52) - 1);
+    // |value| = mantissa * 2^exponent, exactly.
+    let (mantissa, exponent) = if biased == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | 1 << 52, biased - 1075)
+    };
+    // Below 1e21, `scaled` < 2^80 and a left shift is at most 17.
+    let scaled = u128::from(mantissa) * 100_000_000;
+    let n = if exponent >= 0 {
+        scaled << exponent
+    } else {
+        let shift = exponent.unsigned_abs();
+        if shift >= 128 {
+            0
+        } else {
+            let floor = scaled >> shift;
+            let rest = scaled - (floor << shift);
+            if rest >= 1 << (shift - 1) {
+                floor + 1
+            } else {
+                floor
+            }
+        }
+    };
+    let sign = if value < 0.0 { "-" } else { "" };
+    // The unary `+`: the nearest double to n * 10^-8.
+    format!("{sign}{n}e-8").parse().unwrap_or(value)
 }
 
 /// `CLAMP_PARAMETERS(w17_w18_ceiling, enable_short_term = true)`.
@@ -708,6 +829,67 @@ mod test {
         assert_eq!(TsFsrs::new(&W7).unwrap().weights().len(), 34);
         assert!(TsFsrs::new(&W5[..18]).is_err());
         assert!(TsFsrs::new(&[f32::INFINITY; 21]).is_err());
+    }
+
+    /// `toFixed(8)` rounds an exact binary tie up where `{:.8}` rounds it to
+    /// even: w[6] = 1.001953125 migrates to 1.501953125, ts-fsrs' 1.50195313.
+    #[test]
+    fn fsrs45_migration_rounds_ties_like_to_fixed() {
+        let mut w = W5;
+        w[6] = 1.0 + 1.0 / 512.0;
+        let fsrs = TsFsrs::new(&w[..17]).unwrap();
+        assert_eq!(fsrs.weights()[6], 1.50195313);
+        // ts-fsrs' `next_state` after (0, 3), (3, 1) with these weights; the
+        // tie rounded to even (1.50195312) gives a difficulty of 8.24142732.
+        let state = fsrs.next_state(None, 0.0, 3).unwrap();
+        let state = fsrs.next_state(Some(state), 3.0, 1).unwrap();
+        assert_eq!(
+            state,
+            State {
+                stability: 1.017571,
+                difficulty: 8.24142733
+            }
+        );
+    }
+
+    #[test]
+    fn to_fixed_8_follows_javascript() {
+        // Expected: node's `+x.toFixed(8)`.
+        for (x, expected) in [
+            (1.501953125, 1.50195313),
+            (-1.501953125, -1.50195313),
+            (0.001953125, 0.00195313),
+            (1.0009765625, 1.00097656),
+            (7.1949, 7.1949),
+            (0.123456785, 0.12345678),
+            (2.0, 2.0),
+            (5e-324, 0.0),
+            (1e21, 1e21),
+        ] {
+            assert_eq!(to_fixed_8(x).to_bits(), f64::to_bits(expected), "{x}");
+        }
+        assert_eq!(to_fixed_8(-1e-10).to_bits(), (-0.0f64).to_bits());
+        assert!(to_fixed_8(f64::NAN).is_nan());
+    }
+
+    #[test]
+    fn exp_follows_v8() {
+        // Expected: node's `Math.exp`; the first four are an ulp off the
+        // correctly rounded result.
+        for (x, expected) in [
+            (-0.20831489086058508, 0.8119513204026529),
+            (-1.6770674730066657, 0.18692132492043112),
+            (-0.8788072869891621, 0.4152779238020333),
+            (-0.07720867624744941, 0.9256966625441874),
+            (1.0, std::f64::consts::E),
+            (0.0, 1.0),
+            (-800.0, 0.0),
+            (f64::NEG_INFINITY, 0.0),
+            (f64::INFINITY, f64::INFINITY),
+        ] {
+            assert_eq!(js_exp(x).to_bits(), f64::to_bits(expected), "{x}");
+        }
+        assert!(js_exp(f64::NAN).is_nan());
     }
 
     #[test]

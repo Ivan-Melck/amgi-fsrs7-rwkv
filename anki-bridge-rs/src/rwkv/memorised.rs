@@ -104,12 +104,16 @@ pub struct HistoryResult {
 struct Job {
     cancel: AtomicBool,
     display: HashSet<i64>,
-    request_identity: String,
     state: Mutex<JobState>,
+    /// Slows each day of this job down, like `TEST_DAY_DELAY_MS`.
+    #[cfg(test)]
+    day_delay: Duration,
 }
 
 #[derive(Default)]
 struct JobState {
+    /// The identity the job was started for; a restart renews it.
+    request_identity: String,
     phase: &'static str,
     current: u64,
     total: u64,
@@ -122,7 +126,8 @@ struct JobState {
     checkpoint: Option<HistoryResult>,
     done: bool,
     error: Option<String>,
-    /// What the finished `history` call returned, for callers that joined it.
+    /// What the finished build returned, set with `done`, for its caller
+    /// and the callers that joined it.
     outcome: Option<Progress>,
 }
 
@@ -188,7 +193,8 @@ struct Context {
     model_path: PathBuf,
     precision: StatePrecision,
     precision_name: String,
-    model_key: String,
+    /// `_rwkv_model_cache_key`: `None` while the model is unavailable.
+    model_key: Option<String>,
     collection: String,
     dir: Option<PathBuf>,
 }
@@ -201,7 +207,7 @@ pub(super) fn history(backend: &Backend, req: HistoryRequest) -> Result<Progress
         .into_iter()
         .filter(|id| *id > 0)
         .collect();
-    let context = context(backend, &req)?;
+    let mut context = context(backend, &req)?;
     let request_identity = request_identity(backend, &context)?;
     let dir = context.dir.clone();
 
@@ -217,7 +223,8 @@ pub(super) fn history(backend: &Backend, req: HistoryRequest) -> Result<Progress
         let mut slot = lock_job();
         match slot.clone() {
             Some(active) if !active.state().done => {
-                if active.display == display && active.request_identity == request_identity {
+                if active.display == display && active.state().request_identity == request_identity
+                {
                     drop(slot);
                     return Ok(join(&active));
                 }
@@ -231,11 +238,13 @@ pub(super) fn history(backend: &Backend, req: HistoryRequest) -> Result<Progress
                 let job = Arc::new(Job {
                     cancel: AtomicBool::new(false),
                     display: display.clone(),
-                    request_identity: request_identity.clone(),
                     state: Mutex::new(JobState {
+                        request_identity: request_identity.clone(),
                         phase: "loading",
                         ..Default::default()
                     }),
+                    #[cfg(test)]
+                    day_delay: Duration::ZERO,
                 });
                 *slot = Some(job.clone());
                 break job;
@@ -276,30 +285,9 @@ pub(super) fn history(backend: &Backend, req: HistoryRequest) -> Result<Progress
         state.checkpoint = Some(resume);
     }
 
-    run(backend, &context, &job);
-
-    let progress = job.progress();
-    let result = job.state().result.clone();
-    let outcome = match (progress.phase, result) {
-        ("complete", Some(result)) => {
-            if let Some(dir) = &dir {
-                // `_persist_rwkv_memorised_result`: best effort, like a
-                // cache; the chart still gets this build's numbers.
-                let _ = write(&dir.join(CACHE_FILE), &result);
-                delete_checkpoint(dir);
-            }
-            aggregate_cache(&result, &job.display)
-        }
-        ("cancelled", Some(result)) if !result.complete => {
-            if let Some(dir) = &dir {
-                let _ = persist_checkpoint(dir, &result);
-            }
-            progress
-        }
-        _ => progress,
-    };
-    job.state().outcome = Some(outcome.clone());
-    Ok(outcome)
+    run(backend, &mut context, &job);
+    let outcome = job.state().outcome.clone();
+    Ok(outcome.unwrap_or_else(|| job.progress()))
 }
 
 /// Waits for a build another call started, and returns what it returned.
@@ -312,6 +300,43 @@ fn join(job: &Job) -> Progress {
     }
 }
 
+/// `history`'s build on a job of its own, outside the process-wide slot, so
+/// tests can build side by side; `during` runs next to it, reading its
+/// progress.
+#[cfg(test)]
+pub(super) fn detached_history(
+    backend: &Backend,
+    req: HistoryRequest,
+    day_delay: Duration,
+    during: impl FnOnce(&dyn Fn() -> Progress) + Send,
+) -> Result<Progress> {
+    let display: HashSet<i64> = super::fsrs_memorised::search_card_ids(backend, &req.search)?
+        .into_iter()
+        .filter(|id| *id > 0)
+        .collect();
+    let mut context = context(backend, &req)?;
+    let job = Job {
+        cancel: AtomicBool::new(false),
+        display,
+        state: Mutex::new(JobState {
+            request_identity: request_identity(backend, &context)?,
+            phase: "loading",
+            ..Default::default()
+        }),
+        day_delay,
+    };
+    let watched = &job;
+    std::thread::scope(|scope| {
+        scope.spawn(move || during(&|| watched.progress()));
+        run(backend, &mut context, &job);
+    });
+    let outcome = job.state().outcome.clone();
+    Ok(outcome.unwrap_or_else(|| job.progress()))
+}
+
+/// A missing model isn't an error here: like the desktop, the history's
+/// identity then has no model, an empty history still completes, and any
+/// other build fails (`compute`).
 fn context(backend: &Backend, req: &HistoryRequest) -> Result<Context> {
     // `state_precision_for_profile`: unknown values fall back to int8.
     let precision_name = req
@@ -321,11 +346,8 @@ fn context(backend: &Backend, req: &HistoryRequest) -> Result<Context> {
         .unwrap_or_else(|| "int8".into());
     let precision = StatePrecision::parse(&precision_name).map_err(|e| Error(e.to_string()))?;
     let model_path = PathBuf::from(&req.model_path);
-    if !model_path.exists() {
-        return Err(Error("RWKV model is unavailable".into()));
-    }
     Ok(Context {
-        model_key: model_key(&model_path)?,
+        model_key: model_key(&model_path).ok(),
         model_path,
         precision,
         precision_name,
@@ -413,8 +435,78 @@ impl From<io::Error> for Stop {
     }
 }
 
+/// Builds until the job settles, then marks it done. What it saves is on
+/// disk before `done`, so a build waiting to start reads it.
+fn run(backend: &Backend, context: &mut Context, job: &Job) {
+    let outcome = loop {
+        build(backend, context, job);
+        if let Some(outcome) = settle(backend, context, job) {
+            break outcome;
+        }
+    };
+    let mut state = job.state();
+    state.outcome = Some(outcome);
+    state.done = true;
+}
+
+/// The add-on's handling of a finished build: `rwkvMemorisedHistoryProgress`
+/// for a complete one, `cancelRwkvMemorisedHistory` for a cancelled one.
+/// Only a result of the current history is saved; when the history changed
+/// while a build ran, the add-on drops the checkpoint and starts afresh
+/// (`None`).
+fn settle(backend: &Backend, context: &mut Context, job: &Job) -> Option<Progress> {
+    let mut progress = job.progress();
+    progress.done = true;
+    let result = job.state().result.clone();
+    let Some(result) = result else {
+        return Some(progress);
+    };
+    let dir = context.dir.clone();
+    let current = current_identity(backend, context);
+    match progress.phase {
+        "complete" => match current {
+            Ok(identity) if identity != result.identity => {
+                if let Some(dir) = &dir {
+                    delete_checkpoint(dir);
+                }
+                *job.state() = JobState {
+                    request_identity: identity,
+                    phase: "loading",
+                    ..Default::default()
+                };
+                None
+            }
+            current => {
+                // `_persist_rwkv_memorised_result`: best effort, like a
+                // cache; the chart still gets this build's numbers. Nothing
+                // is saved when the identity can't be read.
+                if let (Some(dir), Ok(_)) = (&dir, current) {
+                    let _ = write(&dir.join(CACHE_FILE), &result);
+                    delete_checkpoint(dir);
+                }
+                Some(aggregate_cache(&result, &job.display))
+            }
+        },
+        "cancelled" if !result.complete => {
+            if let (Some(dir), Ok(identity)) = (&dir, current) {
+                if identity == result.identity {
+                    let _ = persist_checkpoint(dir, &result);
+                }
+            }
+            Some(progress)
+        }
+        _ => Some(progress),
+    }
+}
+
+/// `rwkv_memorised_history_identity` now, with the model looked up again.
+fn current_identity(backend: &Backend, context: &mut Context) -> Result<String> {
+    context.model_key = model_key(&context.model_path).ok();
+    request_identity(backend, context)
+}
+
 /// `_run_rwkv_memorised_history_job`.
-fn run(backend: &Backend, context: &Context, job: &Job) {
+fn build(backend: &Backend, context: &Context, job: &Job) {
     loop {
         match compute(backend, context, job) {
             Ok(()) | Err(Stop::Cancelled) => break,
@@ -447,7 +539,6 @@ fn run(backend: &Backend, context: &Context, job: &Job) {
             }
         }
     }
-    job.state().done = true;
 }
 
 /// The build state `_initial_rwkv_memorised_computation_state` returns.
@@ -524,6 +615,12 @@ fn compute(backend: &Backend, context: &Context, job: &Job) -> Result<(), Stop> 
         return Ok(());
     }
 
+    // `_current_embedded_rwkv_model_path() is None`, checked after the
+    // reviews like the desktop: an empty history needs no model.
+    if context.model_key.is_none() || !context.model_path.exists() {
+        return Err(Stop::Failed(Error("RWKV model is unavailable".into())));
+    }
+
     let mut first_day_by_card: HashMap<i64, i64> = HashMap::new();
     let mut note_id_by_card: HashMap<i64, Option<i64>> = HashMap::new();
     for review in &reviews {
@@ -536,10 +633,12 @@ fn compute(backend: &Backend, context: &Context, job: &Job) -> Result<(), Stop> 
         .copied()
         .min()
         .unwrap_or(last_day);
-    let total: u64 = first_day_by_card
+    // Python sums without clamping each card; only the sum must fit a u64.
+    let total: i64 = first_day_by_card
         .values()
-        .map(|day| (last_day - day + 1).max(0) as u64)
+        .map(|day| last_day - day + 1)
         .sum();
+    let total = u64::try_from(total).unwrap_or(0);
 
     let mut selected_note_counts: HashMap<i64, u32> = HashMap::new();
     for card_id in &job.display {
@@ -610,9 +709,9 @@ fn compute(backend: &Backend, context: &Context, job: &Job) -> Result<(), Stop> 
         }
 
         #[cfg(test)]
-        std::thread::sleep(Duration::from_millis(
-            TEST_DAY_DELAY_MS.load(Ordering::SeqCst),
-        ));
+        std::thread::sleep(
+            Duration::from_millis(TEST_DAY_DELAY_MS.load(Ordering::SeqCst)) + job.day_delay,
+        );
         let day_start = build.review_index;
         while build.review_index < reviews.len()
             && reviews[build.review_index].day_offset == Some(day)

@@ -211,8 +211,8 @@ fn busy(backend: &Backend, method: u32, input: &[u8]) -> Result<Vec<u8>, Vec<u8>
             views::clear_deck_counts_without_engine(backend)
         })
         .map_err(to_bytes),
-        CARD_INFO => call(input, |_: views::CardInfoRequest| {
-            Ok(views::loading_card_info())
+        CARD_INFO => call(input, |req: views::CardInfoRequest| {
+            views::replaying_card_info(backend, req)
         })
         .map_err(to_bytes),
         _ => call(input, |req: views::SearchScoresRequest| {
@@ -444,9 +444,8 @@ struct UndoFrame {
     counter: u32,
     review_id: i64,
     card_id: i64,
-    note_id: Option<i64>,
-    deck_id: Option<i64>,
-    preset_id: Option<i64>,
+    /// The identity the answer was replayed under.
+    identity: AnswerIdentity,
     before: ReviewStateOwned,
     runtime: RwkvInferenceState,
     after: ReviewStateOwned,
@@ -473,6 +472,9 @@ struct Engine {
     base: Option<Identity>,
     /// Revlog ids of the answers applied live since `base`, oldest first.
     own_review_ids: Vec<i64>,
+    /// Each of `own_review_ids`' card and the identity it was replayed
+    /// under, kept in step with it.
+    own_review_identities: Vec<(i64, AnswerIdentity)>,
     replay_key: Option<String>,
     /// False when the collection may have changed behind our back.
     trusted: bool,
@@ -586,6 +588,7 @@ impl Engine {
         self.base = None;
         self.lineage = None;
         self.own_review_ids.clear();
+        self.own_review_identities.clear();
         self.trusted = false;
         self.collection_mod = None;
         self.undo.clear();
@@ -636,7 +639,8 @@ impl Engine {
         let fingerprint = fingerprint(backend, &params, Some(&base))?;
         let current = (fingerprint.history_is_valid || fingerprint.history_prefix_is_valid)
             && fingerprint.review_count == base.review_count + self.own_review_ids.len() as u64
-            && self.own_reviews_are_the_suffix(backend, &base)?;
+            && self.own_reviews_are_the_suffix(backend, &base)?
+            && self.own_review_identities_unchanged(backend);
         self.trusted = current;
         self.collection_mod = current.then_some(modified);
         Ok(current)
@@ -657,6 +661,23 @@ impl Engine {
         let mut own = self.own_review_ids.clone();
         own.sort_unstable();
         Ok(ids == own)
+    }
+
+    /// The cards our answers reviewed still have the identity (note, deck,
+    /// preset) those answers were replayed under, as
+    /// `prepare_collection_mutation_reconciliation` and
+    /// `_rwkv_identities_for_card_ids` require of every card with an eligible
+    /// review. The history hashes each review under its card's current
+    /// identity, so `base`'s prefix already covers cards reviewed before it;
+    /// a card only our answers reviewed (a new card answered this session)
+    /// moved to another deck or preset is caught here. A card that can't be
+    /// read counts as changed.
+    fn own_review_identities_unchanged(&self, backend: &Backend) -> bool {
+        let latest: HashMap<i64, AnswerIdentity> =
+            self.own_review_identities.iter().copied().collect();
+        latest.into_iter().all(|(card_id, identity)| {
+            answer_identity(backend, card_id).is_ok_and(|now| now == identity)
+        })
     }
 
     /// Makes the resident state match the collection's canonical history,
@@ -712,6 +733,7 @@ impl Engine {
     ) -> Result<()> {
         self.base = Some(identity);
         self.own_review_ids.clear();
+        self.own_review_identities.clear();
         self.replay_key = Some(params.replay_key.clone());
         self.trusted = true;
         self.collection_mod = Some(collection_mod(backend)?);
@@ -1119,18 +1141,23 @@ impl Engine {
         if min == 0 {
             return Ok(HashMap::new());
         }
-        let deck_ids = backend.with_col(|col| {
-            DecksService::get_deck_and_child_names(col, anki_proto::decks::DeckId { did: deck_id })
-        })?;
-        let ids: Vec<String> = deck_ids.entries.iter().map(|e| e.id.to_string()).collect();
-        let deck_clause = if ids.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "and (case when c.odid != 0 then c.odid else c.did end) in ({})",
-                ids.join(",")
-            )
-        };
+        // `_deck_tree_ids`: the deck itself when its tree can't be read.
+        let mut ids: Vec<String> = backend
+            .with_col(|col| {
+                DecksService::get_deck_and_child_names(
+                    col,
+                    anki_proto::decks::DeckId { did: deck_id },
+                )
+            })
+            .map(|names| names.entries.iter().map(|e| e.id.to_string()).collect())
+            .unwrap_or_default();
+        if ids.is_empty() {
+            ids.push(deck_id.to_string());
+        }
+        let deck_clause = format!(
+            "and (case when c.odid != 0 then c.odid else c.did end) in ({})",
+            ids.join(",")
+        );
         let sql = format!(
             "select r.cid from revlog r join cards c on c.id = r.cid \
              where {} {deck_clause} order by r.id desc, r.cid desc limit ?",
@@ -1210,8 +1237,15 @@ impl Engine {
         let context = LiveContext::load(backend, &card, &config, &self.synthetic)?;
         let input = context.query_input(&card, &config, &states);
 
+        // Like the desktop's `except Exception`, a failed or invalid
+        // prediction leaves the FSRS states as they are, with none stored.
         if !curve {
-            let retrievability = self.predict_many(std::slice::from_ref(&input))?[0];
+            let Ok(retrievability) = self
+                .predict_many(std::slice::from_ref(&input))
+                .map(|r| r[0])
+            else {
+                return Ok(unchanged(true, false));
+            };
             self.session.prediction = Some(Prediction {
                 card_id: card.id,
                 retrievability,
@@ -1226,8 +1260,14 @@ impl Engine {
 
         let model = self.model_mut()?;
         let state = model.warm_up_state(&input);
-        let output = model.review(input, review_state(&state))?;
-        validate_output(&output)?;
+        let Some(output) = model
+            .review(input, review_state(&state))
+            .ok()
+            .map(prediction_from_output)
+            .filter(|output| validate_output(output).is_ok())
+        else {
+            return Ok(unchanged(true, true));
+        };
         // `_has_interval_overrides`: all four buttons.
         let has_intervals = output.intervals.iter().all(Option::is_some);
         self.session.prediction = Some(Prediction {
@@ -1236,14 +1276,17 @@ impl Engine {
             interval_override_used: has_intervals,
             s90s: output.s90s,
         });
+        let kept = SchedulingStatesResponse {
+            retrievability: Some(output.retrievability),
+            ..unchanged(true, true)
+        };
         if !has_intervals {
-            return Ok(SchedulingStatesResponse {
-                retrievability: Some(output.retrievability),
-                ..unchanged(true, true)
-            });
+            return Ok(kept);
         }
         let [again, hard, good, easy] = output.intervals;
-        let mut rebuilt = backend.with_col(|col| {
+        // `rwkv_curve_scheduling_states`; the desktop stored the prediction
+        // first, so a failure here keeps it and the FSRS states.
+        let Ok(mut rebuilt) = backend.with_col(|col| {
             SchedulerService::scheduling_states_with_intervals(
                 col,
                 pb::SchedulingStatesWithIntervalsRequest {
@@ -1254,13 +1297,13 @@ impl Engine {
                     easy,
                 },
             )
-        })?;
+        }) else {
+            return Ok(kept);
+        };
         apply_s90_overrides(&mut rebuilt, &output.intervals, &output.s90s);
         Ok(SchedulingStatesResponse {
             states: BASE64.encode(&rebuilt.encode_to_vec()),
-            active: true,
-            curve: true,
-            retrievability: Some(output.retrievability),
+            ..kept
         })
     }
 
@@ -1479,9 +1522,7 @@ impl Engine {
                             counter,
                             review_id,
                             card_id: answered.card_id,
-                            note_id: answered.note_id,
-                            deck_id: answered.deck_id,
-                            preset_id: answered.preset_id,
+                            identity,
                             before,
                             runtime,
                             after: model.warm_up_state(&answered),
@@ -1491,6 +1532,7 @@ impl Engine {
                             calibration::record_answer_prediction(backend, review_id, prediction);
                         }
                         self.own_review_ids.push(review_id);
+                        self.own_review_identities.push((card.id, identity));
                         self.collection_mod = Some(collection_mod(backend)?);
                         self.unsaved = true;
                         if let Some(frame) = frame {
@@ -1739,13 +1781,14 @@ impl Engine {
         let model = self.model_mut()?;
         model.restore_warm_up_state(
             card_id,
-            frame.note_id,
-            frame.deck_id,
-            frame.preset_id,
+            Some(frame.identity.note_id),
+            Some(frame.identity.deck_id),
+            frame.identity.preset_id,
             clone_state(&frame.before),
         )?;
         model.restore_state(&frame.runtime);
         self.own_review_ids.pop();
+        self.own_review_identities.pop();
         // Revalidate (cheaply) against the post-undo collection.
         self.collection_mod = None;
         self.unsaved = true;
@@ -1788,13 +1831,14 @@ impl Engine {
         let model = self.model_mut()?;
         model.restore_warm_up_state(
             card_id,
-            frame.note_id,
-            frame.deck_id,
-            frame.preset_id,
+            Some(frame.identity.note_id),
+            Some(frame.identity.deck_id),
+            frame.identity.preset_id,
             clone_state(&frame.after),
         )?;
         model.restore_state(&frame.runtime_after);
         self.own_review_ids.push(frame.review_id);
+        self.own_review_identities.push((card_id, frame.identity));
         // `apply_reviewer_redo_card_ids`.
         self.answered_ids.push(card_id);
         self.collection_mod = None;
@@ -2150,12 +2194,49 @@ fn clone_state(state: &ReviewStateOwned) -> ReviewStateOwned {
     }
 }
 
-/// `_validate_prediction` for the fields the answer path uses.
+/// `_RustRwkvRuntime.review`'s conversion of the model's output: an
+/// interval or S90 that isn't a positive finite number of days becomes
+/// None (`_optional_unrounded_interval`).
+fn prediction_from_output(mut output: anki::rwkv::ReviewOutput) -> anki::rwkv::ReviewOutput {
+    fn positive(value: Option<f32>) -> Option<f32> {
+        value.filter(|v| v.is_finite() && *v > 0.0)
+    }
+    output.current_s90 = positive(output.current_s90);
+    output.intervals = output.intervals.map(positive);
+    output.s90s = output.s90s.map(positive);
+    output
+}
+
+/// `_validate_prediction`.
 fn validate_output(output: &anki::rwkv::ReviewOutput) -> Result<()> {
     if !valid_probability(output.retrievability) {
         return Err(Error("retrievability must be between 0 and 1".into()));
     }
-    for value in output.intervals.iter().chain(&output.s90s).flatten() {
+    if output
+        .curve_retrievability
+        .is_some_and(|r| !valid_probability(r))
+    {
+        return Err(Error("curve retrievability must be between 0 and 1".into()));
+    }
+    if !valid_button_probabilities(&output.button_probabilities) {
+        return Err(Error(
+            "button probabilities must be four values between 0 and 1".into(),
+        ));
+    }
+    // `_validated_interval`.
+    if output.current_interval.is_some_and(|days| days < 1) {
+        return Err(Error(
+            "interval overrides must be positive day counts".into(),
+        ));
+    }
+    // `_validated_unrounded_interval`.
+    for value in output
+        .intervals
+        .iter()
+        .chain(&output.s90s)
+        .chain(std::iter::once(&output.current_s90))
+        .flatten()
+    {
         if !value.is_finite() || *value <= 0.0 {
             return Err(Error(
                 "interval overrides must be positive numbers of days".into(),
@@ -2163,6 +2244,13 @@ fn validate_output(output: &anki::rwkv::ReviewOutput) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// `_valid_button_probabilities`: each a probability, summing to 1 within
+/// 0.01 (`math.isclose(total, 1.0, abs_tol=0.01)`).
+fn valid_button_probabilities(probabilities: &[f32; 4]) -> bool {
+    probabilities.iter().all(|p| valid_probability(*p))
+        && (probabilities.iter().map(|p| f64::from(*p)).sum::<f64>() - 1.0).abs() <= 0.01
 }
 
 /// `apply_review_s90_overrides`: each overridden button's review memory state
@@ -2530,13 +2618,16 @@ fn review_exists(backend: &Backend, review_id: i64) -> Result<bool> {
     .is_empty())
 }
 
+/// `_fsrs_preset_overlay_has_routing_rules`: either rule list is non-empty.
 fn overlay_has_routing_rules(backend: &Backend) -> Result<bool> {
     let overlay = backend.with_col(|col| Ok(config_json(col, OVERLAY_KEY)))?;
-    Ok(overlay
-        .as_ref()
-        .and_then(|o| o.get("rules"))
-        .and_then(|r| r.as_array())
-        .is_some_and(|r| !r.is_empty()))
+    Ok(overlay.as_ref().is_some_and(|o| {
+        ["rules", "simulator_rules"].iter().any(|key| {
+            o.get(key)
+                .and_then(|r| r.as_array())
+                .is_some_and(|r| !r.is_empty())
+        })
+    }))
 }
 
 fn db_query<T: for<'de> Deserialize<'de>>(

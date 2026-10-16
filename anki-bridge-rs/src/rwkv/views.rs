@@ -40,8 +40,10 @@ pub(super) struct DeckCountsResponse {
 #[derive(Deserialize)]
 pub(super) struct SearchScoresRequest {
     pub search: String,
-    /// Wait for (and if needed, rebuild) the model state first. Graphs don't
-    /// wait; searches whose matches depend on RWKV scores do.
+    /// Rebuild the model state if needed, replaying the whole history if
+    /// it must (`warm_up_if_needed`, as filtered decks do). Without it the
+    /// state only catches up from the resident or cached state. Either way a
+    /// request that needs the scores waits for a replay already running.
     #[serde(default)]
     pub wait: bool,
 }
@@ -53,8 +55,10 @@ pub(super) struct FilteredDeckRequest {
 
 #[derive(Serialize)]
 pub(super) struct SearchScoresResponse {
-    /// "ready", "pending" (model still loading), "unavailable" (no RWKV
-    /// preset or no model), or "skipped" (nothing in the request needs RWKV).
+    /// "ready"; "pending" (a history replay is running: ask again); "failed"
+    /// (`wait` and the state couldn't be built); "unavailable" (no RWKV
+    /// preset, no model, or no current or cached state to catch up from);
+    /// or "skipped" (nothing in the request needs RWKV).
     pub status: &'static str,
     pub scored: u32,
 }
@@ -173,6 +177,33 @@ fn occurrences<'a>(
 }
 
 impl Engine {
+    /// `_prepare_reviewer_backend_from_cache`, as `_prepare_reviewer_backend_for_stats`
+    /// and `_prepare_reviewer_backend_for_card_info` use it: `ensure_ready`'s
+    /// cheap steps (current as is, newer reviews replayed on top, restored
+    /// from disk plus newer reviews), never a full replay. A failure counts
+    /// as not ready, as the desktop's `except` does.
+    fn prepare_from_cache(&mut self, backend: &Backend) -> bool {
+        let mut prepare = || -> Result<bool> {
+            if self.model.is_none() || self.force_replay {
+                return Ok(false);
+            }
+            if self.current(backend)? {
+                return Ok(true);
+            }
+            let params = history_params(backend, self.model_precision_name())?;
+            if self.replay_key.as_deref() != Some(&params.replay_key) {
+                self.forget_state();
+            }
+            if let (Some(base), true) = (self.base.clone(), self.own_review_ids.is_empty()) {
+                if self.replay_suffix(backend, &params, &base)?.is_some() {
+                    return Ok(true);
+                }
+            }
+            Ok(self.restore_from_disk(backend, &params)?.is_some())
+        };
+        prepare().unwrap_or(false)
+    }
+
     /// Full predictions (`predict_many`) for query inputs, in reschedule-size
     /// batches.
     pub(super) fn predict_full(
@@ -335,21 +366,34 @@ impl Engine {
         self.search_scores_with(backend, &req.search, SearchNeeds::of(&req.search), req.wait)
     }
 
+    /// `warm_up_if_needed` (filtered decks) may replay the whole history
+    /// (`_prepare_reviewer_backend_for_filtered_deck`); everything else only
+    /// catches up from the resident or cached state
+    /// (`_prepare_reviewer_backend_for_stats`). A replay already running
+    /// holds the engine, so reaching here means none is pending: searches
+    /// that need the scores have waited for it, and the graphs' "pending"
+    /// comes only from the busy path (`pending_search_scores`).
     fn search_scores_with(
         &mut self,
         backend: &Backend,
         search: &str,
         needs: SearchNeeds,
-        wait: bool,
+        warm_up_if_needed: bool,
     ) -> Result<SearchScoresResponse> {
         let active = all_deck_configs(backend)?.iter().any(rwkv_active);
         let ready = active
             && self.model.is_some()
-            && (self.current(backend)? || ((wait || needs.any()) && self.ready(backend)));
+            && if warm_up_if_needed {
+                self.ready(backend)
+            } else {
+                self.prepare_from_cache(backend)
+            };
         if !ready {
             set_stats_scores(backend, search, vec![])?;
-            let status = if active && self.model.is_some() {
-                "pending"
+            // `stopped("warmup_not_ready")`: FAILED for a filtered deck with
+            // a backend, otherwise UNAVAILABLE, no warm-up being pending.
+            let status = if warm_up_if_needed && active && self.model.is_some() {
+                "failed"
             } else {
                 "unavailable"
             };
@@ -558,7 +602,8 @@ impl Engine {
     ) -> Result<SearchNoteIdsResponse> {
         let needs = SearchNeeds::of(&req.search);
         if needs.any() {
-            self.search_scores_with(backend, &req.search, needs, true)?;
+            // `prepare_browser_retrievability_scores`: no `warm_up_if_needed`.
+            self.search_scores_with(backend, &req.search, needs, false)?;
         }
         let found = backend.with_col(|col| {
             SearchService::search_notes(
@@ -586,7 +631,9 @@ impl Engine {
                 deck_id: req.deck_id,
             },
         )?;
-        if scores.status == "pending" {
+        // `_prepare_filtered_deck_retrievability_scores` fails on PENDING
+        // and FAILED.
+        if matches!(scores.status, "pending" | "failed") {
             return Err(Error(
                 "RWKV scores for this filtered deck aren't ready yet; try again shortly.".into(),
             ));
@@ -611,120 +658,39 @@ impl Engine {
         backend: &Backend,
         req: CardInfoRequest,
     ) -> Result<CardInfoResponse> {
-        let clear = |backend: &Backend| -> Result<()> {
-            Ok(backend.with_col(|col| {
-                SchedulerService::set_rwkv_card_info_score(
-                    col,
-                    pb::RwkvCardInfoScoreRequest {
-                        card_id: req.card_id,
-                        ..Default::default()
-                    },
-                )
-            })?)
-        };
-        let card = get_card(backend, req.card_id)?;
-        let config = deck_config_for_deck(backend, current_deck_id(&card))?.filter(rwkv_active);
-        let Some(config) = config else {
-            clear(backend)?;
+        let Some(card) = CardInfoCard::load(backend, req.card_id)? else {
             return Ok(CardInfoResponse { rows: vec![] });
         };
-        let fallback = if card.memory_state.is_some() {
-            "FSRS"
-        } else {
-            "SM2"
-        };
-        let curve = curve_enabled(&config);
-
-        let states = backend
-            .with_col(|col| {
-                SchedulerService::get_scheduling_states(
-                    col,
-                    anki_proto::cards::CardId { cid: card.id },
-                )
-            })
-            .ok();
-        let prediction = match (&states, self.current(backend)?) {
+        // `_prepare_reviewer_backend_for_card_info`: the resident state, or
+        // one caught up from it or the cache; Card Info never replays the
+        // whole history.
+        let query = match (&card.states, self.prepare_from_cache(backend)) {
             (Some(states), true) => {
-                let context = LiveContext::load(backend, &card, &config, &self.synthetic)?;
-                let input = context.query_input(&card, &config, states);
-                let prediction = self.predict_full(std::slice::from_ref(&input))?.pop();
-                prediction.map(|p| (input, p))
+                let context =
+                    LiveContext::load(backend, &card.card, &card.config, &self.synthetic)?;
+                Some(context.query_input(&card.card, &card.config, states))
             }
             _ => None,
         };
-
-        let mut rows = vec![];
-        let row = |label: &str, value: String| CardInfoRow {
-            label: label.to_string(),
-            value,
+        // `_queried_card_info_diagnostics`: a failed or invalid
+        // (`_validate_prediction`) prediction gives no diagnostics.
+        let prediction = query
+            .as_ref()
+            .and_then(|input| self.predict_full(std::slice::from_ref(input)).ok()?.pop())
+            .filter(validate_prediction);
+        // `rwkv_card_info_after_review_rows`: independent of the current-R
+        // prediction; needs only the current state and the query input.
+        let after_review = match &query {
+            Some(input) => self.after_review_rows(input)?,
+            None => unavailable_after_review_rows(),
         };
-        let Some((input, prediction)) =
-            prediction.filter(|(_, p)| valid_probability(p.retrievability))
-        else {
-            clear(backend)?;
-            rows.push(row("RWKV computed R", "Unavailable".into()));
-            rows.push(row(
-                "Retrievability source",
-                format!("{fallback} (RWKV unavailable)"),
-            ));
-            if curve {
-                rows.push(row("RWKV Curve Next S90", format_next_s90(&[None; 4])));
-                rows.push(row(
-                    "FSRS Next S90",
-                    format_next_s90(&fsrs_next_s90(states.as_ref())),
-                ));
-            }
-            for (label, _) in AFTER_REVIEW_HORIZONS {
-                rows.push(row(label, unavailable_after_review()));
-            }
-            return Ok(CardInfoResponse { rows });
+        // `_unavailable_retrievability_source`.
+        let unavailable = if self.model.is_some() {
+            "RWKV unavailable"
+        } else {
+            "RWKV backend unavailable"
         };
-
-        backend.with_col(|col| {
-            SchedulerService::set_rwkv_card_info_score(
-                col,
-                pb::RwkvCardInfoScoreRequest {
-                    card_id: card.id,
-                    retrievability: Some(prediction.retrievability),
-                    curve_retrievability: prediction.curve_retrievability,
-                },
-            )
-        })?;
-
-        rows.push(row(
-            "RWKV computed R",
-            format_percent(Some(prediction.retrievability)),
-        ));
-        let probabilities = rescale_button_probabilities(
-            prediction.button_probabilities,
-            prediction.retrievability,
-        );
-        rows.push(row(
-            "RWKV : Answer Button Probability",
-            RATING_LABELS
-                .iter()
-                .zip(probabilities)
-                .map(|(label, p)| format!("{label}:{}", format_percent(Some(p))))
-                .collect::<Vec<_>>()
-                .join(" "),
-        ));
-        rows.push(row("Retrievability source", "RWKV".into()));
-        if curve {
-            rows.push(row(
-                "RWKV Curve Next S90",
-                format_next_s90(&prediction.s90s),
-            ));
-            rows.push(row(
-                "FSRS Next S90",
-                format_next_s90(&fsrs_next_s90(states.as_ref())),
-            ));
-        }
-        rows.extend(
-            self.after_review_rows(&input)?
-                .into_iter()
-                .map(|(label, value)| row(label, value)),
-        );
-        Ok(CardInfoResponse { rows })
+        card.rows(backend, prediction.as_ref(), unavailable, after_review)
     }
 
     /// `rwkv_card_info_after_review_rows`: R right after each possible
@@ -852,9 +818,6 @@ impl Engine {
             })
             .collect();
         let predicted = items.len() as u32;
-        for item in &items {
-            clear_card_info_score(backend, item.card_id)?;
-        }
         if items.is_empty() {
             return Ok(RescheduleResponse {
                 built: true,
@@ -955,17 +918,26 @@ fn set_stats_scores(
     })?)
 }
 
-/// `_validate_prediction` as a filter.
+/// `_validate_prediction` as a filter: an invalid prediction skips its card
+/// (the reschedule's `require!`s would otherwise abort the whole batch).
 fn validate_prediction(p: &ReviewPredictionOutput) -> bool {
     valid_probability(p.retrievability)
         && p.curve_retrievability.is_none_or(valid_probability)
-        && p.button_probabilities.iter().all(|p| valid_probability(*p))
+        && valid_button_probabilities(&p.button_probabilities)
+        // `_validated_interval`.
+        && p.current_interval.is_none_or(|i| i >= 1)
         && p.current_s90.is_none_or(|s| s.is_finite() && s > 0.0)
         && p.intervals
             .iter()
             .chain(&p.s90s)
             .flatten()
             .all(|v| v.is_finite() && *v > 0.0)
+}
+
+/// `_valid_button_probabilities`: four probabilities summing to 1 within 0.01.
+fn valid_button_probabilities(p: &[f32; 4]) -> bool {
+    p.iter().all(|p| valid_probability(*p))
+        && (p.iter().map(|p| f64::from(*p)).sum::<f64>() - 1.0).abs() <= 0.01
 }
 
 /// `_format_retrievability`.
@@ -1055,20 +1027,150 @@ fn s90_for_normal(normal: &pb::scheduling_state::Normal) -> Option<f32> {
     }
 }
 
-/// Card info while the model state is being built (`_prepare_reviewer_backend_for_card_info`).
-pub(super) fn loading_card_info() -> CardInfoResponse {
-    CardInfoResponse {
-        rows: vec![
-            CardInfoRow {
-                label: "RWKV computed R".into(),
-                value: "Unavailable".into(),
-            },
-            CardInfoRow {
-                label: "Retrievability source".into(),
-                value: "RWKV state is loading".into(),
-            },
-        ],
+/// `rwkv_card_info_rows` while a replay holds the engine: the card loads
+/// as usual, but `_prepare_reviewer_backend_for_card_info` fails (warm-up
+/// pending), so an RWKV card gets the unavailable diagnostics, its S90 rows
+/// and unavailable after-review rows; a card whose preset doesn't use RWKV
+/// gets none. A replay only runs with a model loaded, so the source is
+/// "RWKV unavailable", not "backend unavailable".
+pub(super) fn replaying_card_info(
+    backend: &Backend,
+    req: CardInfoRequest,
+) -> Result<CardInfoResponse> {
+    let Some(card) = CardInfoCard::load(backend, req.card_id)? else {
+        return Ok(CardInfoResponse { rows: vec![] });
+    };
+    card.rows(
+        backend,
+        None,
+        "RWKV unavailable",
+        unavailable_after_review_rows(),
+    )
+}
+
+/// A card shown in Card Info whose preset uses RWKV (`rwkv_review_active`).
+struct CardInfoCard {
+    card: Card,
+    config: DeckConfig,
+    states: Option<pb::SchedulingStates>,
+}
+
+impl CardInfoCard {
+    /// None (after clearing its stored score) when the card's preset doesn't
+    /// use RWKV: the desktop then shows no RWKV rows.
+    fn load(backend: &Backend, card_id: i64) -> Result<Option<Self>> {
+        let card = get_card(backend, card_id)?;
+        let Some(config) =
+            deck_config_for_deck(backend, current_deck_id(&card))?.filter(rwkv_active)
+        else {
+            set_card_info_score(backend, card_id, None)?;
+            return Ok(None);
+        };
+        let states = backend
+            .with_col(|col| {
+                SchedulerService::get_scheduling_states(
+                    col,
+                    anki_proto::cards::CardId { cid: card.id },
+                )
+            })
+            .ok();
+        Ok(Some(Self {
+            card,
+            config,
+            states,
+        }))
     }
+
+    /// `_card_info_diagnostic_rows` + `_rwkv_card_info_next_s90_rows` + the
+    /// after-review rows; stores the validated prediction's scores
+    /// (`_set_rwkv_card_info_score`), or clears them without one.
+    /// `unavailable` is the source's parenthetical without a prediction.
+    fn rows(
+        &self,
+        backend: &Backend,
+        prediction: Option<&ReviewPredictionOutput>,
+        unavailable: &str,
+        after_review: Vec<(&'static str, String)>,
+    ) -> Result<CardInfoResponse> {
+        set_card_info_score(backend, self.card.id, prediction)?;
+        let fallback = if self.card.memory_state.is_some() {
+            "FSRS"
+        } else {
+            "SM2"
+        };
+        let row = |label: &str, value: String| CardInfoRow {
+            label: label.to_string(),
+            value,
+        };
+        let mut rows = vec![row(
+            "RWKV computed R",
+            format_percent(prediction.map(|p| p.retrievability)),
+        )];
+        match prediction {
+            Some(prediction) => {
+                let probabilities = rescale_button_probabilities(
+                    prediction.button_probabilities,
+                    prediction.retrievability,
+                );
+                rows.push(row(
+                    "RWKV : Answer Button Probability",
+                    RATING_LABELS
+                        .iter()
+                        .zip(probabilities)
+                        .map(|(label, p)| format!("{label}:{}", format_percent(Some(p))))
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                ));
+                rows.push(row("Retrievability source", "RWKV".into()));
+            }
+            None => rows.push(row(
+                "Retrievability source",
+                format!("{fallback} ({unavailable})"),
+            )),
+        }
+        if curve_enabled(&self.config) {
+            rows.push(row(
+                "RWKV Curve Next S90",
+                format_next_s90(&prediction.map_or([None; 4], |p| p.s90s)),
+            ));
+            rows.push(row(
+                "FSRS Next S90",
+                format_next_s90(&fsrs_next_s90(self.states.as_ref())),
+            ));
+        }
+        rows.extend(
+            after_review
+                .into_iter()
+                .map(|(label, value)| row(label, value)),
+        );
+        Ok(CardInfoResponse { rows })
+    }
+}
+
+/// `_set_rwkv_card_info_score`: the prediction's R and Curve R, or none.
+fn set_card_info_score(
+    backend: &Backend,
+    card_id: i64,
+    prediction: Option<&ReviewPredictionOutput>,
+) -> Result<()> {
+    Ok(backend.with_col(|col| {
+        SchedulerService::set_rwkv_card_info_score(
+            col,
+            pb::RwkvCardInfoScoreRequest {
+                card_id,
+                retrievability: prediction.map(|p| p.retrievability),
+                curve_retrievability: prediction.and_then(|p| p.curve_retrievability),
+            },
+        )
+    })?)
+}
+
+/// `_unavailable_rwkv_card_info_after_review_rows`.
+fn unavailable_after_review_rows() -> Vec<(&'static str, String)> {
+    AFTER_REVIEW_HORIZONS
+        .iter()
+        .map(|(label, _)| (*label, unavailable_after_review()))
+        .collect()
 }
 
 fn unavailable_after_review() -> String {
@@ -1108,5 +1210,36 @@ mod tests {
         assert!((p[0] - 0.2).abs() < 1e-6);
         assert!((p[1] + p[2] + p[3] - 0.8).abs() < 1e-6);
         assert!((p[2] / p[1] - 2.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn prediction_validation_matches_validate_prediction() {
+        let with = |f: fn(&mut ReviewPredictionOutput)| {
+            let mut p = ReviewPredictionOutput {
+                retrievability: 0.9,
+                curve_retrievability: Some(0.85),
+                button_probabilities: [0.1, 0.2, 0.5, 0.2],
+                current_interval: Some(3),
+                current_s90: Some(2.5),
+                intervals: [Some(1.0), Some(2.0), Some(3.0), Some(4.0)],
+                s90s: [Some(1.0), Some(2.0), Some(3.0), Some(4.0)],
+            };
+            f(&mut p);
+            validate_prediction(&p)
+        };
+        assert!(with(|_| {}));
+        // `_valid_button_probabilities`: within 0.01 of 1.
+        assert!(with(|p| p.button_probabilities = [0.1, 0.2, 0.5, 0.209]));
+        assert!(!with(|p| p.button_probabilities = [0.1, 0.2, 0.5, 0.3]));
+        assert!(!with(|p| p.button_probabilities = [0.1, 0.2, 0.5, 0.15]));
+        assert!(!with(|p| p.button_probabilities = [-0.1, 0.3, 0.6, 0.2]));
+        // `_validated_interval`: a positive day count.
+        assert!(!with(|p| p.current_interval = Some(0)));
+        assert!(with(|p| p.current_interval = None));
+        assert!(!with(|p| p.current_s90 = Some(0.0)));
+        assert!(!with(|p| p.curve_retrievability = Some(1.5)));
+        assert!(!with(|p| p.retrievability = f32::NAN));
+        assert!(!with(|p| p.s90s[2] = Some(f32::INFINITY)));
+        assert!(!with(|p| p.intervals[0] = Some(-1.0)));
     }
 }

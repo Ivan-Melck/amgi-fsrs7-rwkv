@@ -15,6 +15,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use anki::services::ConfigService;
 use anki::services::SchedulerService;
@@ -25,6 +26,7 @@ use serde::Serialize;
 use super::calibration::cached_minutes_west;
 use super::calibration::local_review_day;
 use super::calibration::revlog_lower_limit;
+use super::ts_fsrs::js_exp;
 use super::ts_fsrs::js_round;
 use super::ts_fsrs::State;
 use super::ts_fsrs::TsFsrs;
@@ -203,7 +205,10 @@ pub fn memorised_days<'a>(
         }
     }
     let mut sums = Sums::default();
-    let mut replay: BTreeMap<i64, ReplayCard> = BTreeMap::new();
+    let mut replay: HashMap<i64, ReplayCard> = HashMap::new();
+    // `fsrsCards`' insertion order: a card joins it after its first review
+    // that isn't skipped.
+    let mut inserted: Vec<i64> = vec![];
     let mut bw_matrix: BTreeMap<i32, BTreeMap<i64, LossBin>> = BTreeMap::new();
     let mut calibration_predictions = vec![];
 
@@ -274,16 +279,21 @@ pub fn memorised_days<'a>(
         card.last_review = Some(revlog.id);
         card.state = Some(next);
         card.last = Some(next.stability);
+        if new_card {
+            inserted.push(revlog.cid);
+        }
     }
 
-    for (cid, card) in &replay {
-        let (Some(fsrs), Some(last), Some(last_review)) =
-            (fsrs_for_card(*cid), card.last, card.last_review)
-        else {
+    // The curves to today add up in `Object.entries(fsrsCards)` order.
+    for cid in js_key_order(inserted) {
+        let (Some(card), Some(fsrs)) = (replay.get(&cid), fsrs_for_card(cid)) else {
+            continue;
+        };
+        let (Some(last), Some(last_review)) = (card.last, card.last_review) else {
             continue;
         };
         let note_count = cards
-            .get(cid)
+            .get(&cid)
             .and_then(|card| note_counts.get(&card.nid).copied());
         sums.curve(
             fsrs,
@@ -330,6 +340,19 @@ pub fn memorised_days<'a>(
     })
 }
 
+/// The order `Object.entries` lists an object's keys in, given the order
+/// they were added: array indices (0 to 2^32 - 2) first, ascending, then the
+/// rest (real card ids, millisecond timestamps) as added.
+fn js_key_order(inserted: Vec<i64>) -> Vec<i64> {
+    const MAX_ARRAY_INDEX: i64 = u32::MAX as i64 - 1;
+    let (mut keys, named): (Vec<i64>, Vec<i64>) = inserted
+        .into_iter()
+        .partition(|key| (0..=MAX_ARRAY_INDEX).contains(key));
+    keys.sort_unstable();
+    keys.extend(named);
+    keys
+}
+
 #[derive(Default)]
 struct Sums {
     retrievability: DaySums<f64>,
@@ -367,9 +390,9 @@ impl Sums {
     }
 }
 
-/// `stability_weight`.
+/// `stability_weight`, unrounded, so with V8's `Math.exp`.
 fn stability_weight(stability: f64) -> f64 {
-    1.0 - (-STABILITY_WEIGHT_FACTOR * stability).exp()
+    1.0 - js_exp(-STABILITY_WEIGHT_FACTOR * stability)
 }
 
 /// `calculateRevlogStats`' `intervals` replay and `burden`: per day, the
@@ -529,10 +552,14 @@ pub(super) fn replay(backend: &Backend, card_ids: &[i64], day_range: u32) -> Res
     .collect();
 
     // `fsrsPresetData`: each reviewed card's resolved preset, one model per
-    // distinct parameter set (`getFsrs`).
-    let mut reviewed: Vec<i64> = revlogs.iter().map(|r| r.cid).collect();
-    reviewed.sort_unstable();
-    reviewed.dedup();
+    // distinct parameter set (`getFsrs`). In review order, so an unusable
+    // preset fails on the card the add-on's replay would throw on.
+    let mut seen = HashSet::new();
+    let reviewed: Vec<i64> = revlogs
+        .iter()
+        .map(|r| r.cid)
+        .filter(|cid| seen.insert(*cid))
+        .collect();
     let presets = backend.with_col(|col| {
         reviewed
             .iter()
@@ -552,14 +579,7 @@ pub(super) fn replay(backend: &Backend, card_ids: &[i64], day_range: u32) -> Res
         let index = match models.iter().position(|(s, _)| *s == signature) {
             Some(index) => index,
             None => {
-                // `selectResolvedFsrsPresetParams`, then ts-fsrs' checks.
-                let model = TsFsrs::new(&preset.params).map_err(|err| {
-                    Error(format!(
-                        "Resolved FSRS preset {} has unsupported params length {}: {err}",
-                        preset.id,
-                        preset.params.len()
-                    ))
-                })?;
+                let model = preset_model(&preset.id, &preset.params).map_err(Error)?;
                 models.push((signature, model));
                 models.len() - 1
             }
@@ -584,6 +604,22 @@ pub(super) fn replay(backend: &Backend, card_ids: &[i64], day_range: u32) -> Res
         revlogs,
         memorised,
     })
+}
+
+/// `getFsrs` for a resolved preset: `selectResolvedFsrsPresetParams`
+/// (`isTsFsrsCompatible`: a ts-fsrs length, every weight finite, so NaN too
+/// fails), then ts-fsrs' own checks.
+fn preset_model(id: &str, params: &[f32]) -> std::result::Result<TsFsrs, String> {
+    const TS_FSRS_SUPPORTED_PARAM_LENGTHS: [usize; 5] = [17, 19, 21, 34, 35];
+    if !TS_FSRS_SUPPORTED_PARAM_LENGTHS.contains(&params.len())
+        || !params.iter().all(|w| w.is_finite())
+    {
+        return Err(format!(
+            "Resolved FSRS preset {id} has unsupported params length {}",
+            params.len()
+        ));
+    }
+    TsFsrs::new(params)
 }
 
 /// The aux method: `memorised_stats` plus `revlogStats.burden`, for one
@@ -917,6 +953,104 @@ mod test {
             assert!((n - r / 3.0).abs() < 1e-12);
         }
         assert!(memorised.card_count.iter().all(|count| *count == 2));
+    }
+
+    /// Real card ids aren't array indices, so the add-on sums the curves to
+    /// today in the order the cards were first reviewed, not by id; float
+    /// addition doesn't commute in the last bit.
+    #[test]
+    fn curves_to_today_add_up_in_javascript_key_order() {
+        // ts-fsrs' `default_w`.
+        const DEFAULT_W: [f32; 21] = [
+            0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796,
+            1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542,
+        ];
+        let fsrs = TsFsrs::new(&DEFAULT_W).unwrap();
+        let base = 1_700_000_000_000;
+        let revlogs: Vec<Revlog> = [
+            (1000, base + 3, 1),
+            (2000, base + 2, 2),
+            (3000, base + 1, 4),
+        ]
+        .into_iter()
+        .map(|(id, cid, ease)| Revlog {
+            id,
+            cid,
+            ease,
+            ivl: 1,
+            factor: 2500,
+            kind: 0,
+        })
+        .collect();
+        let cards = cards(&[base + 1, base + 2, base + 3]);
+        let memorised =
+            memorised_days(&revlogs, &cards, |_| Some(&fsrs), days(30), utc_day).unwrap();
+        // The add-on's sums (node, the vendored ts-fsrs); by id, days 4, 10,
+        // 15 and 17 would each be an ulp off.
+        for (day, expected) in [
+            (0, 3.0),
+            (4, 2.3811218299999997),
+            (10, 2.15637236),
+            (15, 2.05194583),
+            (17, 2.01945778),
+            (30, 1.8722556300000002),
+        ] {
+            assert_eq!(
+                at(&memorised, day).to_bits(),
+                f64::to_bits(expected),
+                "day {day}"
+            );
+        }
+    }
+
+    #[test]
+    fn javascript_key_order_puts_array_indices_first() {
+        let inserted = vec![
+            5,
+            1_700_000_000_002,
+            3,
+            1_700_000_000_001,
+            4_294_967_295,
+            4_294_967_294,
+            -1,
+            0,
+        ];
+        // node's `Object.keys` of an object given these keys in this order.
+        assert_eq!(
+            js_key_order(inserted),
+            vec![
+                0,
+                3,
+                5,
+                4_294_967_294,
+                1_700_000_000_002,
+                1_700_000_000_001,
+                4_294_967_295,
+                -1
+            ]
+        );
+    }
+
+    /// `selectResolvedFsrsPresetParams` throws on a NaN weight, which
+    /// ts-fsrs itself would read as 0.
+    #[test]
+    fn unusable_preset_params_fail_like_the_add_on() {
+        let mut nan = WEIGHTS;
+        nan[3] = f32::NAN;
+        assert_eq!(
+            preset_model("1", &nan).unwrap_err(),
+            "Resolved FSRS preset 1 has unsupported params length 19"
+        );
+        assert_eq!(
+            preset_model("2", &WEIGHTS[..18]).unwrap_err(),
+            "Resolved FSRS preset 2 has unsupported params length 18"
+        );
+        assert_eq!(
+            preset_model("3", &[]).unwrap_err(),
+            "Resolved FSRS preset 3 has unsupported params length 0"
+        );
+        assert!(preset_model("4", &WEIGHTS).is_ok());
+        assert!(preset_model("5", &WEIGHTS7).is_ok());
     }
 
     #[test]

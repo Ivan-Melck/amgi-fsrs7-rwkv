@@ -584,11 +584,14 @@ impl Engine {
                     precision: req.precision.clone(),
                 };
                 let _progress = ProgressGuard::start("Loading RWKV review history...");
-                self.load_for_calibration(backend, &prepare)?;
-                match self.ensure_calibration_data(backend) {
-                    Ok(_) => rows = read_rwkv(backend, &target, &sample_ids),
-                    Err(err) if err.0 == CANCELLED => {}
-                    Err(err) => return Err(err),
+                // `_ensure_rwkv_calibration_data` swallows every failure, a
+                // cancel included (`except Exception` → False): the FSRS
+                // series still shows, next to an empty RWKV one.
+                let ensured = self
+                    .load_for_calibration(backend, &prepare)
+                    .and_then(|()| self.ensure_calibration_data(backend));
+                if ensured.is_ok_and(|ensured| ensured) {
+                    rows = read_rwkv(backend, &target, &sample_ids);
                 }
             }
         }

@@ -313,10 +313,11 @@ fn answer_next(engine: &mut Engine, fx: &Fixture, rating: u8) -> Option<i64> {
     Some(card_id)
 }
 
-/// The app's undo: the collection's, then `undo_answer` with its counters.
+/// The app's undo: the collection's, then `undo_answer` with its counters,
+/// then the reviewer fetches the queue to show the next card.
 fn undo(engine: &mut Engine, fx: &Fixture) -> UndoResponse {
     let out = fx.backend.with_col(CollectionService::undo).unwrap();
-    engine
+    let undone = engine
         .undo_answer(
             &fx.backend,
             UndoRequest {
@@ -324,13 +325,20 @@ fn undo(engine: &mut Engine, fx: &Fixture) -> UndoResponse {
                 next_counter: out.new_status.map(|s| s.last_step),
             },
         )
-        .unwrap()
+        .unwrap();
+    // Without this the queue can stay unbuilt (a flag change clears it), so
+    // the undone answers aren't put back in front, and a later redo meets a
+    // freshly built queue whose order depends on the clock ("not at top of
+    // queue" about one run in four).
+    queue_head(fx);
+    undone
 }
 
-/// The app's redo: the collection's, then `redo_answer` with its counters.
+/// The app's redo: the collection's, then `redo_answer` with its counters,
+/// then the reviewer fetches the queue to show the next card.
 fn redo(engine: &mut Engine, fx: &Fixture) -> UndoResponse {
     let out = fx.backend.with_col(CollectionService::redo).unwrap();
-    engine
+    let redone = engine
         .redo_answer(
             &fx.backend,
             UndoRequest {
@@ -338,7 +346,9 @@ fn redo(engine: &mut Engine, fx: &Fixture) -> UndoResponse {
                 next_counter: out.new_status.map(|s| s.last_step),
             },
         )
-        .unwrap()
+        .unwrap();
+    queue_head(fx);
+    redone
 }
 
 fn queue_head(fx: &Fixture) -> Option<i64> {
@@ -954,6 +964,14 @@ fn card_info_rows_match_the_desktop_labels() {
         )
         .unwrap();
     assert_eq!(unavailable.rows[0].value, "Unavailable");
+    // `_unavailable_retrievability_source` without a backend.
+    assert!(
+        unavailable.rows[1]
+            .value
+            .ends_with(" (RWKV backend unavailable)"),
+        "{}",
+        unavailable.rows[1].value
+    );
 
     prepare(&mut engine, &fx, None);
     let info = engine
@@ -2859,4 +2877,495 @@ fn rwkv_memorised_history_builds_caches_and_resumes() {
     let after = memorised::history(&fx.backend, request("")).unwrap();
     assert_eq!(after, built);
     assert!(!dir.join("checkpoint.bin").exists());
+}
+
+#[test]
+fn card_info_without_a_current_state_is_unavailable_but_keeps_its_rows() {
+    let Some(fx) = fixture("cardinfostale", 3) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let card_id = fx.card_ids[0];
+    engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id })
+        .unwrap();
+    assert!(rwkv_score(&fx, card_id).is_some());
+
+    // A model is loaded but its state isn't current and there is no cache
+    // to catch up from: "RWKV unavailable" (not "backend unavailable"), the
+    // stored score cleared, the S90 and after-review rows still shown.
+    engine.base = None;
+    let info = engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id })
+        .unwrap();
+    let rows: Vec<(&str, &str)> = info
+        .rows
+        .iter()
+        .map(|r| (r.label.as_str(), r.value.as_str()))
+        .collect();
+    let after = all_unavailable();
+    assert_eq!(rows[0], ("RWKV computed R", "Unavailable"));
+    assert_eq!(rows[1].0, "Retrievability source");
+    assert!(rows[1].1.ends_with(" (RWKV unavailable)"), "{}", rows[1].1);
+    assert_eq!(rows[2], ("RWKV Curve Next S90", all_unavailable()));
+    assert_eq!(rows[3].0, "FSRS Next S90");
+    assert_eq!(rows[4], ("RWKV : R After Review", after));
+    assert_eq!(rows[5], ("RWKV : R After 10min", after));
+    assert_eq!(rows.len(), 6);
+    assert_eq!(rwkv_score(&fx, card_id), None);
+}
+
+/// Every button's value unavailable, as the S90 and after-review rows show it.
+fn all_unavailable() -> &'static str {
+    "Again:Unavailable Hard:Unavailable Good:Unavailable Easy:Unavailable"
+}
+
+#[test]
+fn card_info_during_a_replay_loads_the_card() {
+    let Some(fx) = fixture("cardinforeplay", 3) else {
+        return;
+    };
+    let plain = fx.card_ids[2];
+    add_plain_subdeck(&fx, &[2]);
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let card_id = fx.card_ids[0];
+    engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id })
+        .unwrap();
+    assert!(rwkv_score(&fx, card_id).is_some());
+
+    // `rwkv_card_info_rows` with the warm-up pending.
+    let info = views::replaying_card_info(&fx.backend, views::CardInfoRequest { card_id }).unwrap();
+    let labels: Vec<&str> = info.rows.iter().map(|r| r.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "RWKV computed R",
+            "Retrievability source",
+            "RWKV Curve Next S90",
+            "FSRS Next S90",
+            "RWKV : R After Review",
+            "RWKV : R After 10min",
+        ]
+    );
+    assert_eq!(info.rows[0].value, "Unavailable");
+    assert!(
+        info.rows[1].value.ends_with(" (RWKV unavailable)"),
+        "{}",
+        info.rows[1].value
+    );
+    assert!(
+        !info.rows[3].value.contains("Unavailable"),
+        "{}",
+        info.rows[3].value
+    );
+    assert_eq!(info.rows[4].value, all_unavailable());
+    assert_eq!(rwkv_score(&fx, card_id), None);
+
+    // A card whose preset doesn't use RWKV gets no rows.
+    let plain_info =
+        views::replaying_card_info(&fx.backend, views::CardInfoRequest { card_id: plain }).unwrap();
+    assert!(plain_info.rows.is_empty());
+}
+
+#[test]
+fn curve_reschedule_keeps_card_info_scores() {
+    let Some(fx) = fixture("reschedulescore", 3) else {
+        return;
+    };
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, None);
+    let card_id = fx.card_ids[0];
+    engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id })
+        .unwrap();
+    let before = rwkv_score(&fx, card_id);
+    assert!(before.is_some());
+    // `_apply_rwkv_review_reschedule` leaves Card Info's score alone.
+    let result = engine
+        .reschedule(&fx.backend, views::RescheduleRequest { deck_id: Some(1) })
+        .unwrap();
+    assert_eq!(result.updated, 3);
+    assert_eq!(rwkv_score(&fx, card_id), before);
+}
+
+#[test]
+fn moving_a_card_only_our_answers_reviewed_is_noticed() {
+    let Some(fx) = fixture_with_new("movedown", 4, 2) else {
+        return;
+    };
+    let plain = add_plain_subdeck(&fx, &[]);
+    let mut live = Engine::default();
+    assert_eq!(prepare(&mut live, &fx, None).source, "replayed");
+    live.score_deck_request(
+        &fx.backend,
+        ScoreDeckRequest {
+            deck_id: 1,
+            new_session: true,
+        },
+    )
+    .unwrap();
+    // Answer until a new card, whose only reviews are now ours, is answered.
+    let new_card = std::iter::from_fn(|| answer_next(&mut live, &fx, 3))
+        .take(40)
+        .find(|card_id| !fx.card_ids.contains(card_id))
+        .expect("no new card was answered");
+    assert!(live.current(&fx.backend).unwrap());
+
+    // The browser moves it to a deck with another preset: base's prefix and
+    // the revlog ids are unchanged, but a replay would use the new identity.
+    let _ = fx
+        .backend
+        .with_col(|col| {
+            CardsService::set_deck(
+                col,
+                anki_proto::cards::SetDeckRequest {
+                    card_ids: vec![new_card],
+                    deck_id: plain,
+                },
+            )
+        })
+        .unwrap();
+    assert!(
+        !live.current(&fx.backend).unwrap(),
+        "the move must be noticed"
+    );
+    assert!(
+        !live.save_now(&fx.backend),
+        "a stale state must not be saved"
+    );
+    assert_eq!(live.ensure_ready(&fx.backend).unwrap().0, "replayed");
+
+    let mut card_ids = fx.card_ids.clone();
+    card_ids.push(new_card);
+    let rows = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::rwkv_review_input_rows_for_cards(
+                col,
+                pb::RwkvReviewInputRowsForCardsRequest {
+                    card_ids,
+                    include_disabled_decks: true,
+                    include_suspended_review: true,
+                    include_new_cards: true,
+                },
+            )
+        })
+        .unwrap();
+    let queries: Vec<ReviewInput> = rows.rows.iter().map(query_input_from_row).collect();
+    assert!(queries.iter().any(|q| q.card_id == new_card));
+    assert_matches_a_fresh_replay(&mut live, &fx, &queries);
+}
+
+#[test]
+fn simulator_rules_alone_count_as_routing_rules() {
+    let Some(fx) = fixture("simrules", 1) else {
+        return;
+    };
+    // Written directly: setting it through the backend validates the rules'
+    // presets, which only the shape matters for here.
+    let set_overlay = |overlay: serde_json::Value| {
+        sql(
+            &fx.backend,
+            "insert or replace into config (key, usn, mtime_secs, val) \
+             values (?, -1, 0, cast(? as blob))",
+            vec![OVERLAY_KEY.into(), overlay.to_string().into()],
+        );
+    };
+    assert!(!overlay_has_routing_rules(&fx.backend).unwrap());
+    set_overlay(serde_json::json!({"rules": [], "simulator_rules": []}));
+    assert!(!overlay_has_routing_rules(&fx.backend).unwrap());
+    set_overlay(serde_json::json!({"simulator_rules": [{"preset_id": "x"}]}));
+    assert!(overlay_has_routing_rules(&fx.backend).unwrap());
+    set_overlay(serde_json::json!({"rules": [{"preset_id": "x"}]}));
+    assert!(overlay_has_routing_rules(&fx.backend).unwrap());
+}
+
+#[test]
+fn invalid_predictions_are_validated_like_the_desktop() {
+    let output = |button_probabilities: [f32; 4]| anki::rwkv::ReviewOutput {
+        retrievability: 1.0 - button_probabilities[0],
+        curve_retrievability: None,
+        button_probabilities,
+        current_interval: Some(3),
+        current_s90: Some(f32::NAN),
+        intervals: [Some(1.0), Some(f32::INFINITY), Some(-2.0), Some(4.0)],
+        s90s: [Some(0.0), None, Some(2.0), Some(f32::NAN)],
+        card_state: vec![],
+        deck_state: vec![],
+        note_state: vec![],
+        preset_state: vec![],
+        global_state: vec![],
+    };
+    // `_RustRwkvRuntime.review` drops intervals that aren't positive days.
+    let converted = prediction_from_output(output([0.1, 0.2, 0.6, 0.1]));
+    assert_eq!(converted.current_s90, None);
+    assert_eq!(converted.intervals, [Some(1.0), None, None, Some(4.0)]);
+    assert_eq!(converted.s90s, [None, None, Some(2.0), None]);
+    assert!(validate_output(&converted).is_ok());
+
+    // Button probabilities: each in [0, 1], summing to 1 within 0.01.
+    let valid = |p| validate_output(&prediction_from_output(output(p))).is_ok();
+    assert!(valid([0.1, 0.2, 0.6, 0.105]));
+    assert!(!valid([0.1, 0.2, 0.6, 0.2]));
+    assert!(!valid([-0.1, 0.4, 0.6, 0.1]));
+    assert!(!valid([f32::NAN, 0.2, 0.6, 0.1]));
+
+    let mut bad = prediction_from_output(output([0.1, 0.2, 0.6, 0.1]));
+    bad.curve_retrievability = Some(1.5);
+    assert!(validate_output(&bad).is_err());
+    bad.curve_retrievability = Some(0.5);
+    bad.current_interval = Some(0);
+    assert!(validate_output(&bad).is_err());
+}
+
+#[test]
+fn calibration_data_without_a_usable_model_keeps_the_fsrs_series() {
+    let Some(fx) = fixture("calibration-no-model", 24) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("calibration-no-model-cache");
+    let garbage = cache.0.join("not-a-model.bin");
+    std::fs::write(&garbage, b"not a model").unwrap();
+    let request = |model_path: Option<String>, ensure| calibration::CalibrationDataRequest {
+        search: "deck:current".into(),
+        day_range: 0,
+        model_path,
+        cache_dir: Some(cache.0.to_string_lossy().into_owned()),
+        precision: None,
+        ensure,
+    };
+    let mut engine = Engine::default();
+    let fsrs_only = engine
+        .calibration_data(&fx.backend, request(None, false))
+        .unwrap();
+    assert!(!fsrs_only.fsrs_revlog_ids.is_empty());
+    // `_ensure_rwkv_calibration_data` swallows the failure: the samples and
+    // FSRS predictions still come back, next to no RWKV ones.
+    for model in [
+        "/nonexistent/model.bin".to_string(),
+        garbage.to_string_lossy().into_owned(),
+    ] {
+        let data = engine
+            .calibration_data(&fx.backend, request(Some(model), true))
+            .unwrap();
+        assert_eq!(data, fsrs_only);
+        assert!(data.rwkv_revlog_ids.is_empty());
+    }
+}
+
+fn memorised_request(model_path: &str, cache: &std::path::Path) -> memorised::HistoryRequest {
+    memorised::HistoryRequest {
+        search: String::new(),
+        model_path: model_path.into(),
+        precision: None,
+        cache_dir: Some(cache.to_string_lossy().into_owned()),
+    }
+}
+
+#[test]
+fn rwkv_memorised_history_without_a_model_completes_only_when_empty() {
+    // An empty history completes with no series, model or not.
+    let dir = tempfile_dir::Dir::new("rwkv-memorised-empty");
+    let backend =
+        init_backend(&anki_proto::backend::BackendInit::default().encode_to_vec()).unwrap();
+    backend
+        .open_collection(anki_proto::collection::OpenCollectionRequest {
+            collection_path: dir.0.join("collection.anki2").to_string_lossy().into(),
+            media_folder_path: dir.0.join("media").to_string_lossy().into(),
+            media_db_path: dir.0.join("media.db").to_string_lossy().into(),
+        })
+        .unwrap();
+    let cache = tempfile_dir::Dir::new("rwkv-memorised-empty-cache");
+    let empty = memorised::detached_history(
+        &backend,
+        memorised_request("/nonexistent/model.bin", &cache.0),
+        std::time::Duration::ZERO,
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(empty.phase, "complete", "{:?}", empty.error);
+    assert!(empty.done);
+    assert!(empty.retrievability_by_day.len() <= 1);
+    assert!(empty.retrievability_by_day.iter().all(|r| *r == 0.0));
+
+    // Otherwise the build fails, reported in its progress, not as an error.
+    let Some(fx) = fixture("rwkv-memorised-no-model", 4) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("rwkv-memorised-no-model-cache");
+    let failed = memorised::detached_history(
+        &fx.backend,
+        memorised_request("/nonexistent/model.bin", &cache.0),
+        std::time::Duration::ZERO,
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(failed.phase, "failed");
+    assert!(failed.done);
+    assert_eq!(failed.error.as_deref(), Some("RWKV model is unavailable"));
+    assert!(!cache.0.join("memorised/history.bin").exists());
+}
+
+#[test]
+fn rwkv_memorised_history_restarts_when_the_history_changes_midway() {
+    let Some(fx) = fixture("rwkv-memorised-restart", 6) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("rwkv-memorised-restart-cache");
+    let review_count = |backend: &Backend| {
+        let params = history_params(backend, "int8").unwrap();
+        history_inputs(backend, &params)
+            .unwrap()
+            .metadata
+            .unwrap()
+            .identity
+            .unwrap()
+            .review_count
+    };
+    let before = review_count(&fx.backend);
+    let backend = fx.backend.clone();
+    let card_id = fx.card_ids[0];
+    let built = memorised::detached_history(
+        &fx.backend,
+        memorised_request(&fx.model, &cache.0),
+        std::time::Duration::from_millis(20),
+        move |progress| {
+            let started = std::time::Instant::now();
+            while started.elapsed().as_secs() < 60 {
+                let progress = progress();
+                if progress.phase == "computing"
+                    && progress
+                        .completed_through_day
+                        .is_some_and(|day| day >= progress.first_day.unwrap() + 2)
+                {
+                    // A review answered elsewhere while the build runs.
+                    sql(
+                        &backend,
+                        "insert into revlog (id, cid, usn, ease, ivl, lastIvl, factor, time, type) values (?, ?, -1, 3, 10, 10, 2500, 8000, 1)",
+                        vec![now_millis().into(), card_id.into()],
+                    );
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            panic!("the build never reached its third day");
+        },
+    )
+    .unwrap();
+    let after = review_count(&fx.backend);
+    assert_eq!(after, before + 1);
+    // The stale result was dropped and the build restarted: what it saved
+    // and showed is the changed history's.
+    assert_eq!(built.phase, "complete", "{:?}", built.error);
+    assert!(built.done);
+    let saved = memorised::read(&cache.0.join("memorised/history.bin")).unwrap();
+    let identity: serde_json::Value = serde_json::from_str(&saved.identity).unwrap();
+    assert_eq!(identity["reviewCount"].as_u64(), Some(after));
+    assert!(!cache.0.join("memorised/checkpoint.bin").exists());
+}
+
+/// Answers the queue's next card through the backend alone, as another
+/// client or the browser would.
+fn answer_behind_the_engine(fx: &Fixture) {
+    let queued = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::get_queued_cards(
+                col,
+                pb::GetQueuedCardsRequest {
+                    fetch_limit: 1,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap()
+        .cards
+        .remove(0);
+    let states = queued.states.unwrap();
+    let _ = fx
+        .backend
+        .with_col(|col| {
+            SchedulerService::answer_card(
+                col,
+                pb::CardAnswer {
+                    card_id: queued.card.unwrap().id,
+                    current_state: states.current,
+                    new_state: states.good,
+                    rating: 2,
+                    answered_at_millis: now_millis(),
+                    milliseconds_taken: 3000,
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap();
+}
+
+#[test]
+fn graphs_and_card_info_catch_up_without_a_full_replay() {
+    let Some(fx) = fixture("catchup", 4) else {
+        return;
+    };
+    let cache = tempfile_dir::Dir::new("catchup-cache");
+    let mut engine = Engine::default();
+    prepare(&mut engine, &fx, Some(&cache.0));
+    let graphs = |engine: &mut Engine| {
+        engine
+            .search_scores(
+                &fx.backend,
+                views::SearchScoresRequest {
+                    search: "deck:current".into(),
+                    wait: false,
+                },
+            )
+            .unwrap()
+            .status
+    };
+
+    // Newer reviews replayed on top (`_prepare_reviewer_backend_for_stats`).
+    answer_behind_the_engine(&fx);
+    assert!(!engine.current(&fx.backend).unwrap());
+    assert_eq!(graphs(&mut engine), "ready");
+    assert!(engine.current(&fx.backend).unwrap());
+
+    // Card Info does the same (`_prepare_reviewer_backend_for_card_info`).
+    answer_behind_the_engine(&fx);
+    let card_id = fx.card_ids[0];
+    let info = engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id })
+        .unwrap();
+    assert_eq!(info.rows[2].value, "RWKV");
+    assert!(engine.current(&fx.backend).unwrap());
+
+    // No resident state: restored from the disk cache.
+    engine.forget_state();
+    assert_eq!(graphs(&mut engine), "ready");
+    assert!(engine.current(&fx.backend).unwrap());
+
+    // Nothing to catch up from: unavailable, not pending, and no replay.
+    engine.forget_state();
+    engine.cache_dir = None;
+    assert_eq!(graphs(&mut engine), "unavailable");
+    let info = engine
+        .card_info(&fx.backend, views::CardInfoRequest { card_id })
+        .unwrap();
+    assert!(info.rows[1].value.ends_with(" (RWKV unavailable)"));
+    assert!(
+        engine.base.is_none(),
+        "neither may replay the whole history"
+    );
+    // A filtered deck's `warm_up_if_needed` still may.
+    let scores = engine
+        .search_scores(
+            &fx.backend,
+            views::SearchScoresRequest {
+                search: "deck:current".into(),
+                wait: true,
+            },
+        )
+        .unwrap();
+    assert_eq!(scores.status, "ready");
 }
