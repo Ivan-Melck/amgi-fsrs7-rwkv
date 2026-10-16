@@ -1,16 +1,17 @@
 name: Build Unsigned IPA
 
+# Builds run for version tags only: pushing to main builds nothing. A tag
+# such as `1.0` or `v1.0` builds the IPA and publishes it as a release.
 on:
-  workflow_dispatch:        # manual trigger from Actions UI
+  workflow_dispatch:        # manual trigger from Actions UI (artifact, no release)
   push:
-    branches:
-      - main                # every push builds an IPA artifact
     tags:
-      - 'v*'                # any version tag triggers release publish
+      - 'v*'
+      - '[0-9]*'
 
-# Cancel in-progress runs for branches/dispatch only. Tag-triggered release
-# runs use a tag-specific group with cancel-in-progress disabled so a re-tag
-# (or rapid push) doesn't abort a release publish mid-flight.
+# Cancel in-progress runs for dispatch only. Tag-triggered release runs use a
+# tag-specific group with cancel-in-progress disabled so a re-tag (or rapid
+# push) doesn't abort a release publish mid-flight.
 concurrency:
   group: build-ipa-${{ github.ref_type == 'tag' && format('tag-{0}', github.ref) || github.ref }}
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
@@ -273,7 +274,7 @@ jobs:
           retention-days: 7
 
       # ── 15. Publish GitHub Release (tag builds only) ──────────────
-      # Runs only when the workflow was triggered by a 'v*' tag push.
+      # Runs only when the workflow was triggered by a version tag push.
       # workflow_dispatch runs still upload the artifact above but do not
       # create a release.
 
