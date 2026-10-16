@@ -151,6 +151,12 @@ struct MemorisedHistoryTests {
         #expect(MemorisedChart.format(0.00001234) == "0.000012")
         #expect(MemorisedChart.format(1e-7) == "1.0e-7")
         #expect(MemorisedChart.format(0) == "0.0")
+        // toPrecision rounds the exact binary value: 0.105 and 1.15 sit just
+        // below their halfway points.
+        #expect(MemorisedChart.format(0.105) == "0.10")
+        #expect(MemorisedChart.format(1.15) == "1.1")
+        #expect(MemorisedChart.format(9.95) == "9.9")
+        #expect(MemorisedChart.format(2.5e-7) == "2.5e-7")
     }
 
     @Test func progressReportsRoundedPercent() {

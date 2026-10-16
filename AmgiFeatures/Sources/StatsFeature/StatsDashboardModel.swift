@@ -96,15 +96,75 @@ final class StatsDashboardModel {
     private func loadStatsBody(search: String, days: Int) async {
         if case .loaded = state { isRefreshing = true } else { state = .loading }
         defer { isRefreshing = false }
+        await fetchGraphs(GraphsKey(search: search, days: days), quiet: false)
+    }
+
+    // MARK: - RWKV retry (the desktop's `WithGraphData.svelte`)
+
+    /// While RWKV's scores are pending, the graphs show FSRS values and are
+    /// fetched again after `rwkvStatsRetryDelay`, at most
+    /// `rwkvStatsMaxRetries` times per search and period.
+    @ObservationIgnored var rwkvStatsRetryDelay: Duration = .seconds(2)
+    static let rwkvStatsMaxRetries = 30
+    @ObservationIgnored private var activeGraphsRequest = 0
+    @ObservationIgnored private var rwkvStatsRetryKey: GraphsKey?
+    @ObservationIgnored private var rwkvStatsRetryCount = 0
+    @ObservationIgnored private var rwkvStatsRetryTask: Task<Void, Never>?
+
+    /// `scheduleSourceDataUpdate` + `updateSourceData`. A quiet fetch (a
+    /// retry) keeps the graphs on screen if it fails, as the desktop does.
+    private func fetchGraphs(_ key: GraphsKey, quiet: Bool) async {
+        resetRwkvStatsRetry(for: key)
+        activeGraphsRequest += 1
+        let request = activeGraphsRequest
         do {
-            let graphs = try await statsClient.fetchGraphs(search, days)
-            guard !Task.isCancelled else { return }
+            let graphs = try await statsClient.fetchGraphs(key.search, key.days)
+            guard !Task.isCancelled, request == activeGraphsRequest else { return }
             state = .loaded(graphs)
+            handleRwkvStatsRetry(key, request: request, pending: graphs.rwkvStatsPending)
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, request == activeGraphsRequest, !quiet else { return }
             state = .failed(error.localizedDescription)
         }
     }
+
+    /// `resetRwkvStatsRetryForKey`.
+    private func resetRwkvStatsRetry(for key: GraphsKey) {
+        guard rwkvStatsRetryKey != key else { return }
+        rwkvStatsRetryTask?.cancel()
+        rwkvStatsRetryTask = nil
+        rwkvStatsRetryKey = key
+        rwkvStatsRetryCount = 0
+    }
+
+    /// `handleRwkvStatsRetry`.
+    private func handleRwkvStatsRetry(_ key: GraphsKey, request: Int, pending: Bool) {
+        resetRwkvStatsRetry(for: key)
+        guard pending else {
+            rwkvStatsRetryTask?.cancel()
+            rwkvStatsRetryTask = nil
+            rwkvStatsRetryCount = 0
+            return
+        }
+        guard rwkvStatsRetryTask == nil, rwkvStatsRetryCount < Self.rwkvStatsMaxRetries else { return }
+        rwkvStatsRetryCount += 1
+        let delay = rwkvStatsRetryDelay
+        rwkvStatsRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.rwkvStatsRetryTask = nil
+            // A newer fetch (another search or period, or a refresh) owns
+            // the graphs now.
+            guard request == self.activeGraphsRequest else { return }
+            await self.fetchGraphs(key, quiet: true)
+        }
+    }
+}
+
+/// `graphDataKey`: the search and period a graphs fetch is for.
+private struct GraphsKey: Equatable {
+    let search: String
+    let days: Int
 }

@@ -224,39 +224,7 @@ public struct MemorisedChart: Sendable, Hashable {
 
     /// `value > 10 ? value.toFixed(0) : value.toPrecision(2)`.
     public static func format(_ value: Double) -> String {
-        if value > 10 {
-            return String(format: "%.0f", value.rounded(.toNearestOrAwayFromZero))
-        }
-        return toPrecision2(value)
-    }
-
-    /// JavaScript's `Number.prototype.toPrecision(2)`.
-    static func toPrecision2(_ value: Double) -> String {
-        guard value.isFinite else { return value.isNaN ? "NaN" : (value > 0 ? "Infinity" : "-Infinity") }
-        if value == 0 { return "0.0" }
-        // Round to two significant digits first: the exponent can move.
-        let exponent = Int(floor(log10(abs(value))))
-        var scale = pow(10, Double(1 - exponent))
-        var mantissa = (abs(value) * scale).rounded(.toNearestOrAwayFromZero)
-        var e = exponent
-        if mantissa >= 100 {
-            e += 1
-            scale /= 10
-            mantissa = (abs(value) * scale).rounded(.toNearestOrAwayFromZero)
-        }
-        let sign = value < 0 ? "-" : ""
-        let digits = String(Int(mantissa))
-        if e < -6 || e >= 2 {
-            let exponentText = e < 0 ? "-\(-e)" : "+\(e)"
-            return "\(sign)\(digits.prefix(1)).\(digits.dropFirst())e\(exponentText)"
-        }
-        if e >= 1 {
-            return sign + digits
-        }
-        if e == 0 {
-            return "\(sign)\(digits.prefix(1)).\(digits.dropFirst())"
-        }
-        return sign + "0." + String(repeating: "0", count: -e - 1) + digits
+        value > 10 ? JSNumberFormat.toFixed(value, 0) : JSNumberFormat.toPrecision(value, 2)
     }
 }
 

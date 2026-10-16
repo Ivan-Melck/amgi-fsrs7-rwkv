@@ -28,6 +28,10 @@ public struct GraphsSnapshot: Sendable, Hashable {
     public var fsrs: Bool
     public var stability: IntervalsBuckets
     public var trueRetention: TrueRetentionStats
+    /// Not in the proto: RWKV presets' retrievability is still FSRS's
+    /// because RWKV's scores were pending when this was fetched (the
+    /// desktop's `X-Anki-Rwkv-Stats-Pending`); the graphs refetch shortly.
+    public var rwkvStatsPending: Bool
 
     public init(
         buttons: ButtonsBuckets = ButtonsBuckets(),
@@ -44,7 +48,8 @@ public struct GraphsSnapshot: Sendable, Hashable {
         retrievability: RetrievabilityBuckets = RetrievabilityBuckets(),
         fsrs: Bool = false,
         stability: IntervalsBuckets = IntervalsBuckets(),
-        trueRetention: TrueRetentionStats = TrueRetentionStats()
+        trueRetention: TrueRetentionStats = TrueRetentionStats(),
+        rwkvStatsPending: Bool = false
     ) {
         self.buttons = buttons
         self.cardCounts = cardCounts
@@ -61,6 +66,7 @@ public struct GraphsSnapshot: Sendable, Hashable {
         self.fsrs = fsrs
         self.stability = stability
         self.trueRetention = trueRetention
+        self.rwkvStatsPending = rwkvStatsPending
     }
 }
 

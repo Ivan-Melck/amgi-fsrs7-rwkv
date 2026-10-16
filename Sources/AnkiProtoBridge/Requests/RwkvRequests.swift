@@ -302,20 +302,27 @@ extension Request where Response == Void {
             decode: { _ in () }
         )
     }
+}
 
+private struct SearchScoresResponse: Decodable {
+    let status: String
+}
+
+extension Request where Response == Bool {
     /// RWKV scores for `search`, read by the graphs and by searches using
     /// `prop:rwkv:r` / `is:rwkv:due`. `wait` rebuilds the model state if
-    /// needed; graphs don't wait.
+    /// needed; graphs don't wait. True while the scores are pending (a
+    /// history replay is running, so the graphs show FSRS values for now):
+    /// the desktop's `X-Anki-Rwkv-Stats-Pending`.
     public static func rwkvSearchScores(search: String, wait: Bool) -> Self {
         Self(
             serviceId: ServiceID.aux,
             methodId: AuxMethod.rwkvSearchScores,
             bypassesCallLock: true,
             encode: { try encoder.encode(SearchScoresBody(search: search, wait: wait)) },
-            decode: { _ in () }
+            decode: { data in try decoder.decode(SearchScoresResponse.self, from: data).status == "pending" }
         )
     }
-
 }
 
 private struct SearchBody: Encodable {

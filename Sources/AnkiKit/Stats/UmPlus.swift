@@ -7,7 +7,7 @@
 //  legend and tooltip of `UMPlusGraph.ts`.
 //
 
-import Foundation
+public import Foundation
 
 /// `UmPlusBin`: reviews whose FSRS-minus-RWKV disagreement rounds to the
 /// same 5% step, with each model's mean error (prediction minus outcome).
@@ -95,7 +95,11 @@ public enum UmPlus {
     /// `weightedRmse`.
     static func weightedRmse(_ bins: [UmPlusBin], count: Int, error: (UmPlusBin) -> Double) -> Double {
         guard count > 0 else { return 0 }
-        let sum = bins.reduce(0.0) { $0 + Double($1.count) * error($1) * error($1) }
+        // `bin.count * error(bin) ** 2`: square first, as the add-on does.
+        let sum = bins.reduce(0.0) { partial, bin in
+            let value = error(bin)
+            return partial + Double(bin.count) * (value * value)
+        }
         return (sum / Double(count)).squareRoot()
     }
 
@@ -110,7 +114,7 @@ public enum UmPlus {
             $0 + Double($1.count) * ($1.disagreement - meanX) * (value($1) - meanY)
         }
         let variance = bins.reduce(0.0) {
-            $0 + Double($1.count) * ($1.disagreement - meanX) * ($1.disagreement - meanX)
+            $0 + Double($1.count) * (($1.disagreement - meanX) * ($1.disagreement - meanX))
         }
         return variance > 1e-12 ? covariance / variance : nil
     }
@@ -224,13 +228,16 @@ public enum UmPlus {
         }
     }
 
-    /// The hover tooltip.
-    public static func tooltip(_ bin: UmPlusBin, total: Int) -> [String] {
-        [
+    /// The hover tooltip. Fluent formats `$count` as a locale number
+    /// (grouped: "12,345"); `$percent` arrives as an already-fixed string.
+    public static func tooltip(_ bin: UmPlusBin, total: Int, locale: Locale = .current) -> [String] {
+        let count = bin.count.formatted(.number.locale(locale))
+        let percent = JSNumber.toFixed(Double(bin.count) / Double(total) * 100, 1)
+        return [
             "FSRS − RWKV disagreement: \(signedPercent(bin.disagreement, digits: 1))",
             "FSRS prediction error: \(signedPercent(bin.fsrsError, digits: 1))",
             "RWKV prediction error: \(signedPercent(bin.rwkvError, digits: 1))",
-            "Paired FSRS/RWKV reviews: \(bin.count) (\(JSNumber.toFixed(Double(bin.count) / Double(total) * 100, 1))% of paired reviews)",
+            "Paired FSRS/RWKV reviews: \(count) (\(percent)% of paired reviews)",
         ]
     }
 }

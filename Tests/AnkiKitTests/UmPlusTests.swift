@@ -6,6 +6,7 @@
 //  `umPlusGraph.test.ts` that don't depend on SVG.
 //
 
+import Foundation
 import Testing
 @testable import AnkiKit
 
@@ -133,6 +134,21 @@ import Testing
         #expect(close(UmPlus.weightedRegressionSlope(bins) { $0.rwkvError } ?? .nan, -0.75))
     }
 
+    @Test func scores_and_slopes_square_before_weighting_like_the_add_on() {
+        // `bin.count * error(bin) ** 2`, not `(count * error) * error`.
+        let samples = (1...3).map { CalibrationSample(revlogId: Int64($0), cardId: Int64($0), actual: 0) }
+        let predictions = Dictionary(uniqueKeysWithValues: samples.map { ($0.revlogId, 0.15) })
+        let data = UmPlus.build(samples: samples, fsrsPredictions: predictions, rwkvPredictions: predictions)
+        #expect(data.fsrsScore == 0.15000000000000002)
+        #expect(data.rwkvScore == 0.15000000000000002)
+        // `bin.count * (bin.disagreement - meanX) ** 2` in the variance.
+        let bins = [
+            UmPlusBin(index: 16, disagreement: -0.2, fsrsError: 0.1, rwkvError: 0, count: 1),
+            UmPlusBin(index: 21, disagreement: 0.05, fsrsError: 0.2, rwkvError: 0, count: 9),
+        ]
+        #expect(UmPlus.weightedRegressionSlope(bins) { $0.fsrsError } == 0.39999999999999997)
+    }
+
     @Test func regression_slope_is_unavailable_without_disagreement_variation() {
         #expect(UmPlus.weightedRegressionSlope([volumeBin(20, 200)]) { $0.fsrsError } == nil)
     }
@@ -202,12 +218,16 @@ import Testing
     }
 
     @Test func tooltip_lines() {
-        #expect(UmPlus.tooltip(data.bins[1], total: data.count) == [
+        #expect(UmPlus.tooltip(data.bins[1], total: data.count, locale: Locale(identifier: "en_US")) == [
             "FSRS − RWKV disagreement: +20.0%",
             "FSRS prediction error: 0.0%",
             "RWKV prediction error: -20.0%",
             "Paired FSRS/RWKV reviews: 400 (66.7% of paired reviews)",
         ])
+        // Fluent formats `$count` as a grouped locale number.
+        let large = UmPlusBin(index: 24, disagreement: 0.2, fsrsError: 0, rwkvError: -0.2, count: 12_345)
+        #expect(UmPlus.tooltip(large, total: 24_690, locale: Locale(identifier: "en_US")).last
+            == "Paired FSRS/RWKV reviews: 12,345 (50.0% of paired reviews)")
         let bounds = UmPlus.binBounds(data.bins[0], domain: -0.2...0.2)
         #expect(bounds.lowerBound == -0.2)
         #expect(abs(bounds.upperBound + 0.175) < 1e-12)
