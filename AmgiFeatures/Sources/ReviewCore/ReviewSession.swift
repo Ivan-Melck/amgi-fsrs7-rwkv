@@ -338,6 +338,10 @@ public final class ReviewSession {
             }
 
             undoStatus = outcome.newStatus
+            // The outcome's status is taken before the step lands on the
+            // other stack (no redo right after an undo); re-read it, as the
+            // desktop's `undo_actions_info` does.
+            await refreshUndoStatus()
             // The desktop's tooltip ("Answer Card undone"), spoken.
             AccessibilityNotification.Announcement(
                 redo ? outcome.redoneMessage : outcome.undoneMessage

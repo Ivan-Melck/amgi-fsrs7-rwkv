@@ -110,6 +110,10 @@ public final class CardContextMenuModel {
         defer { isUndoing = false }
         do {
             undoStatus = try await body().newStatus
+            // The outcome's status is taken before the step lands on the
+            // other stack (no redo right after an undo); re-read it, as the
+            // desktop's `undo_actions_info` does.
+            await refreshUndoAvailability()
             return true
         } catch {
             setError("\(prefix): \(error.localizedDescription)")
