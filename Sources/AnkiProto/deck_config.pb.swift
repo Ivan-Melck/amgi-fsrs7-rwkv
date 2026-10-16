@@ -186,6 +186,71 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
       set {_uniqueStorage()._fsrsParams6 = newValue}
     }
 
+    public var fsrsParams7: [Float] {
+      get {_storage._fsrsParams7}
+      set {_uniqueStorage()._fsrsParams7 = newValue}
+    }
+
+    public var fsrsMinimumIntervalSecs: UInt32 {
+      get {_storage._fsrsMinimumIntervalSecs}
+      set {_uniqueStorage()._fsrsMinimumIntervalSecs = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionEnabled: Bool {
+      get {_storage._fsrsDynamicDesiredRetentionEnabled}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionEnabled = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionParams: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionParams}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionParams = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionWeights: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionWeights}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionWeights = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionAvgDrs: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionAvgDrs}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionAvgDrs = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionMin: Float {
+      get {_storage._fsrsDynamicDesiredRetentionMin}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionMin = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionMax: Float {
+      get {_storage._fsrsDynamicDesiredRetentionMax}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionMax = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionFsrsEqWeights}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionFsrsEqWeights = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionFsrsEqDrs}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionFsrsEqDrs = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionClamp: Bool {
+      get {_storage._fsrsDynamicDesiredRetentionClamp}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionClamp = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionFixedTargetWeights}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionFixedTargetWeights = newValue}
+    }
+
+    public var fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] {
+      get {_storage._fsrsDynamicDesiredRetentionFixedTargetDrs}
+      set {_uniqueStorage()._fsrsDynamicDesiredRetentionFixedTargetDrs = newValue}
+    }
+
     public var newPerDay: UInt32 {
       get {_storage._newPerDay}
       set {_uniqueStorage()._newPerDay = newValue}
@@ -287,6 +352,82 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
       set {_uniqueStorage()._leechThreshold = newValue}
     }
 
+    public var leechOnlyIfYoung: Bool {
+      get {_storage._leechOnlyIfYoung}
+      set {_uniqueStorage()._leechOnlyIfYoung = newValue}
+    }
+
+    public var rwkvReviewEnabled: Bool {
+      get {_storage._rwkvReviewEnabled}
+      set {_uniqueStorage()._rwkvReviewEnabled = newValue}
+    }
+
+    public var rwkvReviewBatchSize: UInt32 {
+      get {_storage._rwkvReviewBatchSize}
+      set {_uniqueStorage()._rwkvReviewBatchSize = newValue}
+    }
+
+    public var rwkvReviewRefreshInterval: UInt32 {
+      get {_storage._rwkvReviewRefreshInterval}
+      set {_uniqueStorage()._rwkvReviewRefreshInterval = newValue}
+    }
+
+    public var rwkvReviewRefreshOnExit: Bool {
+      get {_storage._rwkvReviewRefreshOnExit}
+      set {_uniqueStorage()._rwkvReviewRefreshOnExit = newValue}
+    }
+
+    /// Retained for compatibility; Instant uses the global same-day setting.
+    public var rwkvReviewAllowSameDayReview: Bool {
+      get {_storage._rwkvReviewAllowSameDayReview}
+      set {_uniqueStorage()._rwkvReviewAllowSameDayReview = newValue}
+    }
+
+    public var rwkvReviewInstantOrderEnabled: Bool {
+      get {_storage._rwkvReviewInstantOrderEnabled}
+      set {_uniqueStorage()._rwkvReviewInstantOrderEnabled = newValue}
+    }
+
+    public var rwkvReviewDynamicPresetReplay: Bool {
+      get {_storage._rwkvReviewDynamicPresetReplay}
+      set {_uniqueStorage()._rwkvReviewDynamicPresetReplay = newValue}
+    }
+
+    public var rwkvReviewCandidateRefreshEnabled: Bool {
+      get {_storage._rwkvReviewCandidateRefreshEnabled}
+      set {_uniqueStorage()._rwkvReviewCandidateRefreshEnabled = newValue}
+    }
+
+    public var rwkvReviewMinInterveningReviews: UInt32 {
+      get {_storage._rwkvReviewMinInterveningReviews}
+      set {_uniqueStorage()._rwkvReviewMinInterveningReviews = newValue}
+    }
+
+    public var rwkvReviewMinElapsedSecs: UInt32 {
+      get {_storage._rwkvReviewMinElapsedSecs}
+      set {_uniqueStorage()._rwkvReviewMinElapsedSecs = newValue}
+    }
+
+    public var rwkvReviewFirstReviewElapsedFromCardCreation: Bool {
+      get {_storage._rwkvReviewFirstReviewElapsedFromCardCreation}
+      set {_uniqueStorage()._rwkvReviewFirstReviewElapsedFromCardCreation = newValue}
+    }
+
+    public var rwkvReviewEnforceGradeOrder: Bool {
+      get {_storage._rwkvReviewEnforceGradeOrder}
+      set {_uniqueStorage()._rwkvReviewEnforceGradeOrder = newValue}
+    }
+
+    public var rwkvReviewMinimumReviewsPerDay: UInt32 {
+      get {_storage._rwkvReviewMinimumReviewsPerDay}
+      set {_uniqueStorage()._rwkvReviewMinimumReviewsPerDay = newValue}
+    }
+
+    public var sameDayReviewsIgnoreReviewLimit: Bool {
+      get {_storage._sameDayReviewsIgnoreReviewLimit}
+      set {_uniqueStorage()._sameDayReviewsIgnoreReviewLimit = newValue}
+    }
+
     public var disableAutoplay: Bool {
       get {_storage._disableAutoplay}
       set {_uniqueStorage()._disableAutoplay = newValue}
@@ -368,6 +509,56 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
       set {_uniqueStorage()._easyDaysPercentages = newValue}
     }
 
+    public var reviewFuzzBase: Float {
+      get {_storage._reviewFuzzBase ?? 0}
+      set {_uniqueStorage()._reviewFuzzBase = newValue}
+    }
+    /// Returns true if `reviewFuzzBase` has been explicitly set.
+    public var hasReviewFuzzBase: Bool {_storage._reviewFuzzBase != nil}
+    /// Clears the value of `reviewFuzzBase`. Subsequent reads from it will return its default value.
+    public mutating func clearReviewFuzzBase() {_uniqueStorage()._reviewFuzzBase = nil}
+
+    public var reviewFuzzFactorShort: Float {
+      get {_storage._reviewFuzzFactorShort ?? 0}
+      set {_uniqueStorage()._reviewFuzzFactorShort = newValue}
+    }
+    /// Returns true if `reviewFuzzFactorShort` has been explicitly set.
+    public var hasReviewFuzzFactorShort: Bool {_storage._reviewFuzzFactorShort != nil}
+    /// Clears the value of `reviewFuzzFactorShort`. Subsequent reads from it will return its default value.
+    public mutating func clearReviewFuzzFactorShort() {_uniqueStorage()._reviewFuzzFactorShort = nil}
+
+    public var reviewFuzzFactorMid: Float {
+      get {_storage._reviewFuzzFactorMid ?? 0}
+      set {_uniqueStorage()._reviewFuzzFactorMid = newValue}
+    }
+    /// Returns true if `reviewFuzzFactorMid` has been explicitly set.
+    public var hasReviewFuzzFactorMid: Bool {_storage._reviewFuzzFactorMid != nil}
+    /// Clears the value of `reviewFuzzFactorMid`. Subsequent reads from it will return its default value.
+    public mutating func clearReviewFuzzFactorMid() {_uniqueStorage()._reviewFuzzFactorMid = nil}
+
+    public var reviewFuzzFactorLong: Float {
+      get {_storage._reviewFuzzFactorLong ?? 0}
+      set {_uniqueStorage()._reviewFuzzFactorLong = newValue}
+    }
+    /// Returns true if `reviewFuzzFactorLong` has been explicitly set.
+    public var hasReviewFuzzFactorLong: Bool {_storage._reviewFuzzFactorLong != nil}
+    /// Clears the value of `reviewFuzzFactorLong`. Subsequent reads from it will return its default value.
+    public mutating func clearReviewFuzzFactorLong() {_uniqueStorage()._reviewFuzzFactorLong = nil}
+
+    public var reviewFuzzEnabled: Bool {
+      get {_storage._reviewFuzzEnabled ?? false}
+      set {_uniqueStorage()._reviewFuzzEnabled = newValue}
+    }
+    /// Returns true if `reviewFuzzEnabled` has been explicitly set.
+    public var hasReviewFuzzEnabled: Bool {_storage._reviewFuzzEnabled != nil}
+    /// Clears the value of `reviewFuzzEnabled`. Subsequent reads from it will return its default value.
+    public mutating func clearReviewFuzzEnabled() {_uniqueStorage()._reviewFuzzEnabled = nil}
+
+    public var fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion {
+      get {_storage._fsrsVersion}
+      set {_uniqueStorage()._fsrsVersion = newValue}
+    }
+
     public var historicalRetention: Float {
       get {_storage._historicalRetention}
       set {_uniqueStorage()._historicalRetention = newValue}
@@ -443,6 +634,12 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
 
       /// Siblings are neither grouped nor ordered.
       case randomCards // = 4
+
+      /// Descending RWKV retrievability, then ascending position.
+      case descendingRetrievability // = 6
+
+      /// Ascending RWKV retrievability, then ascending position.
+      case ascendingRetrievability // = 7
       case UNRECOGNIZED(Int)
 
       public init() {
@@ -457,6 +654,8 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
         case 3: self = .randomNotes
         case 4: self = .randomCards
         case 5: self = .deckThenRandomNotes
+        case 6: self = .descendingRetrievability
+        case 7: self = .ascendingRetrievability
         default: self = .UNRECOGNIZED(rawValue)
         }
       }
@@ -469,6 +668,8 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
         case .randomNotes: return 3
         case .randomCards: return 4
         case .deckThenRandomNotes: return 5
+        case .descendingRetrievability: return 6
+        case .ascendingRetrievability: return 7
         case .UNRECOGNIZED(let i): return i
         }
       }
@@ -481,6 +682,8 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
         .highestPosition,
         .randomNotes,
         .randomCards,
+        .descendingRetrievability,
+        .ascendingRetrievability,
       ]
 
     }
@@ -773,6 +976,48 @@ public nonisolated struct Anki_DeckConfig_DeckConfig: Sendable {
 
     }
 
+    public nonisolated enum FsrsVersion: SwiftProtobuf.Enum, Swift.CaseIterable {
+      public typealias RawValue = Int
+      case seven // = 0
+      case six // = 1
+      case five // = 2
+      case four // = 3
+      case UNRECOGNIZED(Int)
+
+      public init() {
+        self = .seven
+      }
+
+      public init?(rawValue: Int) {
+        switch rawValue {
+        case 0: self = .seven
+        case 1: self = .six
+        case 2: self = .five
+        case 3: self = .four
+        default: self = .UNRECOGNIZED(rawValue)
+        }
+      }
+
+      public var rawValue: Int {
+        switch self {
+        case .seven: return 0
+        case .six: return 1
+        case .five: return 2
+        case .four: return 3
+        case .UNRECOGNIZED(let i): return i
+        }
+      }
+
+      // The compiler won't synthesize support with the UNRECOGNIZED case.
+      public static let allCases: [Anki_DeckConfig_DeckConfig.Config.FsrsVersion] = [
+        .seven,
+        .six,
+        .five,
+        .four,
+      ]
+
+    }
+
     public init() {}
 
     fileprivate var _storage = _StorageClass.defaultInstance
@@ -833,6 +1078,21 @@ public nonisolated struct Anki_DeckConfig_DeckConfigsForUpdate: @unchecked Senda
     set {_uniqueStorage()._fsrs = newValue}
   }
 
+  public var loadBalancerEnabled: Bool {
+    get {_storage._loadBalancerEnabled}
+    set {_uniqueStorage()._loadBalancerEnabled = newValue}
+  }
+
+  public var fsrsShortTermWithStepsEnabled: Bool {
+    get {_storage._fsrsShortTermWithStepsEnabled}
+    set {_uniqueStorage()._fsrsShortTermWithStepsEnabled = newValue}
+  }
+
+  public var fsrsLearningQueuesDisabled: Bool {
+    get {_storage._fsrsLearningQueuesDisabled}
+    set {_uniqueStorage()._fsrsLearningQueuesDisabled = newValue}
+  }
+
   public var fsrsHealthCheck: Bool {
     get {_storage._fsrsHealthCheck}
     set {_uniqueStorage()._fsrsHealthCheck = newValue}
@@ -851,6 +1111,31 @@ public nonisolated struct Anki_DeckConfig_DeckConfigsForUpdate: @unchecked Senda
   public var daysSinceLastFsrsOptimize: UInt32 {
     get {_storage._daysSinceLastFsrsOptimize}
     set {_uniqueStorage()._daysSinceLastFsrsOptimize = newValue}
+  }
+
+  public var reviewFuzzEnabled: Bool {
+    get {_storage._reviewFuzzEnabled}
+    set {_uniqueStorage()._reviewFuzzEnabled = newValue}
+  }
+
+  public var reviewFuzzBase: Float {
+    get {_storage._reviewFuzzBase}
+    set {_uniqueStorage()._reviewFuzzBase = newValue}
+  }
+
+  public var reviewFuzzFactorShort: Float {
+    get {_storage._reviewFuzzFactorShort}
+    set {_uniqueStorage()._reviewFuzzFactorShort = newValue}
+  }
+
+  public var reviewFuzzFactorMid: Float {
+    get {_storage._reviewFuzzFactorMid}
+    set {_uniqueStorage()._reviewFuzzFactorMid = newValue}
+  }
+
+  public var reviewFuzzFactorLong: Float {
+    get {_storage._reviewFuzzFactorLong}
+    set {_uniqueStorage()._reviewFuzzFactorLong = newValue}
   }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -897,6 +1182,8 @@ public nonisolated struct Anki_DeckConfig_DeckConfigsForUpdate: @unchecked Senda
     public var hasLimits: Bool {self._limits != nil}
     /// Clears the value of `limits`. Subsequent reads from it will return its default value.
     public mutating func clearLimits() {self._limits = nil}
+
+    public var subtreeConfigIds: [Int64] = []
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1043,6 +1330,66 @@ public nonisolated struct Anki_DeckConfig_UpdateDeckConfigsRequest: @unchecked S
     get {_storage._fsrsHealthCheck}
     set {_uniqueStorage()._fsrsHealthCheck = newValue}
   }
+
+  public var loadBalancerEnabled: Bool {
+    get {_storage._loadBalancerEnabled}
+    set {_uniqueStorage()._loadBalancerEnabled = newValue}
+  }
+
+  public var fsrsShortTermWithStepsEnabled: Bool {
+    get {_storage._fsrsShortTermWithStepsEnabled}
+    set {_uniqueStorage()._fsrsShortTermWithStepsEnabled = newValue}
+  }
+
+  public var fsrsLearningQueuesDisabled: Bool {
+    get {_storage._fsrsLearningQueuesDisabled}
+    set {_uniqueStorage()._fsrsLearningQueuesDisabled = newValue}
+  }
+
+  public var reviewFuzzEnabled: Bool {
+    get {_storage._reviewFuzzEnabled ?? false}
+    set {_uniqueStorage()._reviewFuzzEnabled = newValue}
+  }
+  /// Returns true if `reviewFuzzEnabled` has been explicitly set.
+  public var hasReviewFuzzEnabled: Bool {_storage._reviewFuzzEnabled != nil}
+  /// Clears the value of `reviewFuzzEnabled`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzEnabled() {_uniqueStorage()._reviewFuzzEnabled = nil}
+
+  public var reviewFuzzBase: Float {
+    get {_storage._reviewFuzzBase ?? 0}
+    set {_uniqueStorage()._reviewFuzzBase = newValue}
+  }
+  /// Returns true if `reviewFuzzBase` has been explicitly set.
+  public var hasReviewFuzzBase: Bool {_storage._reviewFuzzBase != nil}
+  /// Clears the value of `reviewFuzzBase`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzBase() {_uniqueStorage()._reviewFuzzBase = nil}
+
+  public var reviewFuzzFactorShort: Float {
+    get {_storage._reviewFuzzFactorShort ?? 0}
+    set {_uniqueStorage()._reviewFuzzFactorShort = newValue}
+  }
+  /// Returns true if `reviewFuzzFactorShort` has been explicitly set.
+  public var hasReviewFuzzFactorShort: Bool {_storage._reviewFuzzFactorShort != nil}
+  /// Clears the value of `reviewFuzzFactorShort`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzFactorShort() {_uniqueStorage()._reviewFuzzFactorShort = nil}
+
+  public var reviewFuzzFactorMid: Float {
+    get {_storage._reviewFuzzFactorMid ?? 0}
+    set {_uniqueStorage()._reviewFuzzFactorMid = newValue}
+  }
+  /// Returns true if `reviewFuzzFactorMid` has been explicitly set.
+  public var hasReviewFuzzFactorMid: Bool {_storage._reviewFuzzFactorMid != nil}
+  /// Clears the value of `reviewFuzzFactorMid`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzFactorMid() {_uniqueStorage()._reviewFuzzFactorMid = nil}
+
+  public var reviewFuzzFactorLong: Float {
+    get {_storage._reviewFuzzFactorLong ?? 0}
+    set {_uniqueStorage()._reviewFuzzFactorLong = newValue}
+  }
+  /// Returns true if `reviewFuzzFactorLong` has been explicitly set.
+  public var hasReviewFuzzFactorLong: Bool {_storage._reviewFuzzFactorLong != nil}
+  /// Clears the value of `reviewFuzzFactorLong`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzFactorLong() {_uniqueStorage()._reviewFuzzFactorLong = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1280,7 +1627,7 @@ nonisolated extension Anki_DeckConfig_DeckConfig: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Anki_DeckConfig_DeckConfig.protoMessageName + ".Config"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}learn_steps\0\u{3}relearn_steps\0\u{3}fsrs_params_4\0\u{3}easy_days_percentages\0\u{3}fsrs_params_5\0\u{3}fsrs_params_6\0\u{4}\u{3}new_per_day\0\u{3}reviews_per_day\0\u{3}initial_ease\0\u{3}easy_multiplier\0\u{3}hard_multiplier\0\u{3}lapse_multiplier\0\u{3}interval_multiplier\0\u{3}maximum_review_interval\0\u{3}minimum_lapse_interval\0\u{3}graduating_interval_good\0\u{3}graduating_interval_easy\0\u{3}new_card_insert_order\0\u{3}leech_action\0\u{3}leech_threshold\0\u{3}disable_autoplay\0\u{3}cap_answer_time_to_secs\0\u{3}show_timer\0\u{3}skip_question_when_replaying_answer\0\u{3}bury_new\0\u{3}bury_reviews\0\u{3}bury_interday_learning\0\u{3}new_mix\0\u{3}interday_learning_mix\0\u{3}new_card_sort_order\0\u{3}review_order\0\u{3}new_card_gather_priority\0\u{3}new_per_day_minimum\0\u{3}question_action\0\u{3}desired_retention\0\u{3}stop_timer_on_answer\0\u{4}\u{2}historical_retention\0\u{3}seconds_to_show_question\0\u{3}seconds_to_show_answer\0\u{3}answer_action\0\u{3}wait_for_audio\0\u{3}param_search\0\u{3}ignore_revlogs_before_date\0\u{2}Q\u{3}other\0\u{c}\u{7}\u{2}\u{c}'\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}learn_steps\0\u{3}relearn_steps\0\u{3}fsrs_params_4\0\u{3}easy_days_percentages\0\u{3}fsrs_params_5\0\u{3}fsrs_params_6\0\u{4}\u{3}new_per_day\0\u{3}reviews_per_day\0\u{3}initial_ease\0\u{3}easy_multiplier\0\u{3}hard_multiplier\0\u{3}lapse_multiplier\0\u{3}interval_multiplier\0\u{3}maximum_review_interval\0\u{3}minimum_lapse_interval\0\u{3}graduating_interval_good\0\u{3}graduating_interval_easy\0\u{3}new_card_insert_order\0\u{3}leech_action\0\u{3}leech_threshold\0\u{3}disable_autoplay\0\u{3}cap_answer_time_to_secs\0\u{3}show_timer\0\u{3}skip_question_when_replaying_answer\0\u{3}bury_new\0\u{3}bury_reviews\0\u{3}bury_interday_learning\0\u{3}new_mix\0\u{3}interday_learning_mix\0\u{3}new_card_sort_order\0\u{3}review_order\0\u{3}new_card_gather_priority\0\u{3}new_per_day_minimum\0\u{3}question_action\0\u{3}desired_retention\0\u{3}stop_timer_on_answer\0\u{4}\u{2}historical_retention\0\u{3}seconds_to_show_question\0\u{3}seconds_to_show_answer\0\u{3}answer_action\0\u{3}wait_for_audio\0\u{3}param_search\0\u{3}ignore_revlogs_before_date\0\u{3}review_fuzz_base\0\u{3}review_fuzz_factor_short\0\u{3}review_fuzz_factor_mid\0\u{3}review_fuzz_factor_long\0\u{3}review_fuzz_enabled\0\u{3}fsrs_params_7\0\u{3}fsrs_version\0\u{3}fsrs_minimum_interval_secs\0\u{3}fsrs_dynamic_desired_retention_enabled\0\u{3}fsrs_dynamic_desired_retention_params\0\u{3}fsrs_dynamic_desired_retention_weights\0\u{3}fsrs_dynamic_desired_retention_avg_drs\0\u{3}fsrs_dynamic_desired_retention_min\0\u{3}fsrs_dynamic_desired_retention_max\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_weights\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_drs\0\u{3}fsrs_dynamic_desired_retention_clamp\0\u{3}fsrs_dynamic_desired_retention_fixed_target_weights\0\u{3}fsrs_dynamic_desired_retention_fixed_target_drs\0\u{3}leech_only_if_young\0\u{3}rwkv_review_enabled\0\u{3}rwkv_review_batch_size\0\u{3}rwkv_review_refresh_interval\0\u{3}rwkv_review_refresh_on_exit\0\u{3}rwkv_review_allow_same_day_review\0\u{3}rwkv_review_instant_order_enabled\0\u{3}rwkv_review_dynamic_preset_replay\0\u{3}rwkv_review_candidate_refresh_enabled\0\u{4}\u{4}rwkv_review_min_intervening_reviews\0\u{3}rwkv_review_min_elapsed_secs\0\u{4}\u{3}rwkv_review_first_review_elapsed_from_card_creation\0\u{3}rwkv_review_enforce_grade_order\0\u{3}rwkv_review_minimum_reviews_per_day\0\u{3}same_day_reviews_ignore_review_limit\0\u{2}j\u{2}other\0\u{c}\u{7}\u{2}\u{c}K\u{1}\u{1}\u{c}L\u{1}\u{1}\u{c}M\u{1}\u{1}\u{c}P\u{1}\u{1}\u{c}Q\u{1}\u{1}\u{c}'\u{1}")
 
   fileprivate class _StorageClass {
     var _learnSteps: [Float] = []
@@ -1288,6 +1635,19 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
     var _fsrsParams4: [Float] = []
     var _fsrsParams5: [Float] = []
     var _fsrsParams6: [Float] = []
+    var _fsrsParams7: [Float] = []
+    var _fsrsMinimumIntervalSecs: UInt32 = 0
+    var _fsrsDynamicDesiredRetentionEnabled: Bool = false
+    var _fsrsDynamicDesiredRetentionParams: [Float] = []
+    var _fsrsDynamicDesiredRetentionWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionAvgDrs: [Float] = []
+    var _fsrsDynamicDesiredRetentionMin: Float = 0
+    var _fsrsDynamicDesiredRetentionMax: Float = 0
+    var _fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] = []
+    var _fsrsDynamicDesiredRetentionClamp: Bool = false
+    var _fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] = []
     var _newPerDay: UInt32 = 0
     var _reviewsPerDay: UInt32 = 0
     var _newPerDayMinimum: UInt32 = 0
@@ -1308,6 +1668,21 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
     var _interdayLearningMix: Anki_DeckConfig_DeckConfig.Config.ReviewMix = .mixWithReviews
     var _leechAction: Anki_DeckConfig_DeckConfig.Config.LeechAction = .suspend
     var _leechThreshold: UInt32 = 0
+    var _leechOnlyIfYoung: Bool = false
+    var _rwkvReviewEnabled: Bool = false
+    var _rwkvReviewBatchSize: UInt32 = 0
+    var _rwkvReviewRefreshInterval: UInt32 = 0
+    var _rwkvReviewRefreshOnExit: Bool = false
+    var _rwkvReviewAllowSameDayReview: Bool = false
+    var _rwkvReviewInstantOrderEnabled: Bool = false
+    var _rwkvReviewDynamicPresetReplay: Bool = false
+    var _rwkvReviewCandidateRefreshEnabled: Bool = false
+    var _rwkvReviewMinInterveningReviews: UInt32 = 0
+    var _rwkvReviewMinElapsedSecs: UInt32 = 0
+    var _rwkvReviewFirstReviewElapsedFromCardCreation: Bool = false
+    var _rwkvReviewEnforceGradeOrder: Bool = false
+    var _rwkvReviewMinimumReviewsPerDay: UInt32 = 0
+    var _sameDayReviewsIgnoreReviewLimit: Bool = false
     var _disableAutoplay: Bool = false
     var _capAnswerTimeToSecs: UInt32 = 0
     var _showTimer: Bool = false
@@ -1324,6 +1699,12 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
     var _desiredRetention: Float = 0
     var _ignoreRevlogsBeforeDate: String = String()
     var _easyDaysPercentages: [Float] = []
+    var _reviewFuzzBase: Float? = nil
+    var _reviewFuzzFactorShort: Float? = nil
+    var _reviewFuzzFactorMid: Float? = nil
+    var _reviewFuzzFactorLong: Float? = nil
+    var _reviewFuzzEnabled: Bool? = nil
+    var _fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion = .seven
     var _historicalRetention: Float = 0
     var _paramSearch: String = String()
     var _other: Data = Data()
@@ -1342,6 +1723,19 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
       _fsrsParams4 = source._fsrsParams4
       _fsrsParams5 = source._fsrsParams5
       _fsrsParams6 = source._fsrsParams6
+      _fsrsParams7 = source._fsrsParams7
+      _fsrsMinimumIntervalSecs = source._fsrsMinimumIntervalSecs
+      _fsrsDynamicDesiredRetentionEnabled = source._fsrsDynamicDesiredRetentionEnabled
+      _fsrsDynamicDesiredRetentionParams = source._fsrsDynamicDesiredRetentionParams
+      _fsrsDynamicDesiredRetentionWeights = source._fsrsDynamicDesiredRetentionWeights
+      _fsrsDynamicDesiredRetentionAvgDrs = source._fsrsDynamicDesiredRetentionAvgDrs
+      _fsrsDynamicDesiredRetentionMin = source._fsrsDynamicDesiredRetentionMin
+      _fsrsDynamicDesiredRetentionMax = source._fsrsDynamicDesiredRetentionMax
+      _fsrsDynamicDesiredRetentionFsrsEqWeights = source._fsrsDynamicDesiredRetentionFsrsEqWeights
+      _fsrsDynamicDesiredRetentionFsrsEqDrs = source._fsrsDynamicDesiredRetentionFsrsEqDrs
+      _fsrsDynamicDesiredRetentionClamp = source._fsrsDynamicDesiredRetentionClamp
+      _fsrsDynamicDesiredRetentionFixedTargetWeights = source._fsrsDynamicDesiredRetentionFixedTargetWeights
+      _fsrsDynamicDesiredRetentionFixedTargetDrs = source._fsrsDynamicDesiredRetentionFixedTargetDrs
       _newPerDay = source._newPerDay
       _reviewsPerDay = source._reviewsPerDay
       _newPerDayMinimum = source._newPerDayMinimum
@@ -1362,6 +1756,21 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
       _interdayLearningMix = source._interdayLearningMix
       _leechAction = source._leechAction
       _leechThreshold = source._leechThreshold
+      _leechOnlyIfYoung = source._leechOnlyIfYoung
+      _rwkvReviewEnabled = source._rwkvReviewEnabled
+      _rwkvReviewBatchSize = source._rwkvReviewBatchSize
+      _rwkvReviewRefreshInterval = source._rwkvReviewRefreshInterval
+      _rwkvReviewRefreshOnExit = source._rwkvReviewRefreshOnExit
+      _rwkvReviewAllowSameDayReview = source._rwkvReviewAllowSameDayReview
+      _rwkvReviewInstantOrderEnabled = source._rwkvReviewInstantOrderEnabled
+      _rwkvReviewDynamicPresetReplay = source._rwkvReviewDynamicPresetReplay
+      _rwkvReviewCandidateRefreshEnabled = source._rwkvReviewCandidateRefreshEnabled
+      _rwkvReviewMinInterveningReviews = source._rwkvReviewMinInterveningReviews
+      _rwkvReviewMinElapsedSecs = source._rwkvReviewMinElapsedSecs
+      _rwkvReviewFirstReviewElapsedFromCardCreation = source._rwkvReviewFirstReviewElapsedFromCardCreation
+      _rwkvReviewEnforceGradeOrder = source._rwkvReviewEnforceGradeOrder
+      _rwkvReviewMinimumReviewsPerDay = source._rwkvReviewMinimumReviewsPerDay
+      _sameDayReviewsIgnoreReviewLimit = source._sameDayReviewsIgnoreReviewLimit
       _disableAutoplay = source._disableAutoplay
       _capAnswerTimeToSecs = source._capAnswerTimeToSecs
       _showTimer = source._showTimer
@@ -1378,6 +1787,12 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
       _desiredRetention = source._desiredRetention
       _ignoreRevlogsBeforeDate = source._ignoreRevlogsBeforeDate
       _easyDaysPercentages = source._easyDaysPercentages
+      _reviewFuzzBase = source._reviewFuzzBase
+      _reviewFuzzFactorShort = source._reviewFuzzFactorShort
+      _reviewFuzzFactorMid = source._reviewFuzzFactorMid
+      _reviewFuzzFactorLong = source._reviewFuzzFactorLong
+      _reviewFuzzEnabled = source._reviewFuzzEnabled
+      _fsrsVersion = source._fsrsVersion
       _historicalRetention = source._historicalRetention
       _paramSearch = source._paramSearch
       _other = source._other
@@ -1442,6 +1857,40 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
         case 44: try { try decoder.decodeSingularBoolField(value: &_storage._waitForAudio) }()
         case 45: try { try decoder.decodeSingularStringField(value: &_storage._paramSearch) }()
         case 46: try { try decoder.decodeSingularStringField(value: &_storage._ignoreRevlogsBeforeDate) }()
+        case 47: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzBase) }()
+        case 48: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorShort) }()
+        case 49: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorMid) }()
+        case 50: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorLong) }()
+        case 51: try { try decoder.decodeSingularBoolField(value: &_storage._reviewFuzzEnabled) }()
+        case 52: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsParams7) }()
+        case 53: try { try decoder.decodeSingularEnumField(value: &_storage._fsrsVersion) }()
+        case 54: try { try decoder.decodeSingularUInt32Field(value: &_storage._fsrsMinimumIntervalSecs) }()
+        case 55: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsDynamicDesiredRetentionEnabled) }()
+        case 56: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionParams) }()
+        case 57: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionWeights) }()
+        case 58: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionAvgDrs) }()
+        case 59: try { try decoder.decodeSingularFloatField(value: &_storage._fsrsDynamicDesiredRetentionMin) }()
+        case 60: try { try decoder.decodeSingularFloatField(value: &_storage._fsrsDynamicDesiredRetentionMax) }()
+        case 61: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFsrsEqWeights) }()
+        case 62: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFsrsEqDrs) }()
+        case 63: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsDynamicDesiredRetentionClamp) }()
+        case 64: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFixedTargetWeights) }()
+        case 65: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFixedTargetDrs) }()
+        case 66: try { try decoder.decodeSingularBoolField(value: &_storage._leechOnlyIfYoung) }()
+        case 67: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewEnabled) }()
+        case 68: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvReviewBatchSize) }()
+        case 69: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvReviewRefreshInterval) }()
+        case 70: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewRefreshOnExit) }()
+        case 71: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewAllowSameDayReview) }()
+        case 72: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewInstantOrderEnabled) }()
+        case 73: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewDynamicPresetReplay) }()
+        case 74: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewCandidateRefreshEnabled) }()
+        case 78: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvReviewMinInterveningReviews) }()
+        case 79: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvReviewMinElapsedSecs) }()
+        case 82: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewFirstReviewElapsedFromCardCreation) }()
+        case 83: try { try decoder.decodeSingularBoolField(value: &_storage._rwkvReviewEnforceGradeOrder) }()
+        case 84: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvReviewMinimumReviewsPerDay) }()
+        case 85: try { try decoder.decodeSingularBoolField(value: &_storage._sameDayReviewsIgnoreReviewLimit) }()
         case 255: try { try decoder.decodeSingularBytesField(value: &_storage._other) }()
         default: break
         }
@@ -1451,6 +1900,10 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
       if !_storage._learnSteps.isEmpty {
         try visitor.visitPackedFloatField(value: _storage._learnSteps, fieldNumber: 1)
       }
@@ -1580,6 +2033,108 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
       if !_storage._ignoreRevlogsBeforeDate.isEmpty {
         try visitor.visitSingularStringField(value: _storage._ignoreRevlogsBeforeDate, fieldNumber: 46)
       }
+      try { if let v = _storage._reviewFuzzBase {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 47)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorShort {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 48)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorMid {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 49)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorLong {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 50)
+      } }()
+      try { if let v = _storage._reviewFuzzEnabled {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 51)
+      } }()
+      if !_storage._fsrsParams7.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsParams7, fieldNumber: 52)
+      }
+      if _storage._fsrsVersion != .seven {
+        try visitor.visitSingularEnumField(value: _storage._fsrsVersion, fieldNumber: 53)
+      }
+      if _storage._fsrsMinimumIntervalSecs != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._fsrsMinimumIntervalSecs, fieldNumber: 54)
+      }
+      if _storage._fsrsDynamicDesiredRetentionEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsDynamicDesiredRetentionEnabled, fieldNumber: 55)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionParams.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionParams, fieldNumber: 56)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionWeights, fieldNumber: 57)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionAvgDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionAvgDrs, fieldNumber: 58)
+      }
+      if _storage._fsrsDynamicDesiredRetentionMin.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._fsrsDynamicDesiredRetentionMin, fieldNumber: 59)
+      }
+      if _storage._fsrsDynamicDesiredRetentionMax.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._fsrsDynamicDesiredRetentionMax, fieldNumber: 60)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFsrsEqWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFsrsEqWeights, fieldNumber: 61)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFsrsEqDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFsrsEqDrs, fieldNumber: 62)
+      }
+      if _storage._fsrsDynamicDesiredRetentionClamp != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsDynamicDesiredRetentionClamp, fieldNumber: 63)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFixedTargetWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFixedTargetWeights, fieldNumber: 64)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFixedTargetDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFixedTargetDrs, fieldNumber: 65)
+      }
+      if _storage._leechOnlyIfYoung != false {
+        try visitor.visitSingularBoolField(value: _storage._leechOnlyIfYoung, fieldNumber: 66)
+      }
+      if _storage._rwkvReviewEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewEnabled, fieldNumber: 67)
+      }
+      if _storage._rwkvReviewBatchSize != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvReviewBatchSize, fieldNumber: 68)
+      }
+      if _storage._rwkvReviewRefreshInterval != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvReviewRefreshInterval, fieldNumber: 69)
+      }
+      if _storage._rwkvReviewRefreshOnExit != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewRefreshOnExit, fieldNumber: 70)
+      }
+      if _storage._rwkvReviewAllowSameDayReview != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewAllowSameDayReview, fieldNumber: 71)
+      }
+      if _storage._rwkvReviewInstantOrderEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewInstantOrderEnabled, fieldNumber: 72)
+      }
+      if _storage._rwkvReviewDynamicPresetReplay != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewDynamicPresetReplay, fieldNumber: 73)
+      }
+      if _storage._rwkvReviewCandidateRefreshEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewCandidateRefreshEnabled, fieldNumber: 74)
+      }
+      if _storage._rwkvReviewMinInterveningReviews != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvReviewMinInterveningReviews, fieldNumber: 78)
+      }
+      if _storage._rwkvReviewMinElapsedSecs != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvReviewMinElapsedSecs, fieldNumber: 79)
+      }
+      if _storage._rwkvReviewFirstReviewElapsedFromCardCreation != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewFirstReviewElapsedFromCardCreation, fieldNumber: 82)
+      }
+      if _storage._rwkvReviewEnforceGradeOrder != false {
+        try visitor.visitSingularBoolField(value: _storage._rwkvReviewEnforceGradeOrder, fieldNumber: 83)
+      }
+      if _storage._rwkvReviewMinimumReviewsPerDay != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvReviewMinimumReviewsPerDay, fieldNumber: 84)
+      }
+      if _storage._sameDayReviewsIgnoreReviewLimit != false {
+        try visitor.visitSingularBoolField(value: _storage._sameDayReviewsIgnoreReviewLimit, fieldNumber: 85)
+      }
       if !_storage._other.isEmpty {
         try visitor.visitSingularBytesField(value: _storage._other, fieldNumber: 255)
       }
@@ -1597,6 +2152,19 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
         if _storage._fsrsParams4 != rhs_storage._fsrsParams4 {return false}
         if _storage._fsrsParams5 != rhs_storage._fsrsParams5 {return false}
         if _storage._fsrsParams6 != rhs_storage._fsrsParams6 {return false}
+        if _storage._fsrsParams7 != rhs_storage._fsrsParams7 {return false}
+        if _storage._fsrsMinimumIntervalSecs != rhs_storage._fsrsMinimumIntervalSecs {return false}
+        if _storage._fsrsDynamicDesiredRetentionEnabled != rhs_storage._fsrsDynamicDesiredRetentionEnabled {return false}
+        if _storage._fsrsDynamicDesiredRetentionParams != rhs_storage._fsrsDynamicDesiredRetentionParams {return false}
+        if _storage._fsrsDynamicDesiredRetentionWeights != rhs_storage._fsrsDynamicDesiredRetentionWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionAvgDrs != rhs_storage._fsrsDynamicDesiredRetentionAvgDrs {return false}
+        if _storage._fsrsDynamicDesiredRetentionMin != rhs_storage._fsrsDynamicDesiredRetentionMin {return false}
+        if _storage._fsrsDynamicDesiredRetentionMax != rhs_storage._fsrsDynamicDesiredRetentionMax {return false}
+        if _storage._fsrsDynamicDesiredRetentionFsrsEqWeights != rhs_storage._fsrsDynamicDesiredRetentionFsrsEqWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionFsrsEqDrs != rhs_storage._fsrsDynamicDesiredRetentionFsrsEqDrs {return false}
+        if _storage._fsrsDynamicDesiredRetentionClamp != rhs_storage._fsrsDynamicDesiredRetentionClamp {return false}
+        if _storage._fsrsDynamicDesiredRetentionFixedTargetWeights != rhs_storage._fsrsDynamicDesiredRetentionFixedTargetWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionFixedTargetDrs != rhs_storage._fsrsDynamicDesiredRetentionFixedTargetDrs {return false}
         if _storage._newPerDay != rhs_storage._newPerDay {return false}
         if _storage._reviewsPerDay != rhs_storage._reviewsPerDay {return false}
         if _storage._newPerDayMinimum != rhs_storage._newPerDayMinimum {return false}
@@ -1617,6 +2185,21 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
         if _storage._interdayLearningMix != rhs_storage._interdayLearningMix {return false}
         if _storage._leechAction != rhs_storage._leechAction {return false}
         if _storage._leechThreshold != rhs_storage._leechThreshold {return false}
+        if _storage._leechOnlyIfYoung != rhs_storage._leechOnlyIfYoung {return false}
+        if _storage._rwkvReviewEnabled != rhs_storage._rwkvReviewEnabled {return false}
+        if _storage._rwkvReviewBatchSize != rhs_storage._rwkvReviewBatchSize {return false}
+        if _storage._rwkvReviewRefreshInterval != rhs_storage._rwkvReviewRefreshInterval {return false}
+        if _storage._rwkvReviewRefreshOnExit != rhs_storage._rwkvReviewRefreshOnExit {return false}
+        if _storage._rwkvReviewAllowSameDayReview != rhs_storage._rwkvReviewAllowSameDayReview {return false}
+        if _storage._rwkvReviewInstantOrderEnabled != rhs_storage._rwkvReviewInstantOrderEnabled {return false}
+        if _storage._rwkvReviewDynamicPresetReplay != rhs_storage._rwkvReviewDynamicPresetReplay {return false}
+        if _storage._rwkvReviewCandidateRefreshEnabled != rhs_storage._rwkvReviewCandidateRefreshEnabled {return false}
+        if _storage._rwkvReviewMinInterveningReviews != rhs_storage._rwkvReviewMinInterveningReviews {return false}
+        if _storage._rwkvReviewMinElapsedSecs != rhs_storage._rwkvReviewMinElapsedSecs {return false}
+        if _storage._rwkvReviewFirstReviewElapsedFromCardCreation != rhs_storage._rwkvReviewFirstReviewElapsedFromCardCreation {return false}
+        if _storage._rwkvReviewEnforceGradeOrder != rhs_storage._rwkvReviewEnforceGradeOrder {return false}
+        if _storage._rwkvReviewMinimumReviewsPerDay != rhs_storage._rwkvReviewMinimumReviewsPerDay {return false}
+        if _storage._sameDayReviewsIgnoreReviewLimit != rhs_storage._sameDayReviewsIgnoreReviewLimit {return false}
         if _storage._disableAutoplay != rhs_storage._disableAutoplay {return false}
         if _storage._capAnswerTimeToSecs != rhs_storage._capAnswerTimeToSecs {return false}
         if _storage._showTimer != rhs_storage._showTimer {return false}
@@ -1633,6 +2216,12 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config: SwiftProtobuf.Message, 
         if _storage._desiredRetention != rhs_storage._desiredRetention {return false}
         if _storage._ignoreRevlogsBeforeDate != rhs_storage._ignoreRevlogsBeforeDate {return false}
         if _storage._easyDaysPercentages != rhs_storage._easyDaysPercentages {return false}
+        if _storage._reviewFuzzBase != rhs_storage._reviewFuzzBase {return false}
+        if _storage._reviewFuzzFactorShort != rhs_storage._reviewFuzzFactorShort {return false}
+        if _storage._reviewFuzzFactorMid != rhs_storage._reviewFuzzFactorMid {return false}
+        if _storage._reviewFuzzFactorLong != rhs_storage._reviewFuzzFactorLong {return false}
+        if _storage._reviewFuzzEnabled != rhs_storage._reviewFuzzEnabled {return false}
+        if _storage._fsrsVersion != rhs_storage._fsrsVersion {return false}
         if _storage._historicalRetention != rhs_storage._historicalRetention {return false}
         if _storage._paramSearch != rhs_storage._paramSearch {return false}
         if _storage._other != rhs_storage._other {return false}
@@ -1650,7 +2239,7 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config.NewCardInsertOrder: Swif
 }
 
 nonisolated extension Anki_DeckConfig_DeckConfig.Config.NewCardGatherPriority: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0NEW_CARD_GATHER_PRIORITY_DECK\0\u{1}NEW_CARD_GATHER_PRIORITY_LOWEST_POSITION\0\u{1}NEW_CARD_GATHER_PRIORITY_HIGHEST_POSITION\0\u{1}NEW_CARD_GATHER_PRIORITY_RANDOM_NOTES\0\u{1}NEW_CARD_GATHER_PRIORITY_RANDOM_CARDS\0\u{1}NEW_CARD_GATHER_PRIORITY_DECK_THEN_RANDOM_NOTES\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0NEW_CARD_GATHER_PRIORITY_DECK\0\u{1}NEW_CARD_GATHER_PRIORITY_LOWEST_POSITION\0\u{1}NEW_CARD_GATHER_PRIORITY_HIGHEST_POSITION\0\u{1}NEW_CARD_GATHER_PRIORITY_RANDOM_NOTES\0\u{1}NEW_CARD_GATHER_PRIORITY_RANDOM_CARDS\0\u{1}NEW_CARD_GATHER_PRIORITY_DECK_THEN_RANDOM_NOTES\0\u{1}NEW_CARD_GATHER_PRIORITY_DESCENDING_RETRIEVABILITY\0\u{1}NEW_CARD_GATHER_PRIORITY_ASCENDING_RETRIEVABILITY\0")
 }
 
 nonisolated extension Anki_DeckConfig_DeckConfig.Config.NewCardSortOrder: SwiftProtobuf._ProtoNameProviding {
@@ -1677,9 +2266,13 @@ nonisolated extension Anki_DeckConfig_DeckConfig.Config.QuestionAction: SwiftPro
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0QUESTION_ACTION_SHOW_ANSWER\0\u{1}QUESTION_ACTION_SHOW_REMINDER\0")
 }
 
+nonisolated extension Anki_DeckConfig_DeckConfig.Config.FsrsVersion: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0FSRS_VERSION_SEVEN\0\u{1}FSRS_VERSION_SIX\0\u{1}FSRS_VERSION_FIVE\0\u{1}FSRS_VERSION_FOUR\0")
+}
+
 nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeckConfigsForUpdate"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}all_config\0\u{3}current_deck\0\u{1}defaults\0\u{3}schema_modified\0\u{4}\u{2}card_state_customizer\0\u{3}new_cards_ignore_review_limit\0\u{1}fsrs\0\u{3}apply_all_parent_limits\0\u{3}days_since_last_fsrs_optimize\0\u{3}fsrs_health_check\0\u{3}fsrs_legacy_evaluate\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}all_config\0\u{3}current_deck\0\u{1}defaults\0\u{3}schema_modified\0\u{4}\u{2}card_state_customizer\0\u{3}new_cards_ignore_review_limit\0\u{1}fsrs\0\u{3}apply_all_parent_limits\0\u{3}days_since_last_fsrs_optimize\0\u{3}fsrs_health_check\0\u{3}fsrs_legacy_evaluate\0\u{3}load_balancer_enabled\0\u{3}fsrs_short_term_with_steps_enabled\0\u{3}fsrs_learning_queues_disabled\0\u{3}review_fuzz_enabled\0\u{3}review_fuzz_base\0\u{3}review_fuzz_factor_short\0\u{3}review_fuzz_factor_mid\0\u{3}review_fuzz_factor_long\0")
 
   fileprivate class _StorageClass {
     var _allConfig: [Anki_DeckConfig_DeckConfigsForUpdate.ConfigWithExtra] = []
@@ -1689,10 +2282,18 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate: SwiftProtobuf.Messag
     var _cardStateCustomizer: String = String()
     var _newCardsIgnoreReviewLimit: Bool = false
     var _fsrs: Bool = false
+    var _loadBalancerEnabled: Bool = false
+    var _fsrsShortTermWithStepsEnabled: Bool = false
+    var _fsrsLearningQueuesDisabled: Bool = false
     var _fsrsHealthCheck: Bool = false
     var _fsrsLegacyEvaluate: Bool = false
     var _applyAllParentLimits: Bool = false
     var _daysSinceLastFsrsOptimize: UInt32 = 0
+    var _reviewFuzzEnabled: Bool = false
+    var _reviewFuzzBase: Float = 0
+    var _reviewFuzzFactorShort: Float = 0
+    var _reviewFuzzFactorMid: Float = 0
+    var _reviewFuzzFactorLong: Float = 0
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1710,10 +2311,18 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate: SwiftProtobuf.Messag
       _cardStateCustomizer = source._cardStateCustomizer
       _newCardsIgnoreReviewLimit = source._newCardsIgnoreReviewLimit
       _fsrs = source._fsrs
+      _loadBalancerEnabled = source._loadBalancerEnabled
+      _fsrsShortTermWithStepsEnabled = source._fsrsShortTermWithStepsEnabled
+      _fsrsLearningQueuesDisabled = source._fsrsLearningQueuesDisabled
       _fsrsHealthCheck = source._fsrsHealthCheck
       _fsrsLegacyEvaluate = source._fsrsLegacyEvaluate
       _applyAllParentLimits = source._applyAllParentLimits
       _daysSinceLastFsrsOptimize = source._daysSinceLastFsrsOptimize
+      _reviewFuzzEnabled = source._reviewFuzzEnabled
+      _reviewFuzzBase = source._reviewFuzzBase
+      _reviewFuzzFactorShort = source._reviewFuzzFactorShort
+      _reviewFuzzFactorMid = source._reviewFuzzFactorMid
+      _reviewFuzzFactorLong = source._reviewFuzzFactorLong
     }
   }
 
@@ -1743,6 +2352,14 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate: SwiftProtobuf.Messag
         case 10: try { try decoder.decodeSingularUInt32Field(value: &_storage._daysSinceLastFsrsOptimize) }()
         case 11: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsHealthCheck) }()
         case 12: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsLegacyEvaluate) }()
+        case 13: try { try decoder.decodeSingularBoolField(value: &_storage._loadBalancerEnabled) }()
+        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsShortTermWithStepsEnabled) }()
+        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsLearningQueuesDisabled) }()
+        case 16: try { try decoder.decodeSingularBoolField(value: &_storage._reviewFuzzEnabled) }()
+        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzBase) }()
+        case 18: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorShort) }()
+        case 19: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorMid) }()
+        case 20: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorLong) }()
         default: break
         }
       }
@@ -1788,6 +2405,30 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate: SwiftProtobuf.Messag
       if _storage._fsrsLegacyEvaluate != false {
         try visitor.visitSingularBoolField(value: _storage._fsrsLegacyEvaluate, fieldNumber: 12)
       }
+      if _storage._loadBalancerEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._loadBalancerEnabled, fieldNumber: 13)
+      }
+      if _storage._fsrsShortTermWithStepsEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsShortTermWithStepsEnabled, fieldNumber: 14)
+      }
+      if _storage._fsrsLearningQueuesDisabled != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsLearningQueuesDisabled, fieldNumber: 15)
+      }
+      if _storage._reviewFuzzEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._reviewFuzzEnabled, fieldNumber: 16)
+      }
+      if _storage._reviewFuzzBase.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._reviewFuzzBase, fieldNumber: 17)
+      }
+      if _storage._reviewFuzzFactorShort.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._reviewFuzzFactorShort, fieldNumber: 18)
+      }
+      if _storage._reviewFuzzFactorMid.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._reviewFuzzFactorMid, fieldNumber: 19)
+      }
+      if _storage._reviewFuzzFactorLong.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._reviewFuzzFactorLong, fieldNumber: 20)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1804,10 +2445,18 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate: SwiftProtobuf.Messag
         if _storage._cardStateCustomizer != rhs_storage._cardStateCustomizer {return false}
         if _storage._newCardsIgnoreReviewLimit != rhs_storage._newCardsIgnoreReviewLimit {return false}
         if _storage._fsrs != rhs_storage._fsrs {return false}
+        if _storage._loadBalancerEnabled != rhs_storage._loadBalancerEnabled {return false}
+        if _storage._fsrsShortTermWithStepsEnabled != rhs_storage._fsrsShortTermWithStepsEnabled {return false}
+        if _storage._fsrsLearningQueuesDisabled != rhs_storage._fsrsLearningQueuesDisabled {return false}
         if _storage._fsrsHealthCheck != rhs_storage._fsrsHealthCheck {return false}
         if _storage._fsrsLegacyEvaluate != rhs_storage._fsrsLegacyEvaluate {return false}
         if _storage._applyAllParentLimits != rhs_storage._applyAllParentLimits {return false}
         if _storage._daysSinceLastFsrsOptimize != rhs_storage._daysSinceLastFsrsOptimize {return false}
+        if _storage._reviewFuzzEnabled != rhs_storage._reviewFuzzEnabled {return false}
+        if _storage._reviewFuzzBase != rhs_storage._reviewFuzzBase {return false}
+        if _storage._reviewFuzzFactorShort != rhs_storage._reviewFuzzFactorShort {return false}
+        if _storage._reviewFuzzFactorMid != rhs_storage._reviewFuzzFactorMid {return false}
+        if _storage._reviewFuzzFactorLong != rhs_storage._reviewFuzzFactorLong {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1858,7 +2507,7 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate.ConfigWithExtra: Swif
 
 nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate.CurrentDeck: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Anki_DeckConfig_DeckConfigsForUpdate.protoMessageName + ".CurrentDeck"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}config_id\0\u{3}parent_config_ids\0\u{1}limits\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}config_id\0\u{3}parent_config_ids\0\u{1}limits\0\u{3}subtree_config_ids\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1870,6 +2519,7 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate.CurrentDeck: SwiftPro
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.configID) }()
       case 3: try { try decoder.decodeRepeatedInt64Field(value: &self.parentConfigIds) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._limits) }()
+      case 5: try { try decoder.decodeRepeatedInt64Field(value: &self.subtreeConfigIds) }()
       default: break
       }
     }
@@ -1892,6 +2542,9 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate.CurrentDeck: SwiftPro
     try { if let v = self._limits {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
+    if !self.subtreeConfigIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.subtreeConfigIds, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1900,6 +2553,7 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate.CurrentDeck: SwiftPro
     if lhs.configID != rhs.configID {return false}
     if lhs.parentConfigIds != rhs.parentConfigIds {return false}
     if lhs._limits != rhs._limits {return false}
+    if lhs.subtreeConfigIds != rhs.subtreeConfigIds {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1971,7 +2625,7 @@ nonisolated extension Anki_DeckConfig_DeckConfigsForUpdate.CurrentDeck.Limits: S
 
 nonisolated extension Anki_DeckConfig_UpdateDeckConfigsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdateDeckConfigsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}target_deck_id\0\u{1}configs\0\u{3}removed_config_ids\0\u{1}mode\0\u{3}card_state_customizer\0\u{1}limits\0\u{3}new_cards_ignore_review_limit\0\u{1}fsrs\0\u{3}apply_all_parent_limits\0\u{3}fsrs_reschedule\0\u{3}fsrs_health_check\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}target_deck_id\0\u{1}configs\0\u{3}removed_config_ids\0\u{1}mode\0\u{3}card_state_customizer\0\u{1}limits\0\u{3}new_cards_ignore_review_limit\0\u{1}fsrs\0\u{3}apply_all_parent_limits\0\u{3}fsrs_reschedule\0\u{3}fsrs_health_check\0\u{3}load_balancer_enabled\0\u{3}fsrs_short_term_with_steps_enabled\0\u{3}fsrs_learning_queues_disabled\0\u{3}review_fuzz_enabled\0\u{3}review_fuzz_base\0\u{3}review_fuzz_factor_short\0\u{3}review_fuzz_factor_mid\0\u{3}review_fuzz_factor_long\0")
 
   fileprivate class _StorageClass {
     var _targetDeckID: Int64 = 0
@@ -1985,6 +2639,14 @@ nonisolated extension Anki_DeckConfig_UpdateDeckConfigsRequest: SwiftProtobuf.Me
     var _applyAllParentLimits: Bool = false
     var _fsrsReschedule: Bool = false
     var _fsrsHealthCheck: Bool = false
+    var _loadBalancerEnabled: Bool = false
+    var _fsrsShortTermWithStepsEnabled: Bool = false
+    var _fsrsLearningQueuesDisabled: Bool = false
+    var _reviewFuzzEnabled: Bool? = nil
+    var _reviewFuzzBase: Float? = nil
+    var _reviewFuzzFactorShort: Float? = nil
+    var _reviewFuzzFactorMid: Float? = nil
+    var _reviewFuzzFactorLong: Float? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2006,6 +2668,14 @@ nonisolated extension Anki_DeckConfig_UpdateDeckConfigsRequest: SwiftProtobuf.Me
       _applyAllParentLimits = source._applyAllParentLimits
       _fsrsReschedule = source._fsrsReschedule
       _fsrsHealthCheck = source._fsrsHealthCheck
+      _loadBalancerEnabled = source._loadBalancerEnabled
+      _fsrsShortTermWithStepsEnabled = source._fsrsShortTermWithStepsEnabled
+      _fsrsLearningQueuesDisabled = source._fsrsLearningQueuesDisabled
+      _reviewFuzzEnabled = source._reviewFuzzEnabled
+      _reviewFuzzBase = source._reviewFuzzBase
+      _reviewFuzzFactorShort = source._reviewFuzzFactorShort
+      _reviewFuzzFactorMid = source._reviewFuzzFactorMid
+      _reviewFuzzFactorLong = source._reviewFuzzFactorLong
     }
   }
 
@@ -2035,6 +2705,14 @@ nonisolated extension Anki_DeckConfig_UpdateDeckConfigsRequest: SwiftProtobuf.Me
         case 9: try { try decoder.decodeSingularBoolField(value: &_storage._applyAllParentLimits) }()
         case 10: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsReschedule) }()
         case 11: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsHealthCheck) }()
+        case 12: try { try decoder.decodeSingularBoolField(value: &_storage._loadBalancerEnabled) }()
+        case 13: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsShortTermWithStepsEnabled) }()
+        case 14: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsLearningQueuesDisabled) }()
+        case 15: try { try decoder.decodeSingularBoolField(value: &_storage._reviewFuzzEnabled) }()
+        case 16: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzBase) }()
+        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorShort) }()
+        case 18: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorMid) }()
+        case 19: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorLong) }()
         default: break
         }
       }
@@ -2080,6 +2758,30 @@ nonisolated extension Anki_DeckConfig_UpdateDeckConfigsRequest: SwiftProtobuf.Me
       if _storage._fsrsHealthCheck != false {
         try visitor.visitSingularBoolField(value: _storage._fsrsHealthCheck, fieldNumber: 11)
       }
+      if _storage._loadBalancerEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._loadBalancerEnabled, fieldNumber: 12)
+      }
+      if _storage._fsrsShortTermWithStepsEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsShortTermWithStepsEnabled, fieldNumber: 13)
+      }
+      if _storage._fsrsLearningQueuesDisabled != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsLearningQueuesDisabled, fieldNumber: 14)
+      }
+      try { if let v = _storage._reviewFuzzEnabled {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._reviewFuzzBase {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorShort {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorMid {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 18)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorLong {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 19)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2100,6 +2802,14 @@ nonisolated extension Anki_DeckConfig_UpdateDeckConfigsRequest: SwiftProtobuf.Me
         if _storage._applyAllParentLimits != rhs_storage._applyAllParentLimits {return false}
         if _storage._fsrsReschedule != rhs_storage._fsrsReschedule {return false}
         if _storage._fsrsHealthCheck != rhs_storage._fsrsHealthCheck {return false}
+        if _storage._loadBalancerEnabled != rhs_storage._loadBalancerEnabled {return false}
+        if _storage._fsrsShortTermWithStepsEnabled != rhs_storage._fsrsShortTermWithStepsEnabled {return false}
+        if _storage._fsrsLearningQueuesDisabled != rhs_storage._fsrsLearningQueuesDisabled {return false}
+        if _storage._reviewFuzzEnabled != rhs_storage._reviewFuzzEnabled {return false}
+        if _storage._reviewFuzzBase != rhs_storage._reviewFuzzBase {return false}
+        if _storage._reviewFuzzFactorShort != rhs_storage._reviewFuzzFactorShort {return false}
+        if _storage._reviewFuzzFactorMid != rhs_storage._reviewFuzzFactorMid {return false}
+        if _storage._reviewFuzzFactorLong != rhs_storage._reviewFuzzFactorLong {return false}
         return true
       }
       if !storagesAreEqual {return false}

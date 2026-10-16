@@ -129,6 +129,8 @@ public nonisolated struct Anki_Scheduler_SchedulingState: Sendable {
     /// Clears the value of `memoryState`. Subsequent reads from it will return its default value.
     public mutating func clearMemoryState() {self._memoryState = nil}
 
+    public var fuzzDeltaDays: Int32 = 0
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -136,35 +138,34 @@ public nonisolated struct Anki_Scheduler_SchedulingState: Sendable {
     fileprivate var _memoryState: Anki_Cards_FsrsMemoryState? = nil
   }
 
-  public nonisolated struct Relearning: Sendable {
+  public nonisolated struct Relearning: @unchecked Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
     public var review: Anki_Scheduler_SchedulingState.Review {
-      get {_review ?? Anki_Scheduler_SchedulingState.Review()}
-      set {_review = newValue}
+      get {_storage._review ?? Anki_Scheduler_SchedulingState.Review()}
+      set {_uniqueStorage()._review = newValue}
     }
     /// Returns true if `review` has been explicitly set.
-    public var hasReview: Bool {self._review != nil}
+    public var hasReview: Bool {_storage._review != nil}
     /// Clears the value of `review`. Subsequent reads from it will return its default value.
-    public mutating func clearReview() {self._review = nil}
+    public mutating func clearReview() {_uniqueStorage()._review = nil}
 
     public var learning: Anki_Scheduler_SchedulingState.Learning {
-      get {_learning ?? Anki_Scheduler_SchedulingState.Learning()}
-      set {_learning = newValue}
+      get {_storage._learning ?? Anki_Scheduler_SchedulingState.Learning()}
+      set {_uniqueStorage()._learning = newValue}
     }
     /// Returns true if `learning` has been explicitly set.
-    public var hasLearning: Bool {self._learning != nil}
+    public var hasLearning: Bool {_storage._learning != nil}
     /// Clears the value of `learning`. Subsequent reads from it will return its default value.
-    public mutating func clearLearning() {self._learning = nil}
+    public mutating func clearLearning() {_uniqueStorage()._learning = nil}
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
 
-    fileprivate var _review: Anki_Scheduler_SchedulingState.Review? = nil
-    fileprivate var _learning: Anki_Scheduler_SchedulingState.Learning? = nil
+    fileprivate var _storage = _StorageClass.defaultInstance
   }
 
   public nonisolated struct Normal: Sendable {
@@ -401,9 +402,34 @@ public nonisolated struct Anki_Scheduler_GetQueuedCardsRequest: Sendable {
 
   public var intradayLearningOnly: Bool = false
 
+  public var skipSchedulingStates: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_GetSchedulingStatesRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var desiredRetentionOverride: Float {
+    get {_desiredRetentionOverride ?? 0}
+    set {_desiredRetentionOverride = newValue}
+  }
+  /// Returns true if `desiredRetentionOverride` has been explicitly set.
+  public var hasDesiredRetentionOverride: Bool {self._desiredRetentionOverride != nil}
+  /// Clears the value of `desiredRetentionOverride`. Subsequent reads from it will return its default value.
+  public mutating func clearDesiredRetentionOverride() {self._desiredRetentionOverride = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _desiredRetentionOverride: Float? = nil
 }
 
 public nonisolated struct Anki_Scheduler_SchedTimingTodayResponse: Sendable {
@@ -739,7 +765,42 @@ public nonisolated struct Anki_Scheduler_GradeNowRequest: Sendable {
 
   public var rating: Anki_Scheduler_CardAnswer.Rating = .again
 
+  public var cardOptions: [Anki_Scheduler_GradeNowRequest.CardOptions] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct CardOptions: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var desiredRetentionOverride: Float {
+      get {_desiredRetentionOverride ?? 0}
+      set {_desiredRetentionOverride = newValue}
+    }
+    /// Returns true if `desiredRetentionOverride` has been explicitly set.
+    public var hasDesiredRetentionOverride: Bool {self._desiredRetentionOverride != nil}
+    /// Clears the value of `desiredRetentionOverride`. Subsequent reads from it will return its default value.
+    public mutating func clearDesiredRetentionOverride() {self._desiredRetentionOverride = nil}
+
+    public var schedulingStates: Anki_Scheduler_SchedulingStates {
+      get {_schedulingStates ?? Anki_Scheduler_SchedulingStates()}
+      set {_schedulingStates = newValue}
+    }
+    /// Returns true if `schedulingStates` has been explicitly set.
+    public var hasSchedulingStates: Bool {self._schedulingStates != nil}
+    /// Clears the value of `schedulingStates`. Subsequent reads from it will return its default value.
+    public mutating func clearSchedulingStates() {self._schedulingStates = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _desiredRetentionOverride: Float? = nil
+    fileprivate var _schedulingStates: Anki_Scheduler_SchedulingStates? = nil
+  }
 
   public init() {}
 }
@@ -828,6 +889,16 @@ public nonisolated struct Anki_Scheduler_SchedulingStates: @unchecked Sendable {
   /// Clears the value of `easy`. Subsequent reads from it will return its default value.
   public mutating func clearEasy() {_uniqueStorage()._easy = nil}
 
+  public var dynamicDesiredRetentions: [Float] {
+    get {_storage._dynamicDesiredRetentions}
+    set {_uniqueStorage()._dynamicDesiredRetentions = newValue}
+  }
+
+  public var dynamicDesiredRetentionEnabled: Bool {
+    get {_storage._dynamicDesiredRetentionEnabled}
+    set {_uniqueStorage()._dynamicDesiredRetentionEnabled = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -877,6 +948,44 @@ public nonisolated struct Anki_Scheduler_CardAnswer: @unchecked Sendable {
     get {_storage._millisecondsTaken}
     set {_uniqueStorage()._millisecondsTaken = newValue}
   }
+
+  public var desiredRetentionOverride: Float {
+    get {_storage._desiredRetentionOverride ?? 0}
+    set {_uniqueStorage()._desiredRetentionOverride = newValue}
+  }
+  /// Returns true if `desiredRetentionOverride` has been explicitly set.
+  public var hasDesiredRetentionOverride: Bool {_storage._desiredRetentionOverride != nil}
+  /// Clears the value of `desiredRetentionOverride`. Subsequent reads from it will return its default value.
+  public mutating func clearDesiredRetentionOverride() {_uniqueStorage()._desiredRetentionOverride = nil}
+
+  public var rwkvS90: Float {
+    get {_storage._rwkvS90 ?? 0}
+    set {_uniqueStorage()._rwkvS90 = newValue}
+  }
+  /// Returns true if `rwkvS90` has been explicitly set.
+  public var hasRwkvS90: Bool {_storage._rwkvS90 != nil}
+  /// Clears the value of `rwkvS90`. Subsequent reads from it will return its default value.
+  public mutating func clearRwkvS90() {_uniqueStorage()._rwkvS90 = nil}
+
+  public var rwkvRetrievability: Float {
+    get {_storage._rwkvRetrievability ?? 0}
+    set {_uniqueStorage()._rwkvRetrievability = newValue}
+  }
+  /// Returns true if `rwkvRetrievability` has been explicitly set.
+  public var hasRwkvRetrievability: Bool {_storage._rwkvRetrievability != nil}
+  /// Clears the value of `rwkvRetrievability`. Subsequent reads from it will return its default value.
+  public mutating func clearRwkvRetrievability() {_uniqueStorage()._rwkvRetrievability = nil}
+
+  /// Raw revlog kind selected by RWKV's synthetic same-day state machine.
+  /// Only Learning through Filtered (0-3) are accepted by the backend.
+  public var rwkvReviewKind: UInt32 {
+    get {_storage._rwkvReviewKind ?? 0}
+    set {_uniqueStorage()._rwkvReviewKind = newValue}
+  }
+  /// Returns true if `rwkvReviewKind` has been explicitly set.
+  public var hasRwkvReviewKind: Bool {_storage._rwkvReviewKind != nil}
+  /// Clears the value of `rwkvReviewKind`. Subsequent reads from it will return its default value.
+  public mutating func clearRwkvReviewKind() {_uniqueStorage()._rwkvReviewKind = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1198,9 +1307,62 @@ public nonisolated struct Anki_Scheduler_ComputeFsrsParamsRequest: Sendable {
 
   public var healthCheck: Bool = false
 
+  public var includeSameDayReviews: Bool {
+    get {_includeSameDayReviews ?? false}
+    set {_includeSameDayReviews = newValue}
+  }
+  /// Returns true if `includeSameDayReviews` has been explicitly set.
+  public var hasIncludeSameDayReviews: Bool {self._includeSameDayReviews != nil}
+  /// Clears the value of `includeSameDayReviews`. Subsequent reads from it will return its default value.
+  public mutating func clearIncludeSameDayReviews() {self._includeSameDayReviews = nil}
+
+  public var fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion {
+    get {_fsrsVersion ?? .seven}
+    set {_fsrsVersion = newValue}
+  }
+  /// Returns true if `fsrsVersion` has been explicitly set.
+  public var hasFsrsVersion: Bool {self._fsrsVersion != nil}
+  /// Clears the value of `fsrsVersion`. Subsequent reads from it will return its default value.
+  public mutating func clearFsrsVersion() {self._fsrsVersion = nil}
+
+  public var dynamicDesiredRetentionEnabled: Bool = false
+
+  public var dynamicDesiredRetentionReviewLimit: UInt32 {
+    get {_dynamicDesiredRetentionReviewLimit ?? 0}
+    set {_dynamicDesiredRetentionReviewLimit = newValue}
+  }
+  /// Returns true if `dynamicDesiredRetentionReviewLimit` has been explicitly set.
+  public var hasDynamicDesiredRetentionReviewLimit: Bool {self._dynamicDesiredRetentionReviewLimit != nil}
+  /// Clears the value of `dynamicDesiredRetentionReviewLimit`. Subsequent reads from it will return its default value.
+  public mutating func clearDynamicDesiredRetentionReviewLimit() {self._dynamicDesiredRetentionReviewLimit = nil}
+
+  public var dynamicDesiredRetentionMaxCostPerdayMinutes: Float {
+    get {_dynamicDesiredRetentionMaxCostPerdayMinutes ?? 0}
+    set {_dynamicDesiredRetentionMaxCostPerdayMinutes = newValue}
+  }
+  /// Returns true if `dynamicDesiredRetentionMaxCostPerdayMinutes` has been explicitly set.
+  public var hasDynamicDesiredRetentionMaxCostPerdayMinutes: Bool {self._dynamicDesiredRetentionMaxCostPerdayMinutes != nil}
+  /// Clears the value of `dynamicDesiredRetentionMaxCostPerdayMinutes`. Subsequent reads from it will return its default value.
+  public mutating func clearDynamicDesiredRetentionMaxCostPerdayMinutes() {self._dynamicDesiredRetentionMaxCostPerdayMinutes = nil}
+
+  public var enableSchedulingPenalties: Bool {
+    get {_enableSchedulingPenalties ?? false}
+    set {_enableSchedulingPenalties = newValue}
+  }
+  /// Returns true if `enableSchedulingPenalties` has been explicitly set.
+  public var hasEnableSchedulingPenalties: Bool {self._enableSchedulingPenalties != nil}
+  /// Clears the value of `enableSchedulingPenalties`. Subsequent reads from it will return its default value.
+  public mutating func clearEnableSchedulingPenalties() {self._enableSchedulingPenalties = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _includeSameDayReviews: Bool? = nil
+  fileprivate var _fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion? = nil
+  fileprivate var _dynamicDesiredRetentionReviewLimit: UInt32? = nil
+  fileprivate var _dynamicDesiredRetentionMaxCostPerdayMinutes: Float? = nil
+  fileprivate var _enableSchedulingPenalties: Bool? = nil
 }
 
 public nonisolated struct Anki_Scheduler_ComputeFsrsParamsResponse: Sendable {
@@ -1221,11 +1383,217 @@ public nonisolated struct Anki_Scheduler_ComputeFsrsParamsResponse: Sendable {
   /// Clears the value of `healthCheckPassed`. Subsequent reads from it will return its default value.
   public mutating func clearHealthCheckPassed() {self._healthCheckPassed = nil}
 
+  public var fsrsDynamicDesiredRetentionParams: [Float] = []
+
+  public var fsrsDynamicDesiredRetentionWeights: [Float] = []
+
+  public var fsrsDynamicDesiredRetentionAvgDrs: [Float] = []
+
+  public var fsrsDynamicDesiredRetentionMin: Float = 0
+
+  public var fsrsDynamicDesiredRetentionMax: Float = 0
+
+  public var fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] = []
+
+  public var fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] = []
+
+  public var fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] = []
+
+  public var fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _healthCheckPassed: Bool? = nil
+}
+
+public nonisolated struct Anki_Scheduler_ComputeFsrsParamsBatchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_ComputeFsrsParamsBatchRequest.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var id: String = String()
+
+    public var name: String = String()
+
+    //// The search used to gather cards for training
+    public var search: String = String()
+
+    public var currentParams: [Float] = []
+
+    public var ignoreRevlogsBeforeMs: Int64 = 0
+
+    public var numOfRelearningSteps: UInt32 = 0
+
+    public var includeSameDayReviews: Bool {
+      get {_includeSameDayReviews ?? false}
+      set {_includeSameDayReviews = newValue}
+    }
+    /// Returns true if `includeSameDayReviews` has been explicitly set.
+    public var hasIncludeSameDayReviews: Bool {self._includeSameDayReviews != nil}
+    /// Clears the value of `includeSameDayReviews`. Subsequent reads from it will return its default value.
+    public mutating func clearIncludeSameDayReviews() {self._includeSameDayReviews = nil}
+
+    public var fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion {
+      get {_fsrsVersion ?? .seven}
+      set {_fsrsVersion = newValue}
+    }
+    /// Returns true if `fsrsVersion` has been explicitly set.
+    public var hasFsrsVersion: Bool {self._fsrsVersion != nil}
+    /// Clears the value of `fsrsVersion`. Subsequent reads from it will return its default value.
+    public mutating func clearFsrsVersion() {self._fsrsVersion = nil}
+
+    public var dynamicDesiredRetentionEnabled: Bool = false
+
+    public var dynamicDesiredRetentionReviewLimit: UInt32 {
+      get {_dynamicDesiredRetentionReviewLimit ?? 0}
+      set {_dynamicDesiredRetentionReviewLimit = newValue}
+    }
+    /// Returns true if `dynamicDesiredRetentionReviewLimit` has been explicitly set.
+    public var hasDynamicDesiredRetentionReviewLimit: Bool {self._dynamicDesiredRetentionReviewLimit != nil}
+    /// Clears the value of `dynamicDesiredRetentionReviewLimit`. Subsequent reads from it will return its default value.
+    public mutating func clearDynamicDesiredRetentionReviewLimit() {self._dynamicDesiredRetentionReviewLimit = nil}
+
+    public var dynamicDesiredRetentionMaxCostPerdayMinutes: Float {
+      get {_dynamicDesiredRetentionMaxCostPerdayMinutes ?? 0}
+      set {_dynamicDesiredRetentionMaxCostPerdayMinutes = newValue}
+    }
+    /// Returns true if `dynamicDesiredRetentionMaxCostPerdayMinutes` has been explicitly set.
+    public var hasDynamicDesiredRetentionMaxCostPerdayMinutes: Bool {self._dynamicDesiredRetentionMaxCostPerdayMinutes != nil}
+    /// Clears the value of `dynamicDesiredRetentionMaxCostPerdayMinutes`. Subsequent reads from it will return its default value.
+    public mutating func clearDynamicDesiredRetentionMaxCostPerdayMinutes() {self._dynamicDesiredRetentionMaxCostPerdayMinutes = nil}
+
+    public var enableSchedulingPenalties: Bool {
+      get {_enableSchedulingPenalties ?? false}
+      set {_enableSchedulingPenalties = newValue}
+    }
+    /// Returns true if `enableSchedulingPenalties` has been explicitly set.
+    public var hasEnableSchedulingPenalties: Bool {self._enableSchedulingPenalties != nil}
+    /// Clears the value of `enableSchedulingPenalties`. Subsequent reads from it will return its default value.
+    public mutating func clearEnableSchedulingPenalties() {self._enableSchedulingPenalties = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _includeSameDayReviews: Bool? = nil
+    fileprivate var _fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion? = nil
+    fileprivate var _dynamicDesiredRetentionReviewLimit: UInt32? = nil
+    fileprivate var _dynamicDesiredRetentionMaxCostPerdayMinutes: Float? = nil
+    fileprivate var _enableSchedulingPenalties: Bool? = nil
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_ComputeFsrsParamsBatchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_ComputeFsrsParamsBatchResponse.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var id: String = String()
+
+    public var name: String = String()
+
+    public var params: [Float] = []
+
+    public var fsrsItems: UInt32 = 0
+
+    public var fsrsDynamicDesiredRetentionParams: [Float] = []
+
+    public var fsrsDynamicDesiredRetentionWeights: [Float] = []
+
+    public var fsrsDynamicDesiredRetentionAvgDrs: [Float] = []
+
+    public var fsrsDynamicDesiredRetentionMin: Float = 0
+
+    public var fsrsDynamicDesiredRetentionMax: Float = 0
+
+    public var fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] = []
+
+    public var fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] = []
+
+    public var fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] = []
+
+    public var fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] = []
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_ComputeFsrsReviewRetrievabilityCalibrationRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  //// The search used to gather cards for calibration
+  public var search: String = String()
+
+  public var params: [Float] = []
+
+  public var ignoreRevlogsBeforeMs: Int64 = 0
+
+  public var numOfRelearningSteps: UInt32 = 0
+
+  public var includeSameDayReviews: Bool {
+    get {_includeSameDayReviews ?? false}
+    set {_includeSameDayReviews = newValue}
+  }
+  /// Returns true if `includeSameDayReviews` has been explicitly set.
+  public var hasIncludeSameDayReviews: Bool {self._includeSameDayReviews != nil}
+  /// Clears the value of `includeSameDayReviews`. Subsequent reads from it will return its default value.
+  public mutating func clearIncludeSameDayReviews() {self._includeSameDayReviews = nil}
+
+  public var fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion {
+    get {_fsrsVersion ?? .seven}
+    set {_fsrsVersion = newValue}
+  }
+  /// Returns true if `fsrsVersion` has been explicitly set.
+  public var hasFsrsVersion: Bool {self._fsrsVersion != nil}
+  /// Clears the value of `fsrsVersion`. Subsequent reads from it will return its default value.
+  public mutating func clearFsrsVersion() {self._fsrsVersion = nil}
+
+  public var includeValidationFolds: Bool = false
+
+  public var enableSchedulingPenalties: Bool {
+    get {_enableSchedulingPenalties ?? false}
+    set {_enableSchedulingPenalties = newValue}
+  }
+  /// Returns true if `enableSchedulingPenalties` has been explicitly set.
+  public var hasEnableSchedulingPenalties: Bool {self._enableSchedulingPenalties != nil}
+  /// Clears the value of `enableSchedulingPenalties`. Subsequent reads from it will return its default value.
+  public mutating func clearEnableSchedulingPenalties() {self._enableSchedulingPenalties = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _includeSameDayReviews: Bool? = nil
+  fileprivate var _fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion? = nil
+  fileprivate var _enableSchedulingPenalties: Bool? = nil
 }
 
 public nonisolated struct Anki_Scheduler_ComputeFsrsParamsFromItemsRequest: Sendable {
@@ -1304,53 +1672,229 @@ public nonisolated struct Anki_Scheduler_FsrsReview: Sendable {
   public init() {}
 }
 
-public nonisolated struct Anki_Scheduler_SimulateFsrsReviewRequest: Sendable {
+public nonisolated struct Anki_Scheduler_SimulateFsrsReviewRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var params: [Float] = []
+  public var params: [Float] {
+    get {_storage._params}
+    set {_uniqueStorage()._params = newValue}
+  }
 
-  public var desiredRetention: Float = 0
+  public var desiredRetention: Float {
+    get {_storage._desiredRetention}
+    set {_uniqueStorage()._desiredRetention = newValue}
+  }
 
-  public var deckSize: UInt32 = 0
+  public var deckSize: UInt32 {
+    get {_storage._deckSize}
+    set {_uniqueStorage()._deckSize = newValue}
+  }
 
-  public var daysToSimulate: UInt32 = 0
+  public var daysToSimulate: UInt32 {
+    get {_storage._daysToSimulate}
+    set {_uniqueStorage()._daysToSimulate = newValue}
+  }
 
-  public var newLimit: UInt32 = 0
+  public var newLimit: UInt32 {
+    get {_storage._newLimit}
+    set {_uniqueStorage()._newLimit = newValue}
+  }
 
-  public var reviewLimit: UInt32 = 0
+  public var reviewLimit: UInt32 {
+    get {_storage._reviewLimit}
+    set {_uniqueStorage()._reviewLimit = newValue}
+  }
 
-  public var maxInterval: UInt32 = 0
+  public var maxInterval: UInt32 {
+    get {_storage._maxInterval}
+    set {_uniqueStorage()._maxInterval = newValue}
+  }
 
-  public var search: String = String()
+  public var search: String {
+    get {_storage._search}
+    set {_uniqueStorage()._search = newValue}
+  }
 
-  public var newCardsIgnoreReviewLimit: Bool = false
+  public var newCardsIgnoreReviewLimit: Bool {
+    get {_storage._newCardsIgnoreReviewLimit}
+    set {_uniqueStorage()._newCardsIgnoreReviewLimit = newValue}
+  }
 
-  public var easyDaysPercentages: [Float] = []
+  public var easyDaysPercentages: [Float] {
+    get {_storage._easyDaysPercentages}
+    set {_uniqueStorage()._easyDaysPercentages = newValue}
+  }
 
-  public var reviewOrder: Anki_DeckConfig_DeckConfig.Config.ReviewCardOrder = .day
+  public var reviewOrder: Anki_DeckConfig_DeckConfig.Config.ReviewCardOrder {
+    get {_storage._reviewOrder}
+    set {_uniqueStorage()._reviewOrder = newValue}
+  }
 
   public var suspendAfterLapseCount: UInt32 {
-    get {_suspendAfterLapseCount ?? 0}
-    set {_suspendAfterLapseCount = newValue}
+    get {_storage._suspendAfterLapseCount ?? 0}
+    set {_uniqueStorage()._suspendAfterLapseCount = newValue}
   }
   /// Returns true if `suspendAfterLapseCount` has been explicitly set.
-  public var hasSuspendAfterLapseCount: Bool {self._suspendAfterLapseCount != nil}
+  public var hasSuspendAfterLapseCount: Bool {_storage._suspendAfterLapseCount != nil}
   /// Clears the value of `suspendAfterLapseCount`. Subsequent reads from it will return its default value.
-  public mutating func clearSuspendAfterLapseCount() {self._suspendAfterLapseCount = nil}
+  public mutating func clearSuspendAfterLapseCount() {_uniqueStorage()._suspendAfterLapseCount = nil}
 
-  public var historicalRetention: Float = 0
+  public var historicalRetention: Float {
+    get {_storage._historicalRetention}
+    set {_uniqueStorage()._historicalRetention = newValue}
+  }
 
-  public var learningStepCount: UInt32 = 0
+  public var learningStepCount: UInt32 {
+    get {_storage._learningStepCount}
+    set {_uniqueStorage()._learningStepCount = newValue}
+  }
 
-  public var relearningStepCount: UInt32 = 0
+  public var relearningStepCount: UInt32 {
+    get {_storage._relearningStepCount}
+    set {_uniqueStorage()._relearningStepCount = newValue}
+  }
+
+  public var reviewFuzzBase: Float {
+    get {_storage._reviewFuzzBase ?? 0}
+    set {_uniqueStorage()._reviewFuzzBase = newValue}
+  }
+  /// Returns true if `reviewFuzzBase` has been explicitly set.
+  public var hasReviewFuzzBase: Bool {_storage._reviewFuzzBase != nil}
+  /// Clears the value of `reviewFuzzBase`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzBase() {_uniqueStorage()._reviewFuzzBase = nil}
+
+  public var reviewFuzzFactorShort: Float {
+    get {_storage._reviewFuzzFactorShort ?? 0}
+    set {_uniqueStorage()._reviewFuzzFactorShort = newValue}
+  }
+  /// Returns true if `reviewFuzzFactorShort` has been explicitly set.
+  public var hasReviewFuzzFactorShort: Bool {_storage._reviewFuzzFactorShort != nil}
+  /// Clears the value of `reviewFuzzFactorShort`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzFactorShort() {_uniqueStorage()._reviewFuzzFactorShort = nil}
+
+  public var reviewFuzzFactorMid: Float {
+    get {_storage._reviewFuzzFactorMid ?? 0}
+    set {_uniqueStorage()._reviewFuzzFactorMid = newValue}
+  }
+  /// Returns true if `reviewFuzzFactorMid` has been explicitly set.
+  public var hasReviewFuzzFactorMid: Bool {_storage._reviewFuzzFactorMid != nil}
+  /// Clears the value of `reviewFuzzFactorMid`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzFactorMid() {_uniqueStorage()._reviewFuzzFactorMid = nil}
+
+  public var reviewFuzzFactorLong: Float {
+    get {_storage._reviewFuzzFactorLong ?? 0}
+    set {_uniqueStorage()._reviewFuzzFactorLong = newValue}
+  }
+  /// Returns true if `reviewFuzzFactorLong` has been explicitly set.
+  public var hasReviewFuzzFactorLong: Bool {_storage._reviewFuzzFactorLong != nil}
+  /// Clears the value of `reviewFuzzFactorLong`. Subsequent reads from it will return its default value.
+  public mutating func clearReviewFuzzFactorLong() {_uniqueStorage()._reviewFuzzFactorLong = nil}
+
+  public var helpMeDecideTransitionBlendAlpha: Float {
+    get {_storage._helpMeDecideTransitionBlendAlpha ?? 0}
+    set {_uniqueStorage()._helpMeDecideTransitionBlendAlpha = newValue}
+  }
+  /// Returns true if `helpMeDecideTransitionBlendAlpha` has been explicitly set.
+  public var hasHelpMeDecideTransitionBlendAlpha: Bool {_storage._helpMeDecideTransitionBlendAlpha != nil}
+  /// Clears the value of `helpMeDecideTransitionBlendAlpha`. Subsequent reads from it will return its default value.
+  public mutating func clearHelpMeDecideTransitionBlendAlpha() {_uniqueStorage()._helpMeDecideTransitionBlendAlpha = nil}
+
+  public var helpMeDecideEnforceMonotonicSuccessGradeProbs: Bool {
+    get {_storage._helpMeDecideEnforceMonotonicSuccessGradeProbs ?? false}
+    set {_uniqueStorage()._helpMeDecideEnforceMonotonicSuccessGradeProbs = newValue}
+  }
+  /// Returns true if `helpMeDecideEnforceMonotonicSuccessGradeProbs` has been explicitly set.
+  public var hasHelpMeDecideEnforceMonotonicSuccessGradeProbs: Bool {_storage._helpMeDecideEnforceMonotonicSuccessGradeProbs != nil}
+  /// Clears the value of `helpMeDecideEnforceMonotonicSuccessGradeProbs`. Subsequent reads from it will return its default value.
+  public mutating func clearHelpMeDecideEnforceMonotonicSuccessGradeProbs() {_uniqueStorage()._helpMeDecideEnforceMonotonicSuccessGradeProbs = nil}
+
+  public var simulateDynamicDesiredRetention: Bool {
+    get {_storage._simulateDynamicDesiredRetention}
+    set {_uniqueStorage()._simulateDynamicDesiredRetention = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionParams: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionParams}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionParams = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionWeights: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionWeights}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionWeights = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionAvgDrs: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionAvgDrs}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionAvgDrs = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionMin: Float {
+    get {_storage._fsrsDynamicDesiredRetentionMin}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionMin = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionMax: Float {
+    get {_storage._fsrsDynamicDesiredRetentionMax}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionMax = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFsrsEqWeights}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFsrsEqWeights = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFsrsEqDrs}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFsrsEqDrs = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionClamp: Bool {
+    get {_storage._fsrsDynamicDesiredRetentionClamp}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionClamp = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFixedTargetWeights}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFixedTargetWeights = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFixedTargetDrs}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFixedTargetDrs = newValue}
+  }
+
+  public var splitWorkloadByPreset: Bool {
+    get {_storage._splitWorkloadByPreset}
+    set {_uniqueStorage()._splitWorkloadByPreset = newValue}
+  }
+
+  public var workloadPresetLabel: String {
+    get {_storage._workloadPresetLabel}
+    set {_uniqueStorage()._workloadPresetLabel = newValue}
+  }
+
+  public var rwkvWorkloadSampleLimit: UInt32 {
+    get {_storage._rwkvWorkloadSampleLimit}
+    set {_uniqueStorage()._rwkvWorkloadSampleLimit = newValue}
+  }
+
+  public var rwkvWorkloadTargetStep: UInt32 {
+    get {_storage._rwkvWorkloadTargetStep}
+    set {_uniqueStorage()._rwkvWorkloadTargetStep = newValue}
+  }
+
+  public var rwkvWorkloadStateUpdateInterval: UInt32 {
+    get {_storage._rwkvWorkloadStateUpdateInterval}
+    set {_uniqueStorage()._rwkvWorkloadStateUpdateInterval = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _suspendAfterLapseCount: UInt32? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct Anki_Scheduler_SimulateFsrsReviewResponse: Sendable {
@@ -1371,18 +1915,159 @@ public nonisolated struct Anki_Scheduler_SimulateFsrsReviewResponse: Sendable {
   public init() {}
 }
 
-public nonisolated struct Anki_Scheduler_SimulateFsrsWorkloadResponse: Sendable {
+public nonisolated struct Anki_Scheduler_SimulateFsrsWorkloadResponse: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  public var cost: Dictionary<UInt32,Float> {
+    get {_storage._cost}
+    set {_uniqueStorage()._cost = newValue}
+  }
+
+  public var reviewlessEndMemorized: Float {
+    get {_storage._reviewlessEndMemorized}
+    set {_uniqueStorage()._reviewlessEndMemorized = newValue}
+  }
+
+  public var memorized: Dictionary<UInt32,Float> {
+    get {_storage._memorized}
+    set {_uniqueStorage()._memorized = newValue}
+  }
+
+  public var reviewCount: Dictionary<UInt32,UInt32> {
+    get {_storage._reviewCount}
+    set {_uniqueStorage()._reviewCount = newValue}
+  }
+
+  public var reviewTimeRBucketCount: UInt32 {
+    get {_storage._reviewTimeRBucketCount}
+    set {_uniqueStorage()._reviewTimeRBucketCount = newValue}
+  }
+
+  public var reviewTimeSBucketCount: UInt32 {
+    get {_storage._reviewTimeSBucketCount}
+    set {_uniqueStorage()._reviewTimeSBucketCount = newValue}
+  }
+
+  public var reviewTimeAgainSeconds: [Float] {
+    get {_storage._reviewTimeAgainSeconds}
+    set {_uniqueStorage()._reviewTimeAgainSeconds = newValue}
+  }
+
+  public var reviewTimeHardSeconds: [Float] {
+    get {_storage._reviewTimeHardSeconds}
+    set {_uniqueStorage()._reviewTimeHardSeconds = newValue}
+  }
+
+  public var reviewTimeSampleCounts: [UInt32] {
+    get {_storage._reviewTimeSampleCounts}
+    set {_uniqueStorage()._reviewTimeSampleCounts = newValue}
+  }
+
+  public var reviewTimeAgainCoeffs: [Float] {
+    get {_storage._reviewTimeAgainCoeffs}
+    set {_uniqueStorage()._reviewTimeAgainCoeffs = newValue}
+  }
+
+  public var reviewTimeHardCoeffs: [Float] {
+    get {_storage._reviewTimeHardCoeffs}
+    set {_uniqueStorage()._reviewTimeHardCoeffs = newValue}
+  }
+
+  public var reviewTimeGoodSeconds: [Float] {
+    get {_storage._reviewTimeGoodSeconds}
+    set {_uniqueStorage()._reviewTimeGoodSeconds = newValue}
+  }
+
+  public var reviewTimeEasySeconds: [Float] {
+    get {_storage._reviewTimeEasySeconds}
+    set {_uniqueStorage()._reviewTimeEasySeconds = newValue}
+  }
+
+  public var reviewTimeGoodCoeffs: [Float] {
+    get {_storage._reviewTimeGoodCoeffs}
+    set {_uniqueStorage()._reviewTimeGoodCoeffs = newValue}
+  }
+
+  public var reviewTimeEasyCoeffs: [Float] {
+    get {_storage._reviewTimeEasyCoeffs}
+    set {_uniqueStorage()._reviewTimeEasyCoeffs = newValue}
+  }
+
+  public var reviewTimeGradeWeights: [Float] {
+    get {_storage._reviewTimeGradeWeights}
+    set {_uniqueStorage()._reviewTimeGradeWeights = newValue}
+  }
+
+  public var reviewTimeTransitionProbs: [Float] {
+    get {_storage._reviewTimeTransitionProbs}
+    set {_uniqueStorage()._reviewTimeTransitionProbs = newValue}
+  }
+
+  public var reviewTimeTransitionCounts: [UInt32] {
+    get {_storage._reviewTimeTransitionCounts}
+    set {_uniqueStorage()._reviewTimeTransitionCounts = newValue}
+  }
+
+  public var reviewTimeSuccessGradeProbs: [Float] {
+    get {_storage._reviewTimeSuccessGradeProbs}
+    set {_uniqueStorage()._reviewTimeSuccessGradeProbs = newValue}
+  }
+
+  public var reviewTimeSuccessGradeCounts: [UInt32] {
+    get {_storage._reviewTimeSuccessGradeCounts}
+    set {_uniqueStorage()._reviewTimeSuccessGradeCounts = newValue}
+  }
+
+  /// Sum of end-of-simulation retrievability weighted by stability, using
+  /// 1 - exp((-8 / 365) * S).
+  public var weightedMemorized: Dictionary<UInt32,Float> {
+    get {_storage._weightedMemorized}
+    set {_uniqueStorage()._weightedMemorized = newValue}
+  }
+
+  public var reviewlessEndWeightedMemorized: Float {
+    get {_storage._reviewlessEndWeightedMemorized}
+    set {_uniqueStorage()._reviewlessEndWeightedMemorized = newValue}
+  }
+
+  public var presetWorkload: [Anki_Scheduler_SimulateFsrsPresetWorkload] {
+    get {_storage._presetWorkload}
+    set {_uniqueStorage()._presetWorkload = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct Anki_Scheduler_SimulateFsrsPresetWorkload: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var name: String = String()
+
   public var cost: Dictionary<UInt32,Float> = [:]
 
-  public var reviewlessEndMemorized: Float = 0
+  public var reviewCount: Dictionary<UInt32,UInt32> = [:]
 
+  public var learnCount: Dictionary<UInt32,UInt32> = [:]
+
+  /// End-of-simulation card memorized values attributed to the card's final
+  /// active preset.
   public var memorized: Dictionary<UInt32,Float> = [:]
 
-  public var reviewCount: Dictionary<UInt32,UInt32> = [:]
+  public var weightedMemorized: Dictionary<UInt32,Float> = [:]
+
+  /// Reviewless end-of-simulation baselines attributed to the card's active
+  /// preset before simulated reviews.
+  public var reviewlessEndMemorized: Dictionary<UInt32,Float> = [:]
+
+  public var reviewlessEndWeightedMemorized: Dictionary<UInt32,Float> = [:]
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1462,9 +2147,93 @@ public nonisolated struct Anki_Scheduler_EvaluateParamsRequest: Sendable {
 
   public var numOfRelearningSteps: UInt32 = 0
 
+  public var fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion = .seven
+
+  public var includeSameDayReviews: Bool {
+    get {_includeSameDayReviews ?? false}
+    set {_includeSameDayReviews = newValue}
+  }
+  /// Returns true if `includeSameDayReviews` has been explicitly set.
+  public var hasIncludeSameDayReviews: Bool {self._includeSameDayReviews != nil}
+  /// Clears the value of `includeSameDayReviews`. Subsequent reads from it will return its default value.
+  public mutating func clearIncludeSameDayReviews() {self._includeSameDayReviews = nil}
+
+  public var includeSameDayReviewsForTraining: Bool {
+    get {_includeSameDayReviewsForTraining ?? false}
+    set {_includeSameDayReviewsForTraining = newValue}
+  }
+  /// Returns true if `includeSameDayReviewsForTraining` has been explicitly set.
+  public var hasIncludeSameDayReviewsForTraining: Bool {self._includeSameDayReviewsForTraining != nil}
+  /// Clears the value of `includeSameDayReviewsForTraining`. Subsequent reads from it will return its default value.
+  public mutating func clearIncludeSameDayReviewsForTraining() {self._includeSameDayReviewsForTraining = nil}
+
+  public var searchForTraining: String {
+    get {_searchForTraining ?? String()}
+    set {_searchForTraining = newValue}
+  }
+  /// Returns true if `searchForTraining` has been explicitly set.
+  public var hasSearchForTraining: Bool {self._searchForTraining != nil}
+  /// Clears the value of `searchForTraining`. Subsequent reads from it will return its default value.
+  public mutating func clearSearchForTraining() {self._searchForTraining = nil}
+
+  public var enableSchedulingPenalties: Bool {
+    get {_enableSchedulingPenalties ?? false}
+    set {_enableSchedulingPenalties = newValue}
+  }
+  /// Returns true if `enableSchedulingPenalties` has been explicitly set.
+  public var hasEnableSchedulingPenalties: Bool {self._enableSchedulingPenalties != nil}
+  /// Clears the value of `enableSchedulingPenalties`. Subsequent reads from it will return its default value.
+  public mutating func clearEnableSchedulingPenalties() {self._enableSchedulingPenalties = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _includeSameDayReviews: Bool? = nil
+  fileprivate var _includeSameDayReviewsForTraining: Bool? = nil
+  fileprivate var _searchForTraining: String? = nil
+  fileprivate var _enableSchedulingPenalties: Bool? = nil
+}
+
+public nonisolated struct Anki_Scheduler_GetFsrsNewCardIntervalsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var config: Anki_DeckConfig_DeckConfig.Config {
+    get {_config ?? Anki_DeckConfig_DeckConfig.Config()}
+    set {_config = newValue}
+  }
+  /// Returns true if `config` has been explicitly set.
+  public var hasConfig: Bool {self._config != nil}
+  /// Clears the value of `config`. Subsequent reads from it will return its default value.
+  public mutating func clearConfig() {self._config = nil}
+
+  public var fsrsShortTermWithStepsEnabled: Bool {
+    get {_fsrsShortTermWithStepsEnabled ?? false}
+    set {_fsrsShortTermWithStepsEnabled = newValue}
+  }
+  /// Returns true if `fsrsShortTermWithStepsEnabled` has been explicitly set.
+  public var hasFsrsShortTermWithStepsEnabled: Bool {self._fsrsShortTermWithStepsEnabled != nil}
+  /// Clears the value of `fsrsShortTermWithStepsEnabled`. Subsequent reads from it will return its default value.
+  public mutating func clearFsrsShortTermWithStepsEnabled() {self._fsrsShortTermWithStepsEnabled = nil}
+
+  public var fsrsLearningQueuesDisabled: Bool {
+    get {_fsrsLearningQueuesDisabled ?? false}
+    set {_fsrsLearningQueuesDisabled = newValue}
+  }
+  /// Returns true if `fsrsLearningQueuesDisabled` has been explicitly set.
+  public var hasFsrsLearningQueuesDisabled: Bool {self._fsrsLearningQueuesDisabled != nil}
+  /// Clears the value of `fsrsLearningQueuesDisabled`. Subsequent reads from it will return its default value.
+  public mutating func clearFsrsLearningQueuesDisabled() {self._fsrsLearningQueuesDisabled = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _config: Anki_DeckConfig_DeckConfig.Config? = nil
+  fileprivate var _fsrsShortTermWithStepsEnabled: Bool? = nil
+  fileprivate var _fsrsLearningQueuesDisabled: Bool? = nil
 }
 
 public nonisolated struct Anki_Scheduler_EvaluateParamsLegacyRequest: Sendable {
@@ -1478,9 +2247,20 @@ public nonisolated struct Anki_Scheduler_EvaluateParamsLegacyRequest: Sendable {
 
   public var ignoreRevlogsBeforeMs: Int64 = 0
 
+  public var includeSameDayReviews: Bool {
+    get {_includeSameDayReviews ?? false}
+    set {_includeSameDayReviews = newValue}
+  }
+  /// Returns true if `includeSameDayReviews` has been explicitly set.
+  public var hasIncludeSameDayReviews: Bool {self._includeSameDayReviews != nil}
+  /// Clears the value of `includeSameDayReviews`. Subsequent reads from it will return its default value.
+  public mutating func clearIncludeSameDayReviews() {self._includeSameDayReviews = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _includeSameDayReviews: Bool? = nil
 }
 
 public nonisolated struct Anki_Scheduler_EvaluateParamsResponse: Sendable {
@@ -1522,6 +2302,359 @@ public nonisolated struct Anki_Scheduler_ComputeMemoryStateResponse: Sendable {
   fileprivate var _state: Anki_Cards_FsrsMemoryState? = nil
 }
 
+public nonisolated struct Anki_Scheduler_FsrsPresetForCardResponse: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
+
+  public var name: String {
+    get {_storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
+
+  public var fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion {
+    get {_storage._fsrsVersion}
+    set {_uniqueStorage()._fsrsVersion = newValue}
+  }
+
+  public var params: [Float] {
+    get {_storage._params}
+    set {_uniqueStorage()._params = newValue}
+  }
+
+  public var desiredRetention: Float {
+    get {_storage._desiredRetention}
+    set {_uniqueStorage()._desiredRetention = newValue}
+  }
+
+  public var historicalRetention: Float {
+    get {_storage._historicalRetention}
+    set {_uniqueStorage()._historicalRetention = newValue}
+  }
+
+  public var ignoreRevlogsBeforeDate: String {
+    get {_storage._ignoreRevlogsBeforeDate}
+    set {_uniqueStorage()._ignoreRevlogsBeforeDate = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionEnabled: Bool {
+    get {_storage._fsrsDynamicDesiredRetentionEnabled}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionEnabled = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionParams: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionParams}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionParams = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionWeights: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionWeights}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionWeights = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionAvgDrs: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionAvgDrs}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionAvgDrs = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionMin: Float {
+    get {_storage._fsrsDynamicDesiredRetentionMin}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionMin = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionMax: Float {
+    get {_storage._fsrsDynamicDesiredRetentionMax}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionMax = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFsrsEqWeights}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFsrsEqWeights = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFsrsEqDrs}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFsrsEqDrs = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionClamp: Bool {
+    get {_storage._fsrsDynamicDesiredRetentionClamp}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionClamp = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFixedTargetWeights}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFixedTargetWeights = newValue}
+  }
+
+  public var fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] {
+    get {_storage._fsrsDynamicDesiredRetentionFixedTargetDrs}
+    set {_uniqueStorage()._fsrsDynamicDesiredRetentionFixedTargetDrs = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public nonisolated struct Anki_Scheduler_FsrsPresetIdsForCardsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsPresetIdsForCardsResponse.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var presetID: String = String()
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var ignoredReviewIds: [Int64] = []
+
+  public var dynamicPresetReplay: Bool = false
+
+  /// Add-on preset identifiers are hashed by the desktop with its persisted
+  /// compatibility algorithm. Numeric deck-config identifiers need not be
+  /// included.
+  public var stablePresetIds: Dictionary<String,Int64> = [:]
+
+  /// Supplied by the desktop so collections written before the fork's
+  /// deck-config compatibility encoding retain their existing replay identity.
+  public var firstReviewUsesCreationByConfigID: Dictionary<Int64,Bool> = [:]
+
+  /// When present, Rust compares the canonical history and verifies that every
+  /// requested ignored review still belongs to the eligible history.
+  public var expectedIdentity: Anki_Scheduler_RwkvHistoricalReviewIdentity {
+    get {_expectedIdentity ?? Anki_Scheduler_RwkvHistoricalReviewIdentity()}
+    set {_expectedIdentity = newValue}
+  }
+  /// Returns true if `expectedIdentity` has been explicitly set.
+  public var hasExpectedIdentity: Bool {self._expectedIdentity != nil}
+  /// Clears the value of `expectedIdentity`. Subsequent reads from it will return its default value.
+  public mutating func clearExpectedIdentity() {self._expectedIdentity = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _expectedIdentity: Anki_Scheduler_RwkvHistoricalReviewIdentity? = nil
+}
+
+public nonisolated struct Anki_Scheduler_RwkvHistoricalReviewIdentity: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var lastReviewID: Int64 = 0
+
+  public var reviewCount: UInt64 = 0
+
+  public var historyHash: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvHistoricalReviewFingerprintResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var lastReviewID: Int64 = 0
+
+  public var reviewCount: UInt64 = 0
+
+  public var historyHash: String = String()
+
+  public var activeIgnoredReviewIds: [Int64] = []
+
+  public var queriedReviewCount: UInt64 = 0
+
+  /// False when expected_identity is absent.
+  public var historyIsValid: Bool = false
+
+  /// True when expected_identity is a strict prefix of the current history:
+  /// it matches the first review_count reviews and every later review is
+  /// newer, so only those later reviews need replaying.
+  public var historyPrefixIsValid: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Full collection replay preparation. Incremental and deck-scoped replay use
+/// their existing desktop path.
+public nonisolated struct Anki_Scheduler_RwkvHistoricalReviewInputsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var history: Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest {
+    get {_history ?? Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest()}
+    set {_history = newValue}
+  }
+  /// Returns true if `history` has been explicitly set.
+  public var hasHistory: Bool {self._history != nil}
+  /// Clears the value of `history`. Subsequent reads from it will return its default value.
+  public mutating func clearHistory() {self._history = nil}
+
+  public var preservedLearningStartCutoffs: Dictionary<Int64,Int64> = [:]
+
+  public var firstReviewUsesCreation: Bool {
+    get {_firstReviewUsesCreation ?? false}
+    set {_firstReviewUsesCreation = newValue}
+  }
+  /// Returns true if `firstReviewUsesCreation` has been explicitly set.
+  public var hasFirstReviewUsesCreation: Bool {self._firstReviewUsesCreation != nil}
+  /// Clears the value of `firstReviewUsesCreation`. Subsequent reads from it will return its default value.
+  public mutating func clearFirstReviewUsesCreation() {self._firstReviewUsesCreation = nil}
+
+  public var recoveryCheckpointMaxAgeMillis: Int64 {
+    get {_recoveryCheckpointMaxAgeMillis ?? 0}
+    set {_recoveryCheckpointMaxAgeMillis = newValue}
+  }
+  /// Returns true if `recoveryCheckpointMaxAgeMillis` has been explicitly set.
+  public var hasRecoveryCheckpointMaxAgeMillis: Bool {self._recoveryCheckpointMaxAgeMillis != nil}
+  /// Clears the value of `recoveryCheckpointMaxAgeMillis`. Subsequent reads from it will return its default value.
+  public mutating func clearRecoveryCheckpointMaxAgeMillis() {self._recoveryCheckpointMaxAgeMillis = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _history: Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest? = nil
+  fileprivate var _firstReviewUsesCreation: Bool? = nil
+  fileprivate var _recoveryCheckpointMaxAgeMillis: Int64? = nil
+}
+
+public nonisolated struct Anki_Scheduler_RwkvHistoricalReviewMetadata: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var identity: Anki_Scheduler_RwkvHistoricalReviewIdentity {
+    get {_identity ?? Anki_Scheduler_RwkvHistoricalReviewIdentity()}
+    set {_identity = newValue}
+  }
+  /// Returns true if `identity` has been explicitly set.
+  public var hasIdentity: Bool {self._identity != nil}
+  /// Clears the value of `identity`. Subsequent reads from it will return its default value.
+  public mutating func clearIdentity() {self._identity = nil}
+
+  public var previousReviewIDByCard: Dictionary<Int64,Int64> = [:]
+
+  public var previousIntervalDaysByCard: Dictionary<Int64,Int64> = [:]
+
+  public var reviewCountByCard: Dictionary<Int64,UInt32> = [:]
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _identity: Anki_Scheduler_RwkvHistoricalReviewIdentity? = nil
+}
+
+public nonisolated struct Anki_Scheduler_RwkvHistoricalReviewInputsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var reviews: [Anki_Scheduler_RwkvHistoricalReviewInputsResponse.Review] = []
+
+  public var metadata: Anki_Scheduler_RwkvHistoricalReviewMetadata {
+    get {_metadata ?? Anki_Scheduler_RwkvHistoricalReviewMetadata()}
+    set {_metadata = newValue}
+  }
+  /// Returns true if `metadata` has been explicitly set.
+  public var hasMetadata: Bool {self._metadata != nil}
+  /// Clears the value of `metadata`. Subsequent reads from it will return its default value.
+  public mutating func clearMetadata() {self._metadata = nil}
+
+  public var recoveryCheckpoint: Anki_Scheduler_RwkvHistoricalReviewMetadata {
+    get {_recoveryCheckpoint ?? Anki_Scheduler_RwkvHistoricalReviewMetadata()}
+    set {_recoveryCheckpoint = newValue}
+  }
+  /// Returns true if `recoveryCheckpoint` has been explicitly set.
+  public var hasRecoveryCheckpoint: Bool {self._recoveryCheckpoint != nil}
+  /// Clears the value of `recoveryCheckpoint`. Subsequent reads from it will return its default value.
+  public mutating func clearRecoveryCheckpoint() {self._recoveryCheckpoint = nil}
+
+  public var activeIgnoredReviewIds: [Int64] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Review: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var reviewID: Int64 = 0
+
+    public var cardID: Int64 = 0
+
+    public var noteID: Int64 = 0
+
+    public var deckID: Int64 = 0
+
+    public var presetID: Int64 = 0
+
+    public var ease: Int64 = 0
+
+    public var durationMillis: Int64 = 0
+
+    public var reviewKind: Int64 = 0
+
+    public var intervalDays: Int64 = 0
+
+    public var easeFactor: Int64 = 0
+
+    public var cardType: Int64 = 0
+
+    public var dayOffset: Int64 = 0
+
+    public var elapsedDays: Int64 = 0
+
+    public var elapsedSeconds: Int64 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+
+  fileprivate var _metadata: Anki_Scheduler_RwkvHistoricalReviewMetadata? = nil
+  fileprivate var _recoveryCheckpoint: Anki_Scheduler_RwkvHistoricalReviewMetadata? = nil
+}
+
 public nonisolated struct Anki_Scheduler_FuzzDeltaRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1544,6 +2677,893 @@ public nonisolated struct Anki_Scheduler_FuzzDeltaResponse: Sendable {
   public var deltaDays: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_SchedulingStatesWithIntervalsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var again: Float {
+    get {_again ?? 0}
+    set {_again = newValue}
+  }
+  /// Returns true if `again` has been explicitly set.
+  public var hasAgain: Bool {self._again != nil}
+  /// Clears the value of `again`. Subsequent reads from it will return its default value.
+  public mutating func clearAgain() {self._again = nil}
+
+  public var hard: Float {
+    get {_hard ?? 0}
+    set {_hard = newValue}
+  }
+  /// Returns true if `hard` has been explicitly set.
+  public var hasHard: Bool {self._hard != nil}
+  /// Clears the value of `hard`. Subsequent reads from it will return its default value.
+  public mutating func clearHard() {self._hard = nil}
+
+  public var good: Float {
+    get {_good ?? 0}
+    set {_good = newValue}
+  }
+  /// Returns true if `good` has been explicitly set.
+  public var hasGood: Bool {self._good != nil}
+  /// Clears the value of `good`. Subsequent reads from it will return its default value.
+  public mutating func clearGood() {self._good = nil}
+
+  public var easy: Float {
+    get {_easy ?? 0}
+    set {_easy = newValue}
+  }
+  /// Returns true if `easy` has been explicitly set.
+  public var hasEasy: Bool {self._easy != nil}
+  /// Clears the value of `easy`. Subsequent reads from it will return its default value.
+  public mutating func clearEasy() {self._easy = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _again: Float? = nil
+  fileprivate var _hard: Float? = nil
+  fileprivate var _good: Float? = nil
+  fileprivate var _easy: Float? = nil
+}
+
+public nonisolated struct Anki_Scheduler_FsrsCurrentRetrievabilityRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var stability: Float = 0
+
+  public var elapsedDays: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsCurrentRetrievabilityResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var retrievability: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsNextIntervalRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var stability: Float = 0
+
+  public var desiredRetention: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsNextIntervalResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var interval: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var stability: Float = 0
+
+  public var targetRetrievability: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var interval: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest.Item] = []
+
+  public var targetRetrievability: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var stability: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var interval: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var requestIndex: UInt32 = 0
+
+    public var cardID: Int64 = 0
+
+    public var stability: Float = 0
+
+    public var targetRetrievability: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var requestIndex: UInt32 = 0
+
+    public var interval: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var requestIndex: UInt32 = 0
+
+    public var cardID: Int64 = 0
+
+    public var desiredRetention: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var requestIndex: UInt32 = 0
+
+    public var intervalTargetDesiredRetention: Float = 0
+
+    public var dynamicDesiredRetentions: [Float] = []
+
+    public var dynamicDesiredRetentionEnabled: Bool = false
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest.Item] = []
+
+  public var targetRetrievability: Float = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var requestIndex: UInt32 = 0
+
+    public var configID: Int64 = 0
+
+    public var stability: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var requestIndex: UInt32 = 0
+
+    public var interval: Float = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewQueueScoresRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deckID: Int64 = 0
+
+  public var scores: [Anki_Scheduler_RwkvReviewQueueScoresRequest.Score] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Score: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var retrievability: Float = 0
+
+    public var interveningReviews: UInt32 {
+      get {_interveningReviews ?? 0}
+      set {_interveningReviews = newValue}
+    }
+    /// Returns true if `interveningReviews` has been explicitly set.
+    public var hasInterveningReviews: Bool {self._interveningReviews != nil}
+    /// Clears the value of `interveningReviews`. Subsequent reads from it will return its default value.
+    public mutating func clearInterveningReviews() {self._interveningReviews = nil}
+
+    public var targetRetention: Float {
+      get {_targetRetention ?? 0}
+      set {_targetRetention = newValue}
+    }
+    /// Returns true if `targetRetention` has been explicitly set.
+    public var hasTargetRetention: Bool {self._targetRetention != nil}
+    /// Clears the value of `targetRetention`. Subsequent reads from it will return its default value.
+    public mutating func clearTargetRetention() {self._targetRetention = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _interveningReviews: UInt32? = nil
+    fileprivate var _targetRetention: Float? = nil
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvAnsweredCardQueueScorePatchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deckID: Int64 = 0
+
+  public var cardID: Int64 = 0
+
+  public var score: Anki_Scheduler_RwkvReviewQueueScoresRequest.Score {
+    get {_score ?? Anki_Scheduler_RwkvReviewQueueScoresRequest.Score()}
+    set {_score = newValue}
+  }
+  /// Returns true if `score` has been explicitly set.
+  public var hasScore: Bool {self._score != nil}
+  /// Clears the value of `score`. Subsequent reads from it will return its default value.
+  public mutating func clearScore() {self._score = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _score: Anki_Scheduler_RwkvReviewQueueScoresRequest.Score? = nil
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deckID: Int64 = 0
+
+  public var items: [Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var interveningReviews: UInt32 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvStatsGraphScoresRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var search: String = String()
+
+  public var scores: [Anki_Scheduler_RwkvStatsGraphScoresRequest.Score] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Score: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var retrievability: Float = 0
+
+    public var interveningReviews: UInt32 {
+      get {_interveningReviews ?? 0}
+      set {_interveningReviews = newValue}
+    }
+    /// Returns true if `interveningReviews` has been explicitly set.
+    public var hasInterveningReviews: Bool {self._interveningReviews != nil}
+    /// Clears the value of `interveningReviews`. Subsequent reads from it will return its default value.
+    public mutating func clearInterveningReviews() {self._interveningReviews = nil}
+
+    public var targetRetention: Float {
+      get {_targetRetention ?? 0}
+      set {_targetRetention = newValue}
+    }
+    /// Returns true if `targetRetention` has been explicitly set.
+    public var hasTargetRetention: Bool {self._targetRetention != nil}
+    /// Clears the value of `targetRetention`. Subsequent reads from it will return its default value.
+    public mutating func clearTargetRetention() {self._targetRetention = nil}
+
+    public var curveDue: Bool {
+      get {_curveDue ?? false}
+      set {_curveDue = newValue}
+    }
+    /// Returns true if `curveDue` has been explicitly set.
+    public var hasCurveDue: Bool {self._curveDue != nil}
+    /// Clears the value of `curveDue`. Subsequent reads from it will return its default value.
+    public mutating func clearCurveDue() {self._curveDue = nil}
+
+    public var curveRetrievability: Float {
+      get {_curveRetrievability ?? 0}
+      set {_curveRetrievability = newValue}
+    }
+    /// Returns true if `curveRetrievability` has been explicitly set.
+    public var hasCurveRetrievability: Bool {self._curveRetrievability != nil}
+    /// Clears the value of `curveRetrievability`. Subsequent reads from it will return its default value.
+    public mutating func clearCurveRetrievability() {self._curveRetrievability = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _interveningReviews: UInt32? = nil
+    fileprivate var _targetRetention: Float? = nil
+    fileprivate var _curveDue: Bool? = nil
+    fileprivate var _curveRetrievability: Float? = nil
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvCardInfoScoreRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var retrievability: Float {
+    get {_retrievability ?? 0}
+    set {_retrievability = newValue}
+  }
+  /// Returns true if `retrievability` has been explicitly set.
+  public var hasRetrievability: Bool {self._retrievability != nil}
+  /// Clears the value of `retrievability`. Subsequent reads from it will return its default value.
+  public mutating func clearRetrievability() {self._retrievability = nil}
+
+  public var curveRetrievability: Float {
+    get {_curveRetrievability ?? 0}
+    set {_curveRetrievability = newValue}
+  }
+  /// Returns true if `curveRetrievability` has been explicitly set.
+  public var hasCurveRetrievability: Bool {self._curveRetrievability != nil}
+  /// Clears the value of `curveRetrievability`. Subsequent reads from it will return its default value.
+  public mutating func clearCurveRetrievability() {self._curveRetrievability = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _retrievability: Float? = nil
+  fileprivate var _curveRetrievability: Float? = nil
+}
+
+public nonisolated struct Anki_Scheduler_RwkvRetrievabilityScoreResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var retrievability: Float {
+    get {_retrievability ?? 0}
+    set {_retrievability = newValue}
+  }
+  /// Returns true if `retrievability` has been explicitly set.
+  public var hasRetrievability: Bool {self._retrievability != nil}
+  /// Clears the value of `retrievability`. Subsequent reads from it will return its default value.
+  public mutating func clearRetrievability() {self._retrievability = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _retrievability: Float? = nil
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var source: String = String()
+
+  public var rows: [Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest.Row] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Row: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var revlogID: Int64 = 0
+
+    public var prediction: Float = 0
+
+    public var sampleRole: String = String()
+
+    public var foldIndex: Int32 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// The completed run's source; its rows outside `keep` are deleted.
+  public var source: String = String()
+
+  /// Rows the completed run wrote.
+  public var keep: [Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest.Key] = []
+
+  /// Sources whose rows the run replaces entirely.
+  public var supersededSources: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Key: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var revlogID: Int64 = 0
+
+    public var sampleRole: String = String()
+
+    public var foldIndex: Int32 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewRescheduleRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var items: [Anki_Scheduler_RwkvReviewRescheduleRequest.Item] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Item: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 = 0
+
+    public var intervalDays: UInt32 = 0
+
+    public var elapsedDays: UInt32 = 0
+
+    public var s90: Float = 0
+
+    public var targetRetention: Float {
+      get {_targetRetention ?? 0}
+      set {_targetRetention = newValue}
+    }
+    /// Returns true if `targetRetention` has been explicitly set.
+    public var hasTargetRetention: Bool {self._targetRetention != nil}
+    /// Clears the value of `targetRetention`. Subsequent reads from it will return its default value.
+    public mutating func clearTargetRetention() {self._targetRetention = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _targetRetention: Float? = nil
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewInputRowsForCardsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardIds: [Int64] = []
+
+  public var includeSuspendedReview: Bool = false
+
+  public var includeDisabledDecks: Bool = false
+
+  public var includeNewCards: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewInputRowsForSearchRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var search: String = String()
+
+  public var includeSuspendedReview: Bool = false
+
+  public var includeDisabledDecks: Bool = false
+
+  public var includeNewCards: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewInputRowsForDeckReviewQueueRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var deckID: Int64 = 0
+
+  public var includeDisabledDecks: Bool = false
+
+  public var includeNewCards: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Scheduler_RwkvReviewInputRowsForCardsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var rows: [Anki_Scheduler_RwkvReviewInputRowsForCardsResponse.Row] = []
+
+  public var loadedCards: UInt32 = 0
+
+  public var cardsWithSupportedState: UInt32 = 0
+
+  public var disabledConfigCards: UInt32 = 0
+
+  public var deckConfigs: UInt32 = 0
+
+  public var searchedCards: UInt32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Row: @unchecked Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var cardID: Int64 {
+      get {_storage._cardID}
+      set {_uniqueStorage()._cardID = newValue}
+    }
+
+    public var noteID: Int64 {
+      get {_storage._noteID}
+      set {_uniqueStorage()._noteID = newValue}
+    }
+
+    public var deckID: Int64 {
+      get {_storage._deckID}
+      set {_uniqueStorage()._deckID = newValue}
+    }
+
+    public var presetID: String {
+      get {_storage._presetID}
+      set {_uniqueStorage()._presetID = newValue}
+    }
+
+    public var cardType: Int32 {
+      get {_storage._cardType}
+      set {_uniqueStorage()._cardType = newValue}
+    }
+
+    public var cardQueue: Int32 {
+      get {_storage._cardQueue}
+      set {_uniqueStorage()._cardQueue = newValue}
+    }
+
+    public var cardDue: Int32 {
+      get {_storage._cardDue}
+      set {_uniqueStorage()._cardDue = newValue}
+    }
+
+    public var intervalDays: UInt32 {
+      get {_storage._intervalDays}
+      set {_uniqueStorage()._intervalDays = newValue}
+    }
+
+    public var easeFactor: UInt32 {
+      get {_storage._easeFactor}
+      set {_uniqueStorage()._easeFactor = newValue}
+    }
+
+    public var reps: UInt32 {
+      get {_storage._reps}
+      set {_uniqueStorage()._reps = newValue}
+    }
+
+    public var lapses: UInt32 {
+      get {_storage._lapses}
+      set {_uniqueStorage()._lapses = newValue}
+    }
+
+    public var dayOffset: UInt32 {
+      get {_storage._dayOffset}
+      set {_uniqueStorage()._dayOffset = newValue}
+    }
+
+    public var currentStateKind: String {
+      get {_storage._currentStateKind}
+      set {_uniqueStorage()._currentStateKind = newValue}
+    }
+
+    public var currentNormalStateKind: String {
+      get {_storage._currentNormalStateKind}
+      set {_uniqueStorage()._currentNormalStateKind = newValue}
+    }
+
+    public var currentElapsedDays: UInt32 {
+      get {_storage._currentElapsedDays ?? 0}
+      set {_uniqueStorage()._currentElapsedDays = newValue}
+    }
+    /// Returns true if `currentElapsedDays` has been explicitly set.
+    public var hasCurrentElapsedDays: Bool {_storage._currentElapsedDays != nil}
+    /// Clears the value of `currentElapsedDays`. Subsequent reads from it will return its default value.
+    public mutating func clearCurrentElapsedDays() {_uniqueStorage()._currentElapsedDays = nil}
+
+    public var currentElapsedSeconds: UInt32 {
+      get {_storage._currentElapsedSeconds ?? 0}
+      set {_uniqueStorage()._currentElapsedSeconds = newValue}
+    }
+    /// Returns true if `currentElapsedSeconds` has been explicitly set.
+    public var hasCurrentElapsedSeconds: Bool {_storage._currentElapsedSeconds != nil}
+    /// Clears the value of `currentElapsedSeconds`. Subsequent reads from it will return its default value.
+    public mutating func clearCurrentElapsedSeconds() {_uniqueStorage()._currentElapsedSeconds = nil}
+
+    public var targetRetention: Float {
+      get {_storage._targetRetention}
+      set {_uniqueStorage()._targetRetention = newValue}
+    }
+
+    public var batchSize: UInt32 {
+      get {_storage._batchSize}
+      set {_uniqueStorage()._batchSize = newValue}
+    }
+
+    public var enforceGradeOrder: Bool {
+      get {_storage._enforceGradeOrder ?? false}
+      set {_uniqueStorage()._enforceGradeOrder = newValue}
+    }
+    /// Returns true if `enforceGradeOrder` has been explicitly set.
+    public var hasEnforceGradeOrder: Bool {_storage._enforceGradeOrder != nil}
+    /// Clears the value of `enforceGradeOrder`. Subsequent reads from it will return its default value.
+    public mutating func clearEnforceGradeOrder() {_uniqueStorage()._enforceGradeOrder = nil}
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+
+    fileprivate var _storage = _StorageClass.defaultInstance
+  }
 
   public init() {}
 }
@@ -1705,7 +3725,7 @@ nonisolated extension Anki_Scheduler_SchedulingState.Learning: SwiftProtobuf.Mes
 
 nonisolated extension Anki_Scheduler_SchedulingState.Review: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Anki_Scheduler_SchedulingState.protoMessageName + ".Review"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}scheduled_days\0\u{3}elapsed_days\0\u{3}ease_factor\0\u{1}lapses\0\u{1}leeched\0\u{3}memory_state\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}scheduled_days\0\u{3}elapsed_days\0\u{3}ease_factor\0\u{1}lapses\0\u{1}leeched\0\u{3}memory_state\0\u{3}fuzz_delta_days\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1719,6 +3739,7 @@ nonisolated extension Anki_Scheduler_SchedulingState.Review: SwiftProtobuf.Messa
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.lapses) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.leeched) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._memoryState) }()
+      case 7: try { try decoder.decodeSingularSInt32Field(value: &self.fuzzDeltaDays) }()
       default: break
       }
     }
@@ -1747,6 +3768,9 @@ nonisolated extension Anki_Scheduler_SchedulingState.Review: SwiftProtobuf.Messa
     try { if let v = self._memoryState {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     } }()
+    if self.fuzzDeltaDays != 0 {
+      try visitor.visitSingularSInt32Field(value: self.fuzzDeltaDays, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1757,6 +3781,7 @@ nonisolated extension Anki_Scheduler_SchedulingState.Review: SwiftProtobuf.Messa
     if lhs.lapses != rhs.lapses {return false}
     if lhs.leeched != rhs.leeched {return false}
     if lhs._memoryState != rhs._memoryState {return false}
+    if lhs.fuzzDeltaDays != rhs.fuzzDeltaDays {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1766,36 +3791,74 @@ nonisolated extension Anki_Scheduler_SchedulingState.Relearning: SwiftProtobuf.M
   public static let protoMessageName: String = Anki_Scheduler_SchedulingState.protoMessageName + ".Relearning"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}review\0\u{1}learning\0")
 
+  fileprivate class _StorageClass {
+    var _review: Anki_Scheduler_SchedulingState.Review? = nil
+    var _learning: Anki_Scheduler_SchedulingState.Learning? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _review = source._review
+      _learning = source._learning
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._review) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._learning) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._review) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._learning) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._review {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._learning {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._review {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._learning {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Anki_Scheduler_SchedulingState.Relearning, rhs: Anki_Scheduler_SchedulingState.Relearning) -> Bool {
-    if lhs._review != rhs._review {return false}
-    if lhs._learning != rhs._learning {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._review != rhs_storage._review {return false}
+        if _storage._learning != rhs_storage._learning {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2138,7 +4201,7 @@ nonisolated extension Anki_Scheduler_QueuedCards.QueuedCard: SwiftProtobuf.Messa
 
 nonisolated extension Anki_Scheduler_GetQueuedCardsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetQueuedCardsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}fetch_limit\0\u{3}intraday_learning_only\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}fetch_limit\0\u{3}intraday_learning_only\0\u{3}skip_scheduling_states\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2148,6 +4211,7 @@ nonisolated extension Anki_Scheduler_GetQueuedCardsRequest: SwiftProtobuf.Messag
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.fetchLimit) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.intradayLearningOnly) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.skipSchedulingStates) }()
       default: break
       }
     }
@@ -2160,12 +4224,55 @@ nonisolated extension Anki_Scheduler_GetQueuedCardsRequest: SwiftProtobuf.Messag
     if self.intradayLearningOnly != false {
       try visitor.visitSingularBoolField(value: self.intradayLearningOnly, fieldNumber: 2)
     }
+    if self.skipSchedulingStates != false {
+      try visitor.visitSingularBoolField(value: self.skipSchedulingStates, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Anki_Scheduler_GetQueuedCardsRequest, rhs: Anki_Scheduler_GetQueuedCardsRequest) -> Bool {
     if lhs.fetchLimit != rhs.fetchLimit {return false}
     if lhs.intradayLearningOnly != rhs.intradayLearningOnly {return false}
+    if lhs.skipSchedulingStates != rhs.skipSchedulingStates {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_GetSchedulingStatesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetSchedulingStatesRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}desired_retention_override\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self._desiredRetentionOverride) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    try { if let v = self._desiredRetentionOverride {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_GetSchedulingStatesRequest, rhs: Anki_Scheduler_GetSchedulingStatesRequest) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs._desiredRetentionOverride != rhs._desiredRetentionOverride {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2683,7 +4790,7 @@ nonisolated extension Anki_Scheduler_SetDueDateRequest: SwiftProtobuf.Message, S
 
 nonisolated extension Anki_Scheduler_GradeNowRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GradeNowRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_ids\0\u{1}rating\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_ids\0\u{1}rating\0\u{3}card_options\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2693,6 +4800,7 @@ nonisolated extension Anki_Scheduler_GradeNowRequest: SwiftProtobuf.Message, Swi
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedInt64Field(value: &self.cardIds) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.rating) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.cardOptions) }()
       default: break
       }
     }
@@ -2705,12 +4813,60 @@ nonisolated extension Anki_Scheduler_GradeNowRequest: SwiftProtobuf.Message, Swi
     if self.rating != .again {
       try visitor.visitSingularEnumField(value: self.rating, fieldNumber: 2)
     }
+    if !self.cardOptions.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.cardOptions, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Anki_Scheduler_GradeNowRequest, rhs: Anki_Scheduler_GradeNowRequest) -> Bool {
     if lhs.cardIds != rhs.cardIds {return false}
     if lhs.rating != rhs.rating {return false}
+    if lhs.cardOptions != rhs.cardOptions {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_GradeNowRequest.CardOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_GradeNowRequest.protoMessageName + ".CardOptions"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}desired_retention_override\0\u{3}scheduling_states\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self._desiredRetentionOverride) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._schedulingStates) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    try { if let v = self._desiredRetentionOverride {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._schedulingStates {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_GradeNowRequest.CardOptions, rhs: Anki_Scheduler_GradeNowRequest.CardOptions) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs._desiredRetentionOverride != rhs._desiredRetentionOverride {return false}
+    if lhs._schedulingStates != rhs._schedulingStates {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2803,7 +4959,7 @@ nonisolated extension Anki_Scheduler_SortDeckRequest: SwiftProtobuf.Message, Swi
 
 nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SchedulingStates"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}current\0\u{1}again\0\u{1}hard\0\u{1}good\0\u{1}easy\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}current\0\u{1}again\0\u{1}hard\0\u{1}good\0\u{1}easy\0\u{3}dynamic_desired_retentions\0\u{3}dynamic_desired_retention_enabled\0")
 
   fileprivate class _StorageClass {
     var _current: Anki_Scheduler_SchedulingState? = nil
@@ -2811,6 +4967,8 @@ nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, Sw
     var _hard: Anki_Scheduler_SchedulingState? = nil
     var _good: Anki_Scheduler_SchedulingState? = nil
     var _easy: Anki_Scheduler_SchedulingState? = nil
+    var _dynamicDesiredRetentions: [Float] = []
+    var _dynamicDesiredRetentionEnabled: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2826,6 +4984,8 @@ nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, Sw
       _hard = source._hard
       _good = source._good
       _easy = source._easy
+      _dynamicDesiredRetentions = source._dynamicDesiredRetentions
+      _dynamicDesiredRetentionEnabled = source._dynamicDesiredRetentionEnabled
     }
   }
 
@@ -2849,6 +5009,8 @@ nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, Sw
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._hard) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._good) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._easy) }()
+        case 6: try { try decoder.decodeRepeatedFloatField(value: &_storage._dynamicDesiredRetentions) }()
+        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._dynamicDesiredRetentionEnabled) }()
         default: break
         }
       }
@@ -2876,6 +5038,12 @@ nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, Sw
       try { if let v = _storage._easy {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
       } }()
+      if !_storage._dynamicDesiredRetentions.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._dynamicDesiredRetentions, fieldNumber: 6)
+      }
+      if _storage._dynamicDesiredRetentionEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._dynamicDesiredRetentionEnabled, fieldNumber: 7)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2890,6 +5058,8 @@ nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, Sw
         if _storage._hard != rhs_storage._hard {return false}
         if _storage._good != rhs_storage._good {return false}
         if _storage._easy != rhs_storage._easy {return false}
+        if _storage._dynamicDesiredRetentions != rhs_storage._dynamicDesiredRetentions {return false}
+        if _storage._dynamicDesiredRetentionEnabled != rhs_storage._dynamicDesiredRetentionEnabled {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -2901,7 +5071,7 @@ nonisolated extension Anki_Scheduler_SchedulingStates: SwiftProtobuf.Message, Sw
 
 nonisolated extension Anki_Scheduler_CardAnswer: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CardAnswer"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}current_state\0\u{3}new_state\0\u{1}rating\0\u{3}answered_at_millis\0\u{3}milliseconds_taken\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}current_state\0\u{3}new_state\0\u{1}rating\0\u{3}answered_at_millis\0\u{3}milliseconds_taken\0\u{3}desired_retention_override\0\u{3}rwkv_s90\0\u{3}rwkv_retrievability\0\u{3}rwkv_review_kind\0")
 
   fileprivate class _StorageClass {
     var _cardID: Int64 = 0
@@ -2910,6 +5080,10 @@ nonisolated extension Anki_Scheduler_CardAnswer: SwiftProtobuf.Message, SwiftPro
     var _rating: Anki_Scheduler_CardAnswer.Rating = .again
     var _answeredAtMillis: Int64 = 0
     var _millisecondsTaken: UInt32 = 0
+    var _desiredRetentionOverride: Float? = nil
+    var _rwkvS90: Float? = nil
+    var _rwkvRetrievability: Float? = nil
+    var _rwkvReviewKind: UInt32? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -2926,6 +5100,10 @@ nonisolated extension Anki_Scheduler_CardAnswer: SwiftProtobuf.Message, SwiftPro
       _rating = source._rating
       _answeredAtMillis = source._answeredAtMillis
       _millisecondsTaken = source._millisecondsTaken
+      _desiredRetentionOverride = source._desiredRetentionOverride
+      _rwkvS90 = source._rwkvS90
+      _rwkvRetrievability = source._rwkvRetrievability
+      _rwkvReviewKind = source._rwkvReviewKind
     }
   }
 
@@ -2950,6 +5128,10 @@ nonisolated extension Anki_Scheduler_CardAnswer: SwiftProtobuf.Message, SwiftPro
         case 4: try { try decoder.decodeSingularEnumField(value: &_storage._rating) }()
         case 5: try { try decoder.decodeSingularInt64Field(value: &_storage._answeredAtMillis) }()
         case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._millisecondsTaken) }()
+        case 7: try { try decoder.decodeSingularFloatField(value: &_storage._desiredRetentionOverride) }()
+        case 8: try { try decoder.decodeSingularFloatField(value: &_storage._rwkvS90) }()
+        case 9: try { try decoder.decodeSingularFloatField(value: &_storage._rwkvRetrievability) }()
+        case 10: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvReviewKind) }()
         default: break
         }
       }
@@ -2980,6 +5162,18 @@ nonisolated extension Anki_Scheduler_CardAnswer: SwiftProtobuf.Message, SwiftPro
       if _storage._millisecondsTaken != 0 {
         try visitor.visitSingularUInt32Field(value: _storage._millisecondsTaken, fieldNumber: 6)
       }
+      try { if let v = _storage._desiredRetentionOverride {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._rwkvS90 {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._rwkvRetrievability {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._rwkvReviewKind {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 10)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2995,6 +5189,10 @@ nonisolated extension Anki_Scheduler_CardAnswer: SwiftProtobuf.Message, SwiftPro
         if _storage._rating != rhs_storage._rating {return false}
         if _storage._answeredAtMillis != rhs_storage._answeredAtMillis {return false}
         if _storage._millisecondsTaken != rhs_storage._millisecondsTaken {return false}
+        if _storage._desiredRetentionOverride != rhs_storage._desiredRetentionOverride {return false}
+        if _storage._rwkvS90 != rhs_storage._rwkvS90 {return false}
+        if _storage._rwkvRetrievability != rhs_storage._rwkvRetrievability {return false}
+        if _storage._rwkvReviewKind != rhs_storage._rwkvReviewKind {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -3388,7 +5586,7 @@ nonisolated extension Anki_Scheduler_RepositionDefaultsResponse: SwiftProtobuf.M
 
 nonisolated extension Anki_Scheduler_ComputeFsrsParamsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComputeFsrsParamsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{3}current_params\0\u{3}ignore_revlogs_before_ms\0\u{3}num_of_relearning_steps\0\u{3}health_check\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{3}current_params\0\u{3}ignore_revlogs_before_ms\0\u{3}num_of_relearning_steps\0\u{3}health_check\0\u{3}include_same_day_reviews\0\u{3}fsrs_version\0\u{3}dynamic_desired_retention_enabled\0\u{3}dynamic_desired_retention_review_limit\0\u{3}dynamic_desired_retention_max_cost_perday_minutes\0\u{3}enable_scheduling_penalties\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3401,12 +5599,22 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsRequest: SwiftProtobuf.Mes
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.ignoreRevlogsBeforeMs) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.numOfRelearningSteps) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.healthCheck) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self._includeSameDayReviews) }()
+      case 7: try { try decoder.decodeSingularEnumField(value: &self._fsrsVersion) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.dynamicDesiredRetentionEnabled) }()
+      case 9: try { try decoder.decodeSingularUInt32Field(value: &self._dynamicDesiredRetentionReviewLimit) }()
+      case 10: try { try decoder.decodeSingularFloatField(value: &self._dynamicDesiredRetentionMaxCostPerdayMinutes) }()
+      case 11: try { try decoder.decodeSingularBoolField(value: &self._enableSchedulingPenalties) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.search.isEmpty {
       try visitor.visitSingularStringField(value: self.search, fieldNumber: 1)
     }
@@ -3422,6 +5630,24 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsRequest: SwiftProtobuf.Mes
     if self.healthCheck != false {
       try visitor.visitSingularBoolField(value: self.healthCheck, fieldNumber: 5)
     }
+    try { if let v = self._includeSameDayReviews {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._fsrsVersion {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 7)
+    } }()
+    if self.dynamicDesiredRetentionEnabled != false {
+      try visitor.visitSingularBoolField(value: self.dynamicDesiredRetentionEnabled, fieldNumber: 8)
+    }
+    try { if let v = self._dynamicDesiredRetentionReviewLimit {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._dynamicDesiredRetentionMaxCostPerdayMinutes {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._enableSchedulingPenalties {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 11)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3431,6 +5657,12 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsRequest: SwiftProtobuf.Mes
     if lhs.ignoreRevlogsBeforeMs != rhs.ignoreRevlogsBeforeMs {return false}
     if lhs.numOfRelearningSteps != rhs.numOfRelearningSteps {return false}
     if lhs.healthCheck != rhs.healthCheck {return false}
+    if lhs._includeSameDayReviews != rhs._includeSameDayReviews {return false}
+    if lhs._fsrsVersion != rhs._fsrsVersion {return false}
+    if lhs.dynamicDesiredRetentionEnabled != rhs.dynamicDesiredRetentionEnabled {return false}
+    if lhs._dynamicDesiredRetentionReviewLimit != rhs._dynamicDesiredRetentionReviewLimit {return false}
+    if lhs._dynamicDesiredRetentionMaxCostPerdayMinutes != rhs._dynamicDesiredRetentionMaxCostPerdayMinutes {return false}
+    if lhs._enableSchedulingPenalties != rhs._enableSchedulingPenalties {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3438,7 +5670,7 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsRequest: SwiftProtobuf.Mes
 
 nonisolated extension Anki_Scheduler_ComputeFsrsParamsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComputeFsrsParamsResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}params\0\u{3}fsrs_items\0\u{3}health_check_passed\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}params\0\u{3}fsrs_items\0\u{3}health_check_passed\0\u{3}fsrs_dynamic_desired_retention_params\0\u{3}fsrs_dynamic_desired_retention_weights\0\u{3}fsrs_dynamic_desired_retention_avg_drs\0\u{3}fsrs_dynamic_desired_retention_min\0\u{3}fsrs_dynamic_desired_retention_max\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_weights\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_drs\0\u{3}fsrs_dynamic_desired_retention_fixed_target_weights\0\u{3}fsrs_dynamic_desired_retention_fixed_target_drs\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3449,6 +5681,15 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsResponse: SwiftProtobuf.Me
       case 1: try { try decoder.decodeRepeatedFloatField(value: &self.params) }()
       case 2: try { try decoder.decodeSingularUInt32Field(value: &self.fsrsItems) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self._healthCheckPassed) }()
+      case 4: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionParams) }()
+      case 5: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionWeights) }()
+      case 6: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionAvgDrs) }()
+      case 7: try { try decoder.decodeSingularFloatField(value: &self.fsrsDynamicDesiredRetentionMin) }()
+      case 8: try { try decoder.decodeSingularFloatField(value: &self.fsrsDynamicDesiredRetentionMax) }()
+      case 9: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFsrsEqWeights) }()
+      case 10: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFsrsEqDrs) }()
+      case 11: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFixedTargetWeights) }()
+      case 12: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFixedTargetDrs) }()
       default: break
       }
     }
@@ -3468,6 +5709,33 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsResponse: SwiftProtobuf.Me
     try { if let v = self._healthCheckPassed {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
     } }()
+    if !self.fsrsDynamicDesiredRetentionParams.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionParams, fieldNumber: 4)
+    }
+    if !self.fsrsDynamicDesiredRetentionWeights.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionWeights, fieldNumber: 5)
+    }
+    if !self.fsrsDynamicDesiredRetentionAvgDrs.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionAvgDrs, fieldNumber: 6)
+    }
+    if self.fsrsDynamicDesiredRetentionMin.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.fsrsDynamicDesiredRetentionMin, fieldNumber: 7)
+    }
+    if self.fsrsDynamicDesiredRetentionMax.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.fsrsDynamicDesiredRetentionMax, fieldNumber: 8)
+    }
+    if !self.fsrsDynamicDesiredRetentionFsrsEqWeights.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFsrsEqWeights, fieldNumber: 9)
+    }
+    if !self.fsrsDynamicDesiredRetentionFsrsEqDrs.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFsrsEqDrs, fieldNumber: 10)
+    }
+    if !self.fsrsDynamicDesiredRetentionFixedTargetWeights.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFixedTargetWeights, fieldNumber: 11)
+    }
+    if !self.fsrsDynamicDesiredRetentionFixedTargetDrs.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFixedTargetDrs, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -3475,6 +5743,323 @@ nonisolated extension Anki_Scheduler_ComputeFsrsParamsResponse: SwiftProtobuf.Me
     if lhs.params != rhs.params {return false}
     if lhs.fsrsItems != rhs.fsrsItems {return false}
     if lhs._healthCheckPassed != rhs._healthCheckPassed {return false}
+    if lhs.fsrsDynamicDesiredRetentionParams != rhs.fsrsDynamicDesiredRetentionParams {return false}
+    if lhs.fsrsDynamicDesiredRetentionWeights != rhs.fsrsDynamicDesiredRetentionWeights {return false}
+    if lhs.fsrsDynamicDesiredRetentionAvgDrs != rhs.fsrsDynamicDesiredRetentionAvgDrs {return false}
+    if lhs.fsrsDynamicDesiredRetentionMin != rhs.fsrsDynamicDesiredRetentionMin {return false}
+    if lhs.fsrsDynamicDesiredRetentionMax != rhs.fsrsDynamicDesiredRetentionMax {return false}
+    if lhs.fsrsDynamicDesiredRetentionFsrsEqWeights != rhs.fsrsDynamicDesiredRetentionFsrsEqWeights {return false}
+    if lhs.fsrsDynamicDesiredRetentionFsrsEqDrs != rhs.fsrsDynamicDesiredRetentionFsrsEqDrs {return false}
+    if lhs.fsrsDynamicDesiredRetentionFixedTargetWeights != rhs.fsrsDynamicDesiredRetentionFixedTargetWeights {return false}
+    if lhs.fsrsDynamicDesiredRetentionFixedTargetDrs != rhs.fsrsDynamicDesiredRetentionFixedTargetDrs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_ComputeFsrsParamsBatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ComputeFsrsParamsBatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_ComputeFsrsParamsBatchRequest, rhs: Anki_Scheduler_ComputeFsrsParamsBatchRequest) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_ComputeFsrsParamsBatchRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_ComputeFsrsParamsBatchRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}search\0\u{3}current_params\0\u{3}ignore_revlogs_before_ms\0\u{3}num_of_relearning_steps\0\u{3}include_same_day_reviews\0\u{3}fsrs_version\0\u{3}dynamic_desired_retention_enabled\0\u{3}dynamic_desired_retention_review_limit\0\u{3}dynamic_desired_retention_max_cost_perday_minutes\0\u{3}enable_scheduling_penalties\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.search) }()
+      case 4: try { try decoder.decodeRepeatedFloatField(value: &self.currentParams) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.ignoreRevlogsBeforeMs) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.numOfRelearningSteps) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self._includeSameDayReviews) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self._fsrsVersion) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.dynamicDesiredRetentionEnabled) }()
+      case 10: try { try decoder.decodeSingularUInt32Field(value: &self._dynamicDesiredRetentionReviewLimit) }()
+      case 11: try { try decoder.decodeSingularFloatField(value: &self._dynamicDesiredRetentionMaxCostPerdayMinutes) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self._enableSchedulingPenalties) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if !self.search.isEmpty {
+      try visitor.visitSingularStringField(value: self.search, fieldNumber: 3)
+    }
+    if !self.currentParams.isEmpty {
+      try visitor.visitPackedFloatField(value: self.currentParams, fieldNumber: 4)
+    }
+    if self.ignoreRevlogsBeforeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.ignoreRevlogsBeforeMs, fieldNumber: 5)
+    }
+    if self.numOfRelearningSteps != 0 {
+      try visitor.visitSingularUInt32Field(value: self.numOfRelearningSteps, fieldNumber: 6)
+    }
+    try { if let v = self._includeSameDayReviews {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._fsrsVersion {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 8)
+    } }()
+    if self.dynamicDesiredRetentionEnabled != false {
+      try visitor.visitSingularBoolField(value: self.dynamicDesiredRetentionEnabled, fieldNumber: 9)
+    }
+    try { if let v = self._dynamicDesiredRetentionReviewLimit {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._dynamicDesiredRetentionMaxCostPerdayMinutes {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 11)
+    } }()
+    try { if let v = self._enableSchedulingPenalties {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 12)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_ComputeFsrsParamsBatchRequest.Item, rhs: Anki_Scheduler_ComputeFsrsParamsBatchRequest.Item) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.search != rhs.search {return false}
+    if lhs.currentParams != rhs.currentParams {return false}
+    if lhs.ignoreRevlogsBeforeMs != rhs.ignoreRevlogsBeforeMs {return false}
+    if lhs.numOfRelearningSteps != rhs.numOfRelearningSteps {return false}
+    if lhs._includeSameDayReviews != rhs._includeSameDayReviews {return false}
+    if lhs._fsrsVersion != rhs._fsrsVersion {return false}
+    if lhs.dynamicDesiredRetentionEnabled != rhs.dynamicDesiredRetentionEnabled {return false}
+    if lhs._dynamicDesiredRetentionReviewLimit != rhs._dynamicDesiredRetentionReviewLimit {return false}
+    if lhs._dynamicDesiredRetentionMaxCostPerdayMinutes != rhs._dynamicDesiredRetentionMaxCostPerdayMinutes {return false}
+    if lhs._enableSchedulingPenalties != rhs._enableSchedulingPenalties {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_ComputeFsrsParamsBatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ComputeFsrsParamsBatchResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_ComputeFsrsParamsBatchResponse, rhs: Anki_Scheduler_ComputeFsrsParamsBatchResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_ComputeFsrsParamsBatchResponse.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_ComputeFsrsParamsBatchResponse.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}params\0\u{3}fsrs_items\0\u{3}fsrs_dynamic_desired_retention_params\0\u{3}fsrs_dynamic_desired_retention_weights\0\u{3}fsrs_dynamic_desired_retention_avg_drs\0\u{3}fsrs_dynamic_desired_retention_min\0\u{3}fsrs_dynamic_desired_retention_max\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_weights\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_drs\0\u{3}fsrs_dynamic_desired_retention_fixed_target_weights\0\u{3}fsrs_dynamic_desired_retention_fixed_target_drs\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeRepeatedFloatField(value: &self.params) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.fsrsItems) }()
+      case 5: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionParams) }()
+      case 6: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionWeights) }()
+      case 7: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionAvgDrs) }()
+      case 8: try { try decoder.decodeSingularFloatField(value: &self.fsrsDynamicDesiredRetentionMin) }()
+      case 9: try { try decoder.decodeSingularFloatField(value: &self.fsrsDynamicDesiredRetentionMax) }()
+      case 10: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFsrsEqWeights) }()
+      case 11: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFsrsEqDrs) }()
+      case 12: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFixedTargetWeights) }()
+      case 13: try { try decoder.decodeRepeatedFloatField(value: &self.fsrsDynamicDesiredRetentionFixedTargetDrs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if !self.params.isEmpty {
+      try visitor.visitPackedFloatField(value: self.params, fieldNumber: 3)
+    }
+    if self.fsrsItems != 0 {
+      try visitor.visitSingularUInt32Field(value: self.fsrsItems, fieldNumber: 4)
+    }
+    if !self.fsrsDynamicDesiredRetentionParams.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionParams, fieldNumber: 5)
+    }
+    if !self.fsrsDynamicDesiredRetentionWeights.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionWeights, fieldNumber: 6)
+    }
+    if !self.fsrsDynamicDesiredRetentionAvgDrs.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionAvgDrs, fieldNumber: 7)
+    }
+    if self.fsrsDynamicDesiredRetentionMin.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.fsrsDynamicDesiredRetentionMin, fieldNumber: 8)
+    }
+    if self.fsrsDynamicDesiredRetentionMax.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.fsrsDynamicDesiredRetentionMax, fieldNumber: 9)
+    }
+    if !self.fsrsDynamicDesiredRetentionFsrsEqWeights.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFsrsEqWeights, fieldNumber: 10)
+    }
+    if !self.fsrsDynamicDesiredRetentionFsrsEqDrs.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFsrsEqDrs, fieldNumber: 11)
+    }
+    if !self.fsrsDynamicDesiredRetentionFixedTargetWeights.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFixedTargetWeights, fieldNumber: 12)
+    }
+    if !self.fsrsDynamicDesiredRetentionFixedTargetDrs.isEmpty {
+      try visitor.visitPackedFloatField(value: self.fsrsDynamicDesiredRetentionFixedTargetDrs, fieldNumber: 13)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_ComputeFsrsParamsBatchResponse.Item, rhs: Anki_Scheduler_ComputeFsrsParamsBatchResponse.Item) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.params != rhs.params {return false}
+    if lhs.fsrsItems != rhs.fsrsItems {return false}
+    if lhs.fsrsDynamicDesiredRetentionParams != rhs.fsrsDynamicDesiredRetentionParams {return false}
+    if lhs.fsrsDynamicDesiredRetentionWeights != rhs.fsrsDynamicDesiredRetentionWeights {return false}
+    if lhs.fsrsDynamicDesiredRetentionAvgDrs != rhs.fsrsDynamicDesiredRetentionAvgDrs {return false}
+    if lhs.fsrsDynamicDesiredRetentionMin != rhs.fsrsDynamicDesiredRetentionMin {return false}
+    if lhs.fsrsDynamicDesiredRetentionMax != rhs.fsrsDynamicDesiredRetentionMax {return false}
+    if lhs.fsrsDynamicDesiredRetentionFsrsEqWeights != rhs.fsrsDynamicDesiredRetentionFsrsEqWeights {return false}
+    if lhs.fsrsDynamicDesiredRetentionFsrsEqDrs != rhs.fsrsDynamicDesiredRetentionFsrsEqDrs {return false}
+    if lhs.fsrsDynamicDesiredRetentionFixedTargetWeights != rhs.fsrsDynamicDesiredRetentionFixedTargetWeights {return false}
+    if lhs.fsrsDynamicDesiredRetentionFixedTargetDrs != rhs.fsrsDynamicDesiredRetentionFixedTargetDrs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_ComputeFsrsReviewRetrievabilityCalibrationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ComputeFsrsReviewRetrievabilityCalibrationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{1}params\0\u{3}ignore_revlogs_before_ms\0\u{3}num_of_relearning_steps\0\u{3}include_same_day_reviews\0\u{3}fsrs_version\0\u{3}include_validation_folds\0\u{3}enable_scheduling_penalties\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.search) }()
+      case 2: try { try decoder.decodeRepeatedFloatField(value: &self.params) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.ignoreRevlogsBeforeMs) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.numOfRelearningSteps) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self._includeSameDayReviews) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self._fsrsVersion) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.includeValidationFolds) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self._enableSchedulingPenalties) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.search.isEmpty {
+      try visitor.visitSingularStringField(value: self.search, fieldNumber: 1)
+    }
+    if !self.params.isEmpty {
+      try visitor.visitPackedFloatField(value: self.params, fieldNumber: 2)
+    }
+    if self.ignoreRevlogsBeforeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.ignoreRevlogsBeforeMs, fieldNumber: 3)
+    }
+    if self.numOfRelearningSteps != 0 {
+      try visitor.visitSingularUInt32Field(value: self.numOfRelearningSteps, fieldNumber: 4)
+    }
+    try { if let v = self._includeSameDayReviews {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._fsrsVersion {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
+    } }()
+    if self.includeValidationFolds != false {
+      try visitor.visitSingularBoolField(value: self.includeValidationFolds, fieldNumber: 7)
+    }
+    try { if let v = self._enableSchedulingPenalties {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_ComputeFsrsReviewRetrievabilityCalibrationRequest, rhs: Anki_Scheduler_ComputeFsrsReviewRetrievabilityCalibrationRequest) -> Bool {
+    if lhs.search != rhs.search {return false}
+    if lhs.params != rhs.params {return false}
+    if lhs.ignoreRevlogsBeforeMs != rhs.ignoreRevlogsBeforeMs {return false}
+    if lhs.numOfRelearningSteps != rhs.numOfRelearningSteps {return false}
+    if lhs._includeSameDayReviews != rhs._includeSameDayReviews {return false}
+    if lhs._fsrsVersion != rhs._fsrsVersion {return false}
+    if lhs.includeValidationFolds != rhs.includeValidationFolds {return false}
+    if lhs._enableSchedulingPenalties != rhs._enableSchedulingPenalties {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3672,103 +6257,321 @@ nonisolated extension Anki_Scheduler_FsrsReview: SwiftProtobuf.Message, SwiftPro
 
 nonisolated extension Anki_Scheduler_SimulateFsrsReviewRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SimulateFsrsReviewRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}params\0\u{3}desired_retention\0\u{3}deck_size\0\u{3}days_to_simulate\0\u{3}new_limit\0\u{3}review_limit\0\u{3}max_interval\0\u{1}search\0\u{3}new_cards_ignore_review_limit\0\u{3}easy_days_percentages\0\u{3}review_order\0\u{3}suspend_after_lapse_count\0\u{3}historical_retention\0\u{3}learning_step_count\0\u{3}relearning_step_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}params\0\u{3}desired_retention\0\u{3}deck_size\0\u{3}days_to_simulate\0\u{3}new_limit\0\u{3}review_limit\0\u{3}max_interval\0\u{1}search\0\u{3}new_cards_ignore_review_limit\0\u{3}easy_days_percentages\0\u{3}review_order\0\u{3}suspend_after_lapse_count\0\u{3}historical_retention\0\u{3}learning_step_count\0\u{3}relearning_step_count\0\u{3}review_fuzz_base\0\u{3}review_fuzz_factor_short\0\u{3}review_fuzz_factor_mid\0\u{3}review_fuzz_factor_long\0\u{4}\u{2}help_me_decide_transition_blend_alpha\0\u{3}help_me_decide_enforce_monotonic_success_grade_probs\0\u{3}simulate_dynamic_desired_retention\0\u{3}fsrs_dynamic_desired_retention_params\0\u{3}fsrs_dynamic_desired_retention_weights\0\u{3}fsrs_dynamic_desired_retention_avg_drs\0\u{3}fsrs_dynamic_desired_retention_min\0\u{3}fsrs_dynamic_desired_retention_max\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_weights\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_drs\0\u{3}fsrs_dynamic_desired_retention_clamp\0\u{3}fsrs_dynamic_desired_retention_fixed_target_weights\0\u{3}fsrs_dynamic_desired_retention_fixed_target_drs\0\u{3}split_workload_by_preset\0\u{3}workload_preset_label\0\u{3}rwkv_workload_sample_limit\0\u{3}rwkv_workload_target_step\0\u{3}rwkv_workload_state_update_interval\0")
+
+  fileprivate class _StorageClass {
+    var _params: [Float] = []
+    var _desiredRetention: Float = 0
+    var _deckSize: UInt32 = 0
+    var _daysToSimulate: UInt32 = 0
+    var _newLimit: UInt32 = 0
+    var _reviewLimit: UInt32 = 0
+    var _maxInterval: UInt32 = 0
+    var _search: String = String()
+    var _newCardsIgnoreReviewLimit: Bool = false
+    var _easyDaysPercentages: [Float] = []
+    var _reviewOrder: Anki_DeckConfig_DeckConfig.Config.ReviewCardOrder = .day
+    var _suspendAfterLapseCount: UInt32? = nil
+    var _historicalRetention: Float = 0
+    var _learningStepCount: UInt32 = 0
+    var _relearningStepCount: UInt32 = 0
+    var _reviewFuzzBase: Float? = nil
+    var _reviewFuzzFactorShort: Float? = nil
+    var _reviewFuzzFactorMid: Float? = nil
+    var _reviewFuzzFactorLong: Float? = nil
+    var _helpMeDecideTransitionBlendAlpha: Float? = nil
+    var _helpMeDecideEnforceMonotonicSuccessGradeProbs: Bool? = nil
+    var _simulateDynamicDesiredRetention: Bool = false
+    var _fsrsDynamicDesiredRetentionParams: [Float] = []
+    var _fsrsDynamicDesiredRetentionWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionAvgDrs: [Float] = []
+    var _fsrsDynamicDesiredRetentionMin: Float = 0
+    var _fsrsDynamicDesiredRetentionMax: Float = 0
+    var _fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] = []
+    var _fsrsDynamicDesiredRetentionClamp: Bool = false
+    var _fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] = []
+    var _splitWorkloadByPreset: Bool = false
+    var _workloadPresetLabel: String = String()
+    var _rwkvWorkloadSampleLimit: UInt32 = 0
+    var _rwkvWorkloadTargetStep: UInt32 = 0
+    var _rwkvWorkloadStateUpdateInterval: UInt32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _params = source._params
+      _desiredRetention = source._desiredRetention
+      _deckSize = source._deckSize
+      _daysToSimulate = source._daysToSimulate
+      _newLimit = source._newLimit
+      _reviewLimit = source._reviewLimit
+      _maxInterval = source._maxInterval
+      _search = source._search
+      _newCardsIgnoreReviewLimit = source._newCardsIgnoreReviewLimit
+      _easyDaysPercentages = source._easyDaysPercentages
+      _reviewOrder = source._reviewOrder
+      _suspendAfterLapseCount = source._suspendAfterLapseCount
+      _historicalRetention = source._historicalRetention
+      _learningStepCount = source._learningStepCount
+      _relearningStepCount = source._relearningStepCount
+      _reviewFuzzBase = source._reviewFuzzBase
+      _reviewFuzzFactorShort = source._reviewFuzzFactorShort
+      _reviewFuzzFactorMid = source._reviewFuzzFactorMid
+      _reviewFuzzFactorLong = source._reviewFuzzFactorLong
+      _helpMeDecideTransitionBlendAlpha = source._helpMeDecideTransitionBlendAlpha
+      _helpMeDecideEnforceMonotonicSuccessGradeProbs = source._helpMeDecideEnforceMonotonicSuccessGradeProbs
+      _simulateDynamicDesiredRetention = source._simulateDynamicDesiredRetention
+      _fsrsDynamicDesiredRetentionParams = source._fsrsDynamicDesiredRetentionParams
+      _fsrsDynamicDesiredRetentionWeights = source._fsrsDynamicDesiredRetentionWeights
+      _fsrsDynamicDesiredRetentionAvgDrs = source._fsrsDynamicDesiredRetentionAvgDrs
+      _fsrsDynamicDesiredRetentionMin = source._fsrsDynamicDesiredRetentionMin
+      _fsrsDynamicDesiredRetentionMax = source._fsrsDynamicDesiredRetentionMax
+      _fsrsDynamicDesiredRetentionFsrsEqWeights = source._fsrsDynamicDesiredRetentionFsrsEqWeights
+      _fsrsDynamicDesiredRetentionFsrsEqDrs = source._fsrsDynamicDesiredRetentionFsrsEqDrs
+      _fsrsDynamicDesiredRetentionClamp = source._fsrsDynamicDesiredRetentionClamp
+      _fsrsDynamicDesiredRetentionFixedTargetWeights = source._fsrsDynamicDesiredRetentionFixedTargetWeights
+      _fsrsDynamicDesiredRetentionFixedTargetDrs = source._fsrsDynamicDesiredRetentionFixedTargetDrs
+      _splitWorkloadByPreset = source._splitWorkloadByPreset
+      _workloadPresetLabel = source._workloadPresetLabel
+      _rwkvWorkloadSampleLimit = source._rwkvWorkloadSampleLimit
+      _rwkvWorkloadTargetStep = source._rwkvWorkloadTargetStep
+      _rwkvWorkloadStateUpdateInterval = source._rwkvWorkloadStateUpdateInterval
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedFloatField(value: &self.params) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.desiredRetention) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.deckSize) }()
-      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.daysToSimulate) }()
-      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.newLimit) }()
-      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.reviewLimit) }()
-      case 7: try { try decoder.decodeSingularUInt32Field(value: &self.maxInterval) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self.search) }()
-      case 9: try { try decoder.decodeSingularBoolField(value: &self.newCardsIgnoreReviewLimit) }()
-      case 10: try { try decoder.decodeRepeatedFloatField(value: &self.easyDaysPercentages) }()
-      case 11: try { try decoder.decodeSingularEnumField(value: &self.reviewOrder) }()
-      case 12: try { try decoder.decodeSingularUInt32Field(value: &self._suspendAfterLapseCount) }()
-      case 13: try { try decoder.decodeSingularFloatField(value: &self.historicalRetention) }()
-      case 14: try { try decoder.decodeSingularUInt32Field(value: &self.learningStepCount) }()
-      case 15: try { try decoder.decodeSingularUInt32Field(value: &self.relearningStepCount) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeRepeatedFloatField(value: &_storage._params) }()
+        case 2: try { try decoder.decodeSingularFloatField(value: &_storage._desiredRetention) }()
+        case 3: try { try decoder.decodeSingularUInt32Field(value: &_storage._deckSize) }()
+        case 4: try { try decoder.decodeSingularUInt32Field(value: &_storage._daysToSimulate) }()
+        case 5: try { try decoder.decodeSingularUInt32Field(value: &_storage._newLimit) }()
+        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._reviewLimit) }()
+        case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._maxInterval) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._search) }()
+        case 9: try { try decoder.decodeSingularBoolField(value: &_storage._newCardsIgnoreReviewLimit) }()
+        case 10: try { try decoder.decodeRepeatedFloatField(value: &_storage._easyDaysPercentages) }()
+        case 11: try { try decoder.decodeSingularEnumField(value: &_storage._reviewOrder) }()
+        case 12: try { try decoder.decodeSingularUInt32Field(value: &_storage._suspendAfterLapseCount) }()
+        case 13: try { try decoder.decodeSingularFloatField(value: &_storage._historicalRetention) }()
+        case 14: try { try decoder.decodeSingularUInt32Field(value: &_storage._learningStepCount) }()
+        case 15: try { try decoder.decodeSingularUInt32Field(value: &_storage._relearningStepCount) }()
+        case 16: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzBase) }()
+        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorShort) }()
+        case 18: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorMid) }()
+        case 19: try { try decoder.decodeSingularFloatField(value: &_storage._reviewFuzzFactorLong) }()
+        case 21: try { try decoder.decodeSingularFloatField(value: &_storage._helpMeDecideTransitionBlendAlpha) }()
+        case 22: try { try decoder.decodeSingularBoolField(value: &_storage._helpMeDecideEnforceMonotonicSuccessGradeProbs) }()
+        case 23: try { try decoder.decodeSingularBoolField(value: &_storage._simulateDynamicDesiredRetention) }()
+        case 24: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionParams) }()
+        case 25: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionWeights) }()
+        case 26: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionAvgDrs) }()
+        case 27: try { try decoder.decodeSingularFloatField(value: &_storage._fsrsDynamicDesiredRetentionMin) }()
+        case 28: try { try decoder.decodeSingularFloatField(value: &_storage._fsrsDynamicDesiredRetentionMax) }()
+        case 29: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFsrsEqWeights) }()
+        case 30: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFsrsEqDrs) }()
+        case 31: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsDynamicDesiredRetentionClamp) }()
+        case 32: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFixedTargetWeights) }()
+        case 33: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFixedTargetDrs) }()
+        case 34: try { try decoder.decodeSingularBoolField(value: &_storage._splitWorkloadByPreset) }()
+        case 35: try { try decoder.decodeSingularStringField(value: &_storage._workloadPresetLabel) }()
+        case 36: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvWorkloadSampleLimit) }()
+        case 37: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvWorkloadTargetStep) }()
+        case 38: try { try decoder.decodeSingularUInt32Field(value: &_storage._rwkvWorkloadStateUpdateInterval) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.params.isEmpty {
-      try visitor.visitPackedFloatField(value: self.params, fieldNumber: 1)
-    }
-    if self.desiredRetention.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.desiredRetention, fieldNumber: 2)
-    }
-    if self.deckSize != 0 {
-      try visitor.visitSingularUInt32Field(value: self.deckSize, fieldNumber: 3)
-    }
-    if self.daysToSimulate != 0 {
-      try visitor.visitSingularUInt32Field(value: self.daysToSimulate, fieldNumber: 4)
-    }
-    if self.newLimit != 0 {
-      try visitor.visitSingularUInt32Field(value: self.newLimit, fieldNumber: 5)
-    }
-    if self.reviewLimit != 0 {
-      try visitor.visitSingularUInt32Field(value: self.reviewLimit, fieldNumber: 6)
-    }
-    if self.maxInterval != 0 {
-      try visitor.visitSingularUInt32Field(value: self.maxInterval, fieldNumber: 7)
-    }
-    if !self.search.isEmpty {
-      try visitor.visitSingularStringField(value: self.search, fieldNumber: 8)
-    }
-    if self.newCardsIgnoreReviewLimit != false {
-      try visitor.visitSingularBoolField(value: self.newCardsIgnoreReviewLimit, fieldNumber: 9)
-    }
-    if !self.easyDaysPercentages.isEmpty {
-      try visitor.visitPackedFloatField(value: self.easyDaysPercentages, fieldNumber: 10)
-    }
-    if self.reviewOrder != .day {
-      try visitor.visitSingularEnumField(value: self.reviewOrder, fieldNumber: 11)
-    }
-    try { if let v = self._suspendAfterLapseCount {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 12)
-    } }()
-    if self.historicalRetention.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.historicalRetention, fieldNumber: 13)
-    }
-    if self.learningStepCount != 0 {
-      try visitor.visitSingularUInt32Field(value: self.learningStepCount, fieldNumber: 14)
-    }
-    if self.relearningStepCount != 0 {
-      try visitor.visitSingularUInt32Field(value: self.relearningStepCount, fieldNumber: 15)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._params.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._params, fieldNumber: 1)
+      }
+      if _storage._desiredRetention.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._desiredRetention, fieldNumber: 2)
+      }
+      if _storage._deckSize != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._deckSize, fieldNumber: 3)
+      }
+      if _storage._daysToSimulate != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._daysToSimulate, fieldNumber: 4)
+      }
+      if _storage._newLimit != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._newLimit, fieldNumber: 5)
+      }
+      if _storage._reviewLimit != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._reviewLimit, fieldNumber: 6)
+      }
+      if _storage._maxInterval != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._maxInterval, fieldNumber: 7)
+      }
+      if !_storage._search.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._search, fieldNumber: 8)
+      }
+      if _storage._newCardsIgnoreReviewLimit != false {
+        try visitor.visitSingularBoolField(value: _storage._newCardsIgnoreReviewLimit, fieldNumber: 9)
+      }
+      if !_storage._easyDaysPercentages.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._easyDaysPercentages, fieldNumber: 10)
+      }
+      if _storage._reviewOrder != .day {
+        try visitor.visitSingularEnumField(value: _storage._reviewOrder, fieldNumber: 11)
+      }
+      try { if let v = _storage._suspendAfterLapseCount {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 12)
+      } }()
+      if _storage._historicalRetention.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._historicalRetention, fieldNumber: 13)
+      }
+      if _storage._learningStepCount != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._learningStepCount, fieldNumber: 14)
+      }
+      if _storage._relearningStepCount != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._relearningStepCount, fieldNumber: 15)
+      }
+      try { if let v = _storage._reviewFuzzBase {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorShort {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorMid {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 18)
+      } }()
+      try { if let v = _storage._reviewFuzzFactorLong {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._helpMeDecideTransitionBlendAlpha {
+        try visitor.visitSingularFloatField(value: v, fieldNumber: 21)
+      } }()
+      try { if let v = _storage._helpMeDecideEnforceMonotonicSuccessGradeProbs {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 22)
+      } }()
+      if _storage._simulateDynamicDesiredRetention != false {
+        try visitor.visitSingularBoolField(value: _storage._simulateDynamicDesiredRetention, fieldNumber: 23)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionParams.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionParams, fieldNumber: 24)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionWeights, fieldNumber: 25)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionAvgDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionAvgDrs, fieldNumber: 26)
+      }
+      if _storage._fsrsDynamicDesiredRetentionMin.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._fsrsDynamicDesiredRetentionMin, fieldNumber: 27)
+      }
+      if _storage._fsrsDynamicDesiredRetentionMax.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._fsrsDynamicDesiredRetentionMax, fieldNumber: 28)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFsrsEqWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFsrsEqWeights, fieldNumber: 29)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFsrsEqDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFsrsEqDrs, fieldNumber: 30)
+      }
+      if _storage._fsrsDynamicDesiredRetentionClamp != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsDynamicDesiredRetentionClamp, fieldNumber: 31)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFixedTargetWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFixedTargetWeights, fieldNumber: 32)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFixedTargetDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFixedTargetDrs, fieldNumber: 33)
+      }
+      if _storage._splitWorkloadByPreset != false {
+        try visitor.visitSingularBoolField(value: _storage._splitWorkloadByPreset, fieldNumber: 34)
+      }
+      if !_storage._workloadPresetLabel.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._workloadPresetLabel, fieldNumber: 35)
+      }
+      if _storage._rwkvWorkloadSampleLimit != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvWorkloadSampleLimit, fieldNumber: 36)
+      }
+      if _storage._rwkvWorkloadTargetStep != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvWorkloadTargetStep, fieldNumber: 37)
+      }
+      if _storage._rwkvWorkloadStateUpdateInterval != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._rwkvWorkloadStateUpdateInterval, fieldNumber: 38)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Anki_Scheduler_SimulateFsrsReviewRequest, rhs: Anki_Scheduler_SimulateFsrsReviewRequest) -> Bool {
-    if lhs.params != rhs.params {return false}
-    if lhs.desiredRetention != rhs.desiredRetention {return false}
-    if lhs.deckSize != rhs.deckSize {return false}
-    if lhs.daysToSimulate != rhs.daysToSimulate {return false}
-    if lhs.newLimit != rhs.newLimit {return false}
-    if lhs.reviewLimit != rhs.reviewLimit {return false}
-    if lhs.maxInterval != rhs.maxInterval {return false}
-    if lhs.search != rhs.search {return false}
-    if lhs.newCardsIgnoreReviewLimit != rhs.newCardsIgnoreReviewLimit {return false}
-    if lhs.easyDaysPercentages != rhs.easyDaysPercentages {return false}
-    if lhs.reviewOrder != rhs.reviewOrder {return false}
-    if lhs._suspendAfterLapseCount != rhs._suspendAfterLapseCount {return false}
-    if lhs.historicalRetention != rhs.historicalRetention {return false}
-    if lhs.learningStepCount != rhs.learningStepCount {return false}
-    if lhs.relearningStepCount != rhs.relearningStepCount {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._params != rhs_storage._params {return false}
+        if _storage._desiredRetention != rhs_storage._desiredRetention {return false}
+        if _storage._deckSize != rhs_storage._deckSize {return false}
+        if _storage._daysToSimulate != rhs_storage._daysToSimulate {return false}
+        if _storage._newLimit != rhs_storage._newLimit {return false}
+        if _storage._reviewLimit != rhs_storage._reviewLimit {return false}
+        if _storage._maxInterval != rhs_storage._maxInterval {return false}
+        if _storage._search != rhs_storage._search {return false}
+        if _storage._newCardsIgnoreReviewLimit != rhs_storage._newCardsIgnoreReviewLimit {return false}
+        if _storage._easyDaysPercentages != rhs_storage._easyDaysPercentages {return false}
+        if _storage._reviewOrder != rhs_storage._reviewOrder {return false}
+        if _storage._suspendAfterLapseCount != rhs_storage._suspendAfterLapseCount {return false}
+        if _storage._historicalRetention != rhs_storage._historicalRetention {return false}
+        if _storage._learningStepCount != rhs_storage._learningStepCount {return false}
+        if _storage._relearningStepCount != rhs_storage._relearningStepCount {return false}
+        if _storage._reviewFuzzBase != rhs_storage._reviewFuzzBase {return false}
+        if _storage._reviewFuzzFactorShort != rhs_storage._reviewFuzzFactorShort {return false}
+        if _storage._reviewFuzzFactorMid != rhs_storage._reviewFuzzFactorMid {return false}
+        if _storage._reviewFuzzFactorLong != rhs_storage._reviewFuzzFactorLong {return false}
+        if _storage._helpMeDecideTransitionBlendAlpha != rhs_storage._helpMeDecideTransitionBlendAlpha {return false}
+        if _storage._helpMeDecideEnforceMonotonicSuccessGradeProbs != rhs_storage._helpMeDecideEnforceMonotonicSuccessGradeProbs {return false}
+        if _storage._simulateDynamicDesiredRetention != rhs_storage._simulateDynamicDesiredRetention {return false}
+        if _storage._fsrsDynamicDesiredRetentionParams != rhs_storage._fsrsDynamicDesiredRetentionParams {return false}
+        if _storage._fsrsDynamicDesiredRetentionWeights != rhs_storage._fsrsDynamicDesiredRetentionWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionAvgDrs != rhs_storage._fsrsDynamicDesiredRetentionAvgDrs {return false}
+        if _storage._fsrsDynamicDesiredRetentionMin != rhs_storage._fsrsDynamicDesiredRetentionMin {return false}
+        if _storage._fsrsDynamicDesiredRetentionMax != rhs_storage._fsrsDynamicDesiredRetentionMax {return false}
+        if _storage._fsrsDynamicDesiredRetentionFsrsEqWeights != rhs_storage._fsrsDynamicDesiredRetentionFsrsEqWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionFsrsEqDrs != rhs_storage._fsrsDynamicDesiredRetentionFsrsEqDrs {return false}
+        if _storage._fsrsDynamicDesiredRetentionClamp != rhs_storage._fsrsDynamicDesiredRetentionClamp {return false}
+        if _storage._fsrsDynamicDesiredRetentionFixedTargetWeights != rhs_storage._fsrsDynamicDesiredRetentionFixedTargetWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionFixedTargetDrs != rhs_storage._fsrsDynamicDesiredRetentionFixedTargetDrs {return false}
+        if _storage._splitWorkloadByPreset != rhs_storage._splitWorkloadByPreset {return false}
+        if _storage._workloadPresetLabel != rhs_storage._workloadPresetLabel {return false}
+        if _storage._rwkvWorkloadSampleLimit != rhs_storage._rwkvWorkloadSampleLimit {return false}
+        if _storage._rwkvWorkloadTargetStep != rhs_storage._rwkvWorkloadTargetStep {return false}
+        if _storage._rwkvWorkloadStateUpdateInterval != rhs_storage._rwkvWorkloadStateUpdateInterval {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3821,7 +6624,227 @@ nonisolated extension Anki_Scheduler_SimulateFsrsReviewResponse: SwiftProtobuf.M
 
 nonisolated extension Anki_Scheduler_SimulateFsrsWorkloadResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SimulateFsrsWorkloadResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cost\0\u{3}reviewless_end_memorized\0\u{1}memorized\0\u{3}review_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}cost\0\u{3}reviewless_end_memorized\0\u{1}memorized\0\u{3}review_count\0\u{3}review_time_r_bucket_count\0\u{3}review_time_s_bucket_count\0\u{3}review_time_again_seconds\0\u{3}review_time_hard_seconds\0\u{3}review_time_sample_counts\0\u{3}review_time_again_coeffs\0\u{3}review_time_hard_coeffs\0\u{3}review_time_good_seconds\0\u{3}review_time_easy_seconds\0\u{3}review_time_good_coeffs\0\u{3}review_time_easy_coeffs\0\u{3}review_time_grade_weights\0\u{3}review_time_transition_probs\0\u{3}review_time_transition_counts\0\u{3}review_time_success_grade_probs\0\u{3}review_time_success_grade_counts\0\u{3}weighted_memorized\0\u{3}reviewless_end_weighted_memorized\0\u{3}preset_workload\0")
+
+  fileprivate class _StorageClass {
+    var _cost: Dictionary<UInt32,Float> = [:]
+    var _reviewlessEndMemorized: Float = 0
+    var _memorized: Dictionary<UInt32,Float> = [:]
+    var _reviewCount: Dictionary<UInt32,UInt32> = [:]
+    var _reviewTimeRBucketCount: UInt32 = 0
+    var _reviewTimeSBucketCount: UInt32 = 0
+    var _reviewTimeAgainSeconds: [Float] = []
+    var _reviewTimeHardSeconds: [Float] = []
+    var _reviewTimeSampleCounts: [UInt32] = []
+    var _reviewTimeAgainCoeffs: [Float] = []
+    var _reviewTimeHardCoeffs: [Float] = []
+    var _reviewTimeGoodSeconds: [Float] = []
+    var _reviewTimeEasySeconds: [Float] = []
+    var _reviewTimeGoodCoeffs: [Float] = []
+    var _reviewTimeEasyCoeffs: [Float] = []
+    var _reviewTimeGradeWeights: [Float] = []
+    var _reviewTimeTransitionProbs: [Float] = []
+    var _reviewTimeTransitionCounts: [UInt32] = []
+    var _reviewTimeSuccessGradeProbs: [Float] = []
+    var _reviewTimeSuccessGradeCounts: [UInt32] = []
+    var _weightedMemorized: Dictionary<UInt32,Float> = [:]
+    var _reviewlessEndWeightedMemorized: Float = 0
+    var _presetWorkload: [Anki_Scheduler_SimulateFsrsPresetWorkload] = []
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _cost = source._cost
+      _reviewlessEndMemorized = source._reviewlessEndMemorized
+      _memorized = source._memorized
+      _reviewCount = source._reviewCount
+      _reviewTimeRBucketCount = source._reviewTimeRBucketCount
+      _reviewTimeSBucketCount = source._reviewTimeSBucketCount
+      _reviewTimeAgainSeconds = source._reviewTimeAgainSeconds
+      _reviewTimeHardSeconds = source._reviewTimeHardSeconds
+      _reviewTimeSampleCounts = source._reviewTimeSampleCounts
+      _reviewTimeAgainCoeffs = source._reviewTimeAgainCoeffs
+      _reviewTimeHardCoeffs = source._reviewTimeHardCoeffs
+      _reviewTimeGoodSeconds = source._reviewTimeGoodSeconds
+      _reviewTimeEasySeconds = source._reviewTimeEasySeconds
+      _reviewTimeGoodCoeffs = source._reviewTimeGoodCoeffs
+      _reviewTimeEasyCoeffs = source._reviewTimeEasyCoeffs
+      _reviewTimeGradeWeights = source._reviewTimeGradeWeights
+      _reviewTimeTransitionProbs = source._reviewTimeTransitionProbs
+      _reviewTimeTransitionCounts = source._reviewTimeTransitionCounts
+      _reviewTimeSuccessGradeProbs = source._reviewTimeSuccessGradeProbs
+      _reviewTimeSuccessGradeCounts = source._reviewTimeSuccessGradeCounts
+      _weightedMemorized = source._weightedMemorized
+      _reviewlessEndWeightedMemorized = source._reviewlessEndWeightedMemorized
+      _presetWorkload = source._presetWorkload
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &_storage._cost) }()
+        case 2: try { try decoder.decodeSingularFloatField(value: &_storage._reviewlessEndMemorized) }()
+        case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &_storage._memorized) }()
+        case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: &_storage._reviewCount) }()
+        case 5: try { try decoder.decodeSingularUInt32Field(value: &_storage._reviewTimeRBucketCount) }()
+        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._reviewTimeSBucketCount) }()
+        case 7: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeAgainSeconds) }()
+        case 8: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeHardSeconds) }()
+        case 9: try { try decoder.decodeRepeatedUInt32Field(value: &_storage._reviewTimeSampleCounts) }()
+        case 10: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeAgainCoeffs) }()
+        case 11: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeHardCoeffs) }()
+        case 12: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeGoodSeconds) }()
+        case 13: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeEasySeconds) }()
+        case 14: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeGoodCoeffs) }()
+        case 15: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeEasyCoeffs) }()
+        case 16: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeGradeWeights) }()
+        case 17: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeTransitionProbs) }()
+        case 18: try { try decoder.decodeRepeatedUInt32Field(value: &_storage._reviewTimeTransitionCounts) }()
+        case 19: try { try decoder.decodeRepeatedFloatField(value: &_storage._reviewTimeSuccessGradeProbs) }()
+        case 20: try { try decoder.decodeRepeatedUInt32Field(value: &_storage._reviewTimeSuccessGradeCounts) }()
+        case 21: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &_storage._weightedMemorized) }()
+        case 22: try { try decoder.decodeSingularFloatField(value: &_storage._reviewlessEndWeightedMemorized) }()
+        case 23: try { try decoder.decodeRepeatedMessageField(value: &_storage._presetWorkload) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      if !_storage._cost.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: _storage._cost, fieldNumber: 1)
+      }
+      if _storage._reviewlessEndMemorized.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._reviewlessEndMemorized, fieldNumber: 2)
+      }
+      if !_storage._memorized.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: _storage._memorized, fieldNumber: 3)
+      }
+      if !_storage._reviewCount.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: _storage._reviewCount, fieldNumber: 4)
+      }
+      if _storage._reviewTimeRBucketCount != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._reviewTimeRBucketCount, fieldNumber: 5)
+      }
+      if _storage._reviewTimeSBucketCount != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._reviewTimeSBucketCount, fieldNumber: 6)
+      }
+      if !_storage._reviewTimeAgainSeconds.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeAgainSeconds, fieldNumber: 7)
+      }
+      if !_storage._reviewTimeHardSeconds.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeHardSeconds, fieldNumber: 8)
+      }
+      if !_storage._reviewTimeSampleCounts.isEmpty {
+        try visitor.visitPackedUInt32Field(value: _storage._reviewTimeSampleCounts, fieldNumber: 9)
+      }
+      if !_storage._reviewTimeAgainCoeffs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeAgainCoeffs, fieldNumber: 10)
+      }
+      if !_storage._reviewTimeHardCoeffs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeHardCoeffs, fieldNumber: 11)
+      }
+      if !_storage._reviewTimeGoodSeconds.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeGoodSeconds, fieldNumber: 12)
+      }
+      if !_storage._reviewTimeEasySeconds.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeEasySeconds, fieldNumber: 13)
+      }
+      if !_storage._reviewTimeGoodCoeffs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeGoodCoeffs, fieldNumber: 14)
+      }
+      if !_storage._reviewTimeEasyCoeffs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeEasyCoeffs, fieldNumber: 15)
+      }
+      if !_storage._reviewTimeGradeWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeGradeWeights, fieldNumber: 16)
+      }
+      if !_storage._reviewTimeTransitionProbs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeTransitionProbs, fieldNumber: 17)
+      }
+      if !_storage._reviewTimeTransitionCounts.isEmpty {
+        try visitor.visitPackedUInt32Field(value: _storage._reviewTimeTransitionCounts, fieldNumber: 18)
+      }
+      if !_storage._reviewTimeSuccessGradeProbs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._reviewTimeSuccessGradeProbs, fieldNumber: 19)
+      }
+      if !_storage._reviewTimeSuccessGradeCounts.isEmpty {
+        try visitor.visitPackedUInt32Field(value: _storage._reviewTimeSuccessGradeCounts, fieldNumber: 20)
+      }
+      if !_storage._weightedMemorized.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: _storage._weightedMemorized, fieldNumber: 21)
+      }
+      if _storage._reviewlessEndWeightedMemorized.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._reviewlessEndWeightedMemorized, fieldNumber: 22)
+      }
+      if !_storage._presetWorkload.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._presetWorkload, fieldNumber: 23)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_SimulateFsrsWorkloadResponse, rhs: Anki_Scheduler_SimulateFsrsWorkloadResponse) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._cost != rhs_storage._cost {return false}
+        if _storage._reviewlessEndMemorized != rhs_storage._reviewlessEndMemorized {return false}
+        if _storage._memorized != rhs_storage._memorized {return false}
+        if _storage._reviewCount != rhs_storage._reviewCount {return false}
+        if _storage._reviewTimeRBucketCount != rhs_storage._reviewTimeRBucketCount {return false}
+        if _storage._reviewTimeSBucketCount != rhs_storage._reviewTimeSBucketCount {return false}
+        if _storage._reviewTimeAgainSeconds != rhs_storage._reviewTimeAgainSeconds {return false}
+        if _storage._reviewTimeHardSeconds != rhs_storage._reviewTimeHardSeconds {return false}
+        if _storage._reviewTimeSampleCounts != rhs_storage._reviewTimeSampleCounts {return false}
+        if _storage._reviewTimeAgainCoeffs != rhs_storage._reviewTimeAgainCoeffs {return false}
+        if _storage._reviewTimeHardCoeffs != rhs_storage._reviewTimeHardCoeffs {return false}
+        if _storage._reviewTimeGoodSeconds != rhs_storage._reviewTimeGoodSeconds {return false}
+        if _storage._reviewTimeEasySeconds != rhs_storage._reviewTimeEasySeconds {return false}
+        if _storage._reviewTimeGoodCoeffs != rhs_storage._reviewTimeGoodCoeffs {return false}
+        if _storage._reviewTimeEasyCoeffs != rhs_storage._reviewTimeEasyCoeffs {return false}
+        if _storage._reviewTimeGradeWeights != rhs_storage._reviewTimeGradeWeights {return false}
+        if _storage._reviewTimeTransitionProbs != rhs_storage._reviewTimeTransitionProbs {return false}
+        if _storage._reviewTimeTransitionCounts != rhs_storage._reviewTimeTransitionCounts {return false}
+        if _storage._reviewTimeSuccessGradeProbs != rhs_storage._reviewTimeSuccessGradeProbs {return false}
+        if _storage._reviewTimeSuccessGradeCounts != rhs_storage._reviewTimeSuccessGradeCounts {return false}
+        if _storage._weightedMemorized != rhs_storage._weightedMemorized {return false}
+        if _storage._reviewlessEndWeightedMemorized != rhs_storage._reviewlessEndWeightedMemorized {return false}
+        if _storage._presetWorkload != rhs_storage._presetWorkload {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_SimulateFsrsPresetWorkload: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SimulateFsrsPresetWorkload"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}cost\0\u{3}review_count\0\u{3}learn_count\0\u{1}memorized\0\u{3}weighted_memorized\0\u{3}reviewless_end_memorized\0\u{3}reviewless_end_weighted_memorized\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3829,36 +6852,56 @@ nonisolated extension Anki_Scheduler_SimulateFsrsWorkloadResponse: SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.cost) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.reviewlessEndMemorized) }()
-      case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.memorized) }()
-      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: &self.reviewCount) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.cost) }()
+      case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: &self.reviewCount) }()
+      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: &self.learnCount) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.memorized) }()
+      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.weightedMemorized) }()
+      case 7: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.reviewlessEndMemorized) }()
+      case 8: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: &self.reviewlessEndWeightedMemorized) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
     if !self.cost.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.cost, fieldNumber: 1)
-    }
-    if self.reviewlessEndMemorized.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.reviewlessEndMemorized, fieldNumber: 2)
-    }
-    if !self.memorized.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.memorized, fieldNumber: 3)
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.cost, fieldNumber: 2)
     }
     if !self.reviewCount.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: self.reviewCount, fieldNumber: 4)
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: self.reviewCount, fieldNumber: 3)
+    }
+    if !self.learnCount.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: self.learnCount, fieldNumber: 4)
+    }
+    if !self.memorized.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.memorized, fieldNumber: 5)
+    }
+    if !self.weightedMemorized.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.weightedMemorized, fieldNumber: 6)
+    }
+    if !self.reviewlessEndMemorized.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.reviewlessEndMemorized, fieldNumber: 7)
+    }
+    if !self.reviewlessEndWeightedMemorized.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufFloat>.self, value: self.reviewlessEndWeightedMemorized, fieldNumber: 8)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Anki_Scheduler_SimulateFsrsWorkloadResponse, rhs: Anki_Scheduler_SimulateFsrsWorkloadResponse) -> Bool {
+  public static func ==(lhs: Anki_Scheduler_SimulateFsrsPresetWorkload, rhs: Anki_Scheduler_SimulateFsrsPresetWorkload) -> Bool {
+    if lhs.name != rhs.name {return false}
     if lhs.cost != rhs.cost {return false}
-    if lhs.reviewlessEndMemorized != rhs.reviewlessEndMemorized {return false}
-    if lhs.memorized != rhs.memorized {return false}
     if lhs.reviewCount != rhs.reviewCount {return false}
+    if lhs.learnCount != rhs.learnCount {return false}
+    if lhs.memorized != rhs.memorized {return false}
+    if lhs.weightedMemorized != rhs.weightedMemorized {return false}
+    if lhs.reviewlessEndMemorized != rhs.reviewlessEndMemorized {return false}
+    if lhs.reviewlessEndWeightedMemorized != rhs.reviewlessEndWeightedMemorized {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4021,7 +7064,7 @@ nonisolated extension Anki_Scheduler_GetOptimalRetentionParametersResponse: Swif
 
 nonisolated extension Anki_Scheduler_EvaluateParamsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EvaluateParamsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{3}ignore_revlogs_before_ms\0\u{3}num_of_relearning_steps\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{3}ignore_revlogs_before_ms\0\u{3}num_of_relearning_steps\0\u{3}fsrs_version\0\u{3}include_same_day_reviews\0\u{3}include_same_day_reviews_for_training\0\u{3}search_for_training\0\u{3}enable_scheduling_penalties\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4032,12 +7075,21 @@ nonisolated extension Anki_Scheduler_EvaluateParamsRequest: SwiftProtobuf.Messag
       case 1: try { try decoder.decodeSingularStringField(value: &self.search) }()
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.ignoreRevlogsBeforeMs) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.numOfRelearningSteps) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.fsrsVersion) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self._includeSameDayReviews) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self._includeSameDayReviewsForTraining) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._searchForTraining) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self._enableSchedulingPenalties) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.search.isEmpty {
       try visitor.visitSingularStringField(value: self.search, fieldNumber: 1)
     }
@@ -4047,6 +7099,21 @@ nonisolated extension Anki_Scheduler_EvaluateParamsRequest: SwiftProtobuf.Messag
     if self.numOfRelearningSteps != 0 {
       try visitor.visitSingularUInt32Field(value: self.numOfRelearningSteps, fieldNumber: 3)
     }
+    if self.fsrsVersion != .seven {
+      try visitor.visitSingularEnumField(value: self.fsrsVersion, fieldNumber: 4)
+    }
+    try { if let v = self._includeSameDayReviews {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._includeSameDayReviewsForTraining {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._searchForTraining {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._enableSchedulingPenalties {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4054,6 +7121,55 @@ nonisolated extension Anki_Scheduler_EvaluateParamsRequest: SwiftProtobuf.Messag
     if lhs.search != rhs.search {return false}
     if lhs.ignoreRevlogsBeforeMs != rhs.ignoreRevlogsBeforeMs {return false}
     if lhs.numOfRelearningSteps != rhs.numOfRelearningSteps {return false}
+    if lhs.fsrsVersion != rhs.fsrsVersion {return false}
+    if lhs._includeSameDayReviews != rhs._includeSameDayReviews {return false}
+    if lhs._includeSameDayReviewsForTraining != rhs._includeSameDayReviewsForTraining {return false}
+    if lhs._searchForTraining != rhs._searchForTraining {return false}
+    if lhs._enableSchedulingPenalties != rhs._enableSchedulingPenalties {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_GetFsrsNewCardIntervalsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetFsrsNewCardIntervalsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}config\0\u{3}fsrs_short_term_with_steps_enabled\0\u{3}fsrs_learning_queues_disabled\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._config) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self._fsrsShortTermWithStepsEnabled) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self._fsrsLearningQueuesDisabled) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._config {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._fsrsShortTermWithStepsEnabled {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._fsrsLearningQueuesDisabled {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_GetFsrsNewCardIntervalsRequest, rhs: Anki_Scheduler_GetFsrsNewCardIntervalsRequest) -> Bool {
+    if lhs._config != rhs._config {return false}
+    if lhs._fsrsShortTermWithStepsEnabled != rhs._fsrsShortTermWithStepsEnabled {return false}
+    if lhs._fsrsLearningQueuesDisabled != rhs._fsrsLearningQueuesDisabled {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4061,7 +7177,7 @@ nonisolated extension Anki_Scheduler_EvaluateParamsRequest: SwiftProtobuf.Messag
 
 nonisolated extension Anki_Scheduler_EvaluateParamsLegacyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EvaluateParamsLegacyRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}params\0\u{1}search\0\u{3}ignore_revlogs_before_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}params\0\u{1}search\0\u{3}ignore_revlogs_before_ms\0\u{3}include_same_day_reviews\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4072,12 +7188,17 @@ nonisolated extension Anki_Scheduler_EvaluateParamsLegacyRequest: SwiftProtobuf.
       case 1: try { try decoder.decodeRepeatedFloatField(value: &self.params) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.search) }()
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.ignoreRevlogsBeforeMs) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self._includeSameDayReviews) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.params.isEmpty {
       try visitor.visitPackedFloatField(value: self.params, fieldNumber: 1)
     }
@@ -4087,6 +7208,9 @@ nonisolated extension Anki_Scheduler_EvaluateParamsLegacyRequest: SwiftProtobuf.
     if self.ignoreRevlogsBeforeMs != 0 {
       try visitor.visitSingularInt64Field(value: self.ignoreRevlogsBeforeMs, fieldNumber: 3)
     }
+    try { if let v = self._includeSameDayReviews {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4094,6 +7218,7 @@ nonisolated extension Anki_Scheduler_EvaluateParamsLegacyRequest: SwiftProtobuf.
     if lhs.params != rhs.params {return false}
     if lhs.search != rhs.search {return false}
     if lhs.ignoreRevlogsBeforeMs != rhs.ignoreRevlogsBeforeMs {return false}
+    if lhs._includeSameDayReviews != rhs._includeSameDayReviews {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4178,6 +7303,652 @@ nonisolated extension Anki_Scheduler_ComputeMemoryStateResponse: SwiftProtobuf.M
   }
 }
 
+nonisolated extension Anki_Scheduler_FsrsPresetForCardResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsPresetForCardResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}fsrs_version\0\u{1}params\0\u{3}desired_retention\0\u{3}historical_retention\0\u{3}ignore_revlogs_before_date\0\u{3}fsrs_dynamic_desired_retention_enabled\0\u{3}fsrs_dynamic_desired_retention_params\0\u{3}fsrs_dynamic_desired_retention_weights\0\u{3}fsrs_dynamic_desired_retention_avg_drs\0\u{3}fsrs_dynamic_desired_retention_min\0\u{3}fsrs_dynamic_desired_retention_max\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_weights\0\u{3}fsrs_dynamic_desired_retention_fsrs_eq_drs\0\u{3}fsrs_dynamic_desired_retention_clamp\0\u{3}fsrs_dynamic_desired_retention_fixed_target_weights\0\u{3}fsrs_dynamic_desired_retention_fixed_target_drs\0")
+
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _name: String = String()
+    var _fsrsVersion: Anki_DeckConfig_DeckConfig.Config.FsrsVersion = .seven
+    var _params: [Float] = []
+    var _desiredRetention: Float = 0
+    var _historicalRetention: Float = 0
+    var _ignoreRevlogsBeforeDate: String = String()
+    var _fsrsDynamicDesiredRetentionEnabled: Bool = false
+    var _fsrsDynamicDesiredRetentionParams: [Float] = []
+    var _fsrsDynamicDesiredRetentionWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionAvgDrs: [Float] = []
+    var _fsrsDynamicDesiredRetentionMin: Float = 0
+    var _fsrsDynamicDesiredRetentionMax: Float = 0
+    var _fsrsDynamicDesiredRetentionFsrsEqWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionFsrsEqDrs: [Float] = []
+    var _fsrsDynamicDesiredRetentionClamp: Bool = false
+    var _fsrsDynamicDesiredRetentionFixedTargetWeights: [Float] = []
+    var _fsrsDynamicDesiredRetentionFixedTargetDrs: [Float] = []
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _name = source._name
+      _fsrsVersion = source._fsrsVersion
+      _params = source._params
+      _desiredRetention = source._desiredRetention
+      _historicalRetention = source._historicalRetention
+      _ignoreRevlogsBeforeDate = source._ignoreRevlogsBeforeDate
+      _fsrsDynamicDesiredRetentionEnabled = source._fsrsDynamicDesiredRetentionEnabled
+      _fsrsDynamicDesiredRetentionParams = source._fsrsDynamicDesiredRetentionParams
+      _fsrsDynamicDesiredRetentionWeights = source._fsrsDynamicDesiredRetentionWeights
+      _fsrsDynamicDesiredRetentionAvgDrs = source._fsrsDynamicDesiredRetentionAvgDrs
+      _fsrsDynamicDesiredRetentionMin = source._fsrsDynamicDesiredRetentionMin
+      _fsrsDynamicDesiredRetentionMax = source._fsrsDynamicDesiredRetentionMax
+      _fsrsDynamicDesiredRetentionFsrsEqWeights = source._fsrsDynamicDesiredRetentionFsrsEqWeights
+      _fsrsDynamicDesiredRetentionFsrsEqDrs = source._fsrsDynamicDesiredRetentionFsrsEqDrs
+      _fsrsDynamicDesiredRetentionClamp = source._fsrsDynamicDesiredRetentionClamp
+      _fsrsDynamicDesiredRetentionFixedTargetWeights = source._fsrsDynamicDesiredRetentionFixedTargetWeights
+      _fsrsDynamicDesiredRetentionFixedTargetDrs = source._fsrsDynamicDesiredRetentionFixedTargetDrs
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._fsrsVersion) }()
+        case 4: try { try decoder.decodeRepeatedFloatField(value: &_storage._params) }()
+        case 5: try { try decoder.decodeSingularFloatField(value: &_storage._desiredRetention) }()
+        case 6: try { try decoder.decodeSingularFloatField(value: &_storage._historicalRetention) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._ignoreRevlogsBeforeDate) }()
+        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsDynamicDesiredRetentionEnabled) }()
+        case 9: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionParams) }()
+        case 10: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionWeights) }()
+        case 11: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionAvgDrs) }()
+        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._fsrsDynamicDesiredRetentionMin) }()
+        case 13: try { try decoder.decodeSingularFloatField(value: &_storage._fsrsDynamicDesiredRetentionMax) }()
+        case 14: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFsrsEqWeights) }()
+        case 15: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFsrsEqDrs) }()
+        case 16: try { try decoder.decodeSingularBoolField(value: &_storage._fsrsDynamicDesiredRetentionClamp) }()
+        case 17: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFixedTargetWeights) }()
+        case 18: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsDynamicDesiredRetentionFixedTargetDrs) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 2)
+      }
+      if _storage._fsrsVersion != .seven {
+        try visitor.visitSingularEnumField(value: _storage._fsrsVersion, fieldNumber: 3)
+      }
+      if !_storage._params.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._params, fieldNumber: 4)
+      }
+      if _storage._desiredRetention.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._desiredRetention, fieldNumber: 5)
+      }
+      if _storage._historicalRetention.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._historicalRetention, fieldNumber: 6)
+      }
+      if !_storage._ignoreRevlogsBeforeDate.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._ignoreRevlogsBeforeDate, fieldNumber: 7)
+      }
+      if _storage._fsrsDynamicDesiredRetentionEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsDynamicDesiredRetentionEnabled, fieldNumber: 8)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionParams.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionParams, fieldNumber: 9)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionWeights, fieldNumber: 10)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionAvgDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionAvgDrs, fieldNumber: 11)
+      }
+      if _storage._fsrsDynamicDesiredRetentionMin.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._fsrsDynamicDesiredRetentionMin, fieldNumber: 12)
+      }
+      if _storage._fsrsDynamicDesiredRetentionMax.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._fsrsDynamicDesiredRetentionMax, fieldNumber: 13)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFsrsEqWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFsrsEqWeights, fieldNumber: 14)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFsrsEqDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFsrsEqDrs, fieldNumber: 15)
+      }
+      if _storage._fsrsDynamicDesiredRetentionClamp != false {
+        try visitor.visitSingularBoolField(value: _storage._fsrsDynamicDesiredRetentionClamp, fieldNumber: 16)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFixedTargetWeights.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFixedTargetWeights, fieldNumber: 17)
+      }
+      if !_storage._fsrsDynamicDesiredRetentionFixedTargetDrs.isEmpty {
+        try visitor.visitPackedFloatField(value: _storage._fsrsDynamicDesiredRetentionFixedTargetDrs, fieldNumber: 18)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsPresetForCardResponse, rhs: Anki_Scheduler_FsrsPresetForCardResponse) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._fsrsVersion != rhs_storage._fsrsVersion {return false}
+        if _storage._params != rhs_storage._params {return false}
+        if _storage._desiredRetention != rhs_storage._desiredRetention {return false}
+        if _storage._historicalRetention != rhs_storage._historicalRetention {return false}
+        if _storage._ignoreRevlogsBeforeDate != rhs_storage._ignoreRevlogsBeforeDate {return false}
+        if _storage._fsrsDynamicDesiredRetentionEnabled != rhs_storage._fsrsDynamicDesiredRetentionEnabled {return false}
+        if _storage._fsrsDynamicDesiredRetentionParams != rhs_storage._fsrsDynamicDesiredRetentionParams {return false}
+        if _storage._fsrsDynamicDesiredRetentionWeights != rhs_storage._fsrsDynamicDesiredRetentionWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionAvgDrs != rhs_storage._fsrsDynamicDesiredRetentionAvgDrs {return false}
+        if _storage._fsrsDynamicDesiredRetentionMin != rhs_storage._fsrsDynamicDesiredRetentionMin {return false}
+        if _storage._fsrsDynamicDesiredRetentionMax != rhs_storage._fsrsDynamicDesiredRetentionMax {return false}
+        if _storage._fsrsDynamicDesiredRetentionFsrsEqWeights != rhs_storage._fsrsDynamicDesiredRetentionFsrsEqWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionFsrsEqDrs != rhs_storage._fsrsDynamicDesiredRetentionFsrsEqDrs {return false}
+        if _storage._fsrsDynamicDesiredRetentionClamp != rhs_storage._fsrsDynamicDesiredRetentionClamp {return false}
+        if _storage._fsrsDynamicDesiredRetentionFixedTargetWeights != rhs_storage._fsrsDynamicDesiredRetentionFixedTargetWeights {return false}
+        if _storage._fsrsDynamicDesiredRetentionFixedTargetDrs != rhs_storage._fsrsDynamicDesiredRetentionFixedTargetDrs {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsPresetIdsForCardsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsPresetIdsForCardsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsPresetIdsForCardsResponse, rhs: Anki_Scheduler_FsrsPresetIdsForCardsResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsPresetIdsForCardsResponse.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsPresetIdsForCardsResponse.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}preset_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.presetID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if !self.presetID.isEmpty {
+      try visitor.visitSingularStringField(value: self.presetID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsPresetIdsForCardsResponse.Item, rhs: Anki_Scheduler_FsrsPresetIdsForCardsResponse.Item) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.presetID != rhs.presetID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvHistoricalReviewFingerprintRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}ignored_review_ids\0\u{3}dynamic_preset_replay\0\u{3}stable_preset_ids\0\u{3}first_review_uses_creation_by_config_id\0\u{3}expected_identity\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedInt64Field(value: &self.ignoredReviewIds) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.dynamicPresetReplay) }()
+      case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufInt64>.self, value: &self.stablePresetIds) }()
+      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufBool>.self, value: &self.firstReviewUsesCreationByConfigID) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._expectedIdentity) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.ignoredReviewIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.ignoredReviewIds, fieldNumber: 1)
+    }
+    if self.dynamicPresetReplay != false {
+      try visitor.visitSingularBoolField(value: self.dynamicPresetReplay, fieldNumber: 2)
+    }
+    if !self.stablePresetIds.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufInt64>.self, value: self.stablePresetIds, fieldNumber: 3)
+    }
+    if !self.firstReviewUsesCreationByConfigID.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufBool>.self, value: self.firstReviewUsesCreationByConfigID, fieldNumber: 4)
+    }
+    try { if let v = self._expectedIdentity {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest, rhs: Anki_Scheduler_RwkvHistoricalReviewFingerprintRequest) -> Bool {
+    if lhs.ignoredReviewIds != rhs.ignoredReviewIds {return false}
+    if lhs.dynamicPresetReplay != rhs.dynamicPresetReplay {return false}
+    if lhs.stablePresetIds != rhs.stablePresetIds {return false}
+    if lhs.firstReviewUsesCreationByConfigID != rhs.firstReviewUsesCreationByConfigID {return false}
+    if lhs._expectedIdentity != rhs._expectedIdentity {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewIdentity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvHistoricalReviewIdentity"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}last_review_id\0\u{3}review_count\0\u{3}history_hash\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.lastReviewID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.reviewCount) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.historyHash) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.lastReviewID != 0 {
+      try visitor.visitSingularInt64Field(value: self.lastReviewID, fieldNumber: 1)
+    }
+    if self.reviewCount != 0 {
+      try visitor.visitSingularUInt64Field(value: self.reviewCount, fieldNumber: 2)
+    }
+    if !self.historyHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.historyHash, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewIdentity, rhs: Anki_Scheduler_RwkvHistoricalReviewIdentity) -> Bool {
+    if lhs.lastReviewID != rhs.lastReviewID {return false}
+    if lhs.reviewCount != rhs.reviewCount {return false}
+    if lhs.historyHash != rhs.historyHash {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewFingerprintResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvHistoricalReviewFingerprintResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}last_review_id\0\u{3}review_count\0\u{3}history_hash\0\u{3}active_ignored_review_ids\0\u{3}queried_review_count\0\u{3}history_is_valid\0\u{3}history_prefix_is_valid\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.lastReviewID) }()
+      case 2: try { try decoder.decodeSingularUInt64Field(value: &self.reviewCount) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.historyHash) }()
+      case 4: try { try decoder.decodeRepeatedInt64Field(value: &self.activeIgnoredReviewIds) }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.queriedReviewCount) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.historyIsValid) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.historyPrefixIsValid) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.lastReviewID != 0 {
+      try visitor.visitSingularInt64Field(value: self.lastReviewID, fieldNumber: 1)
+    }
+    if self.reviewCount != 0 {
+      try visitor.visitSingularUInt64Field(value: self.reviewCount, fieldNumber: 2)
+    }
+    if !self.historyHash.isEmpty {
+      try visitor.visitSingularStringField(value: self.historyHash, fieldNumber: 3)
+    }
+    if !self.activeIgnoredReviewIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.activeIgnoredReviewIds, fieldNumber: 4)
+    }
+    if self.queriedReviewCount != 0 {
+      try visitor.visitSingularUInt64Field(value: self.queriedReviewCount, fieldNumber: 5)
+    }
+    if self.historyIsValid != false {
+      try visitor.visitSingularBoolField(value: self.historyIsValid, fieldNumber: 6)
+    }
+    if self.historyPrefixIsValid != false {
+      try visitor.visitSingularBoolField(value: self.historyPrefixIsValid, fieldNumber: 7)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewFingerprintResponse, rhs: Anki_Scheduler_RwkvHistoricalReviewFingerprintResponse) -> Bool {
+    if lhs.lastReviewID != rhs.lastReviewID {return false}
+    if lhs.reviewCount != rhs.reviewCount {return false}
+    if lhs.historyHash != rhs.historyHash {return false}
+    if lhs.activeIgnoredReviewIds != rhs.activeIgnoredReviewIds {return false}
+    if lhs.queriedReviewCount != rhs.queriedReviewCount {return false}
+    if lhs.historyIsValid != rhs.historyIsValid {return false}
+    if lhs.historyPrefixIsValid != rhs.historyPrefixIsValid {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewInputsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvHistoricalReviewInputsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}history\0\u{3}preserved_learning_start_cutoffs\0\u{3}first_review_uses_creation\0\u{3}recovery_checkpoint_max_age_millis\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._history) }()
+      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufInt64>.self, value: &self.preservedLearningStartCutoffs) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self._firstReviewUsesCreation) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self._recoveryCheckpointMaxAgeMillis) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._history {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.preservedLearningStartCutoffs.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufInt64>.self, value: self.preservedLearningStartCutoffs, fieldNumber: 2)
+    }
+    try { if let v = self._firstReviewUsesCreation {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._recoveryCheckpointMaxAgeMillis {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewInputsRequest, rhs: Anki_Scheduler_RwkvHistoricalReviewInputsRequest) -> Bool {
+    if lhs._history != rhs._history {return false}
+    if lhs.preservedLearningStartCutoffs != rhs.preservedLearningStartCutoffs {return false}
+    if lhs._firstReviewUsesCreation != rhs._firstReviewUsesCreation {return false}
+    if lhs._recoveryCheckpointMaxAgeMillis != rhs._recoveryCheckpointMaxAgeMillis {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvHistoricalReviewMetadata"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identity\0\u{3}previous_review_id_by_card\0\u{3}previous_interval_days_by_card\0\u{3}review_count_by_card\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._identity) }()
+      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufInt64>.self, value: &self.previousReviewIDByCard) }()
+      case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufInt64>.self, value: &self.previousIntervalDaysByCard) }()
+      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufUInt32>.self, value: &self.reviewCountByCard) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._identity {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.previousReviewIDByCard.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufInt64>.self, value: self.previousReviewIDByCard, fieldNumber: 2)
+    }
+    if !self.previousIntervalDaysByCard.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufInt64>.self, value: self.previousIntervalDaysByCard, fieldNumber: 3)
+    }
+    if !self.reviewCountByCard.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufInt64,SwiftProtobuf.ProtobufUInt32>.self, value: self.reviewCountByCard, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewMetadata, rhs: Anki_Scheduler_RwkvHistoricalReviewMetadata) -> Bool {
+    if lhs._identity != rhs._identity {return false}
+    if lhs.previousReviewIDByCard != rhs.previousReviewIDByCard {return false}
+    if lhs.previousIntervalDaysByCard != rhs.previousIntervalDaysByCard {return false}
+    if lhs.reviewCountByCard != rhs.reviewCountByCard {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewInputsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvHistoricalReviewInputsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}reviews\0\u{1}metadata\0\u{3}recovery_checkpoint\0\u{3}active_ignored_review_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.reviews) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._metadata) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._recoveryCheckpoint) }()
+      case 4: try { try decoder.decodeRepeatedInt64Field(value: &self.activeIgnoredReviewIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.reviews.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.reviews, fieldNumber: 1)
+    }
+    try { if let v = self._metadata {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._recoveryCheckpoint {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    if !self.activeIgnoredReviewIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.activeIgnoredReviewIds, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewInputsResponse, rhs: Anki_Scheduler_RwkvHistoricalReviewInputsResponse) -> Bool {
+    if lhs.reviews != rhs.reviews {return false}
+    if lhs._metadata != rhs._metadata {return false}
+    if lhs._recoveryCheckpoint != rhs._recoveryCheckpoint {return false}
+    if lhs.activeIgnoredReviewIds != rhs.activeIgnoredReviewIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvHistoricalReviewInputsResponse.Review: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvHistoricalReviewInputsResponse.protoMessageName + ".Review"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}review_id\0\u{3}card_id\0\u{3}note_id\0\u{3}deck_id\0\u{3}preset_id\0\u{1}ease\0\u{3}duration_millis\0\u{3}review_kind\0\u{3}interval_days\0\u{3}ease_factor\0\u{3}card_type\0\u{3}day_offset\0\u{3}elapsed_days\0\u{3}elapsed_seconds\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.reviewID) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.noteID) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.deckID) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.presetID) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.ease) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.durationMillis) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self.reviewKind) }()
+      case 9: try { try decoder.decodeSingularInt64Field(value: &self.intervalDays) }()
+      case 10: try { try decoder.decodeSingularInt64Field(value: &self.easeFactor) }()
+      case 11: try { try decoder.decodeSingularInt64Field(value: &self.cardType) }()
+      case 12: try { try decoder.decodeSingularInt64Field(value: &self.dayOffset) }()
+      case 13: try { try decoder.decodeSingularInt64Field(value: &self.elapsedDays) }()
+      case 14: try { try decoder.decodeSingularInt64Field(value: &self.elapsedSeconds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.reviewID != 0 {
+      try visitor.visitSingularInt64Field(value: self.reviewID, fieldNumber: 1)
+    }
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 2)
+    }
+    if self.noteID != 0 {
+      try visitor.visitSingularInt64Field(value: self.noteID, fieldNumber: 3)
+    }
+    if self.deckID != 0 {
+      try visitor.visitSingularInt64Field(value: self.deckID, fieldNumber: 4)
+    }
+    if self.presetID != 0 {
+      try visitor.visitSingularInt64Field(value: self.presetID, fieldNumber: 5)
+    }
+    if self.ease != 0 {
+      try visitor.visitSingularInt64Field(value: self.ease, fieldNumber: 6)
+    }
+    if self.durationMillis != 0 {
+      try visitor.visitSingularInt64Field(value: self.durationMillis, fieldNumber: 7)
+    }
+    if self.reviewKind != 0 {
+      try visitor.visitSingularInt64Field(value: self.reviewKind, fieldNumber: 8)
+    }
+    if self.intervalDays != 0 {
+      try visitor.visitSingularInt64Field(value: self.intervalDays, fieldNumber: 9)
+    }
+    if self.easeFactor != 0 {
+      try visitor.visitSingularInt64Field(value: self.easeFactor, fieldNumber: 10)
+    }
+    if self.cardType != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardType, fieldNumber: 11)
+    }
+    if self.dayOffset != 0 {
+      try visitor.visitSingularInt64Field(value: self.dayOffset, fieldNumber: 12)
+    }
+    if self.elapsedDays != 0 {
+      try visitor.visitSingularInt64Field(value: self.elapsedDays, fieldNumber: 13)
+    }
+    if self.elapsedSeconds != 0 {
+      try visitor.visitSingularInt64Field(value: self.elapsedSeconds, fieldNumber: 14)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvHistoricalReviewInputsResponse.Review, rhs: Anki_Scheduler_RwkvHistoricalReviewInputsResponse.Review) -> Bool {
+    if lhs.reviewID != rhs.reviewID {return false}
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.noteID != rhs.noteID {return false}
+    if lhs.deckID != rhs.deckID {return false}
+    if lhs.presetID != rhs.presetID {return false}
+    if lhs.ease != rhs.ease {return false}
+    if lhs.durationMillis != rhs.durationMillis {return false}
+    if lhs.reviewKind != rhs.reviewKind {return false}
+    if lhs.intervalDays != rhs.intervalDays {return false}
+    if lhs.easeFactor != rhs.easeFactor {return false}
+    if lhs.cardType != rhs.cardType {return false}
+    if lhs.dayOffset != rhs.dayOffset {return false}
+    if lhs.elapsedDays != rhs.elapsedDays {return false}
+    if lhs.elapsedSeconds != rhs.elapsedSeconds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension Anki_Scheduler_FuzzDeltaRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FuzzDeltaRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}interval\0")
@@ -4238,6 +8009,1825 @@ nonisolated extension Anki_Scheduler_FuzzDeltaResponse: SwiftProtobuf.Message, S
 
   public static func ==(lhs: Anki_Scheduler_FuzzDeltaResponse, rhs: Anki_Scheduler_FuzzDeltaResponse) -> Bool {
     if lhs.deltaDays != rhs.deltaDays {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_SchedulingStatesWithIntervalsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SchedulingStatesWithIntervalsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}again\0\u{1}hard\0\u{1}good\0\u{1}easy\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self._again) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self._hard) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self._good) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self._easy) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    try { if let v = self._again {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._hard {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._good {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._easy {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_SchedulingStatesWithIntervalsRequest, rhs: Anki_Scheduler_SchedulingStatesWithIntervalsRequest) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs._again != rhs._again {return false}
+    if lhs._hard != rhs._hard {return false}
+    if lhs._good != rhs._good {return false}
+    if lhs._easy != rhs._easy {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsCurrentRetrievabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsCurrentRetrievabilityRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}stability\0\u{3}elapsed_days\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.elapsedDays) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.stability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 2)
+    }
+    if self.elapsedDays.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.elapsedDays, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsCurrentRetrievabilityRequest, rhs: Anki_Scheduler_FsrsCurrentRetrievabilityRequest) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.stability != rhs.stability {return false}
+    if lhs.elapsedDays != rhs.elapsedDays {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsCurrentRetrievabilityResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsCurrentRetrievabilityResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularFloatField(value: &self.retrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.retrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.retrievability, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsCurrentRetrievabilityResponse, rhs: Anki_Scheduler_FsrsCurrentRetrievabilityResponse) -> Bool {
+    if lhs.retrievability != rhs.retrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsNextIntervalRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsNextIntervalRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}stability\0\u{3}desired_retention\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.desiredRetention) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.stability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 2)
+    }
+    if self.desiredRetention.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.desiredRetention, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsNextIntervalRequest, rhs: Anki_Scheduler_FsrsNextIntervalRequest) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.stability != rhs.stability {return false}
+    if lhs.desiredRetention != rhs.desiredRetention {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsNextIntervalResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsNextIntervalResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}interval\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularFloatField(value: &self.interval) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.interval.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.interval, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsNextIntervalResponse, rhs: Anki_Scheduler_FsrsNextIntervalResponse) -> Bool {
+    if lhs.interval != rhs.interval {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}stability\0\u{3}target_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.targetRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.stability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 2)
+    }
+    if self.targetRetrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.targetRetrievability, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityRequest, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityRequest) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.stability != rhs.stability {return false}
+    if lhs.targetRetrievability != rhs.targetRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}interval\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularFloatField(value: &self.interval) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.interval.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.interval, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityResponse, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityResponse) -> Bool {
+    if lhs.interval != rhs.interval {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityBatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0\u{3}target_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.targetRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    if self.targetRetrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.targetRetrievability, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.targetRetrievability != rhs.targetRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}stability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.stability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest.Item, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchRequest.Item) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.stability != rhs.stability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityBatchResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}interval\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.interval) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.interval.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.interval, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse.Item, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityBatchResponse.Item) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.interval != rhs.interval {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityVariableBatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_index\0\u{3}card_id\0\u{1}stability\0\u{3}target_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.requestIndex) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self.targetRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.requestIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.requestIndex, fieldNumber: 1)
+    }
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 2)
+    }
+    if self.stability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 3)
+    }
+    if self.targetRetrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.targetRetrievability, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest.Item, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchRequest.Item) -> Bool {
+    if lhs.requestIndex != rhs.requestIndex {return false}
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.stability != rhs.stability {return false}
+    if lhs.targetRetrievability != rhs.targetRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityVariableBatchResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_index\0\u{1}interval\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.requestIndex) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.interval) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.requestIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.requestIndex, fieldNumber: 1)
+    }
+    if self.interval.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.interval, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse.Item, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityVariableBatchResponse.Item) -> Bool {
+    if lhs.requestIndex != rhs.requestIndex {return false}
+    if lhs.interval != rhs.interval {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsDesiredRetentionForIntervalsBatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest, rhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_index\0\u{3}card_id\0\u{3}desired_retention\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.requestIndex) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.desiredRetention) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.requestIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.requestIndex, fieldNumber: 1)
+    }
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 2)
+    }
+    if self.desiredRetention.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.desiredRetention, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest.Item, rhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchRequest.Item) -> Bool {
+    if lhs.requestIndex != rhs.requestIndex {return false}
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.desiredRetention != rhs.desiredRetention {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsDesiredRetentionForIntervalsBatchResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse, rhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_index\0\u{3}interval_target_desired_retention\0\u{3}dynamic_desired_retentions\0\u{3}dynamic_desired_retention_enabled\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.requestIndex) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.intervalTargetDesiredRetention) }()
+      case 3: try { try decoder.decodeRepeatedFloatField(value: &self.dynamicDesiredRetentions) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.dynamicDesiredRetentionEnabled) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.requestIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.requestIndex, fieldNumber: 1)
+    }
+    if self.intervalTargetDesiredRetention.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.intervalTargetDesiredRetention, fieldNumber: 2)
+    }
+    if !self.dynamicDesiredRetentions.isEmpty {
+      try visitor.visitPackedFloatField(value: self.dynamicDesiredRetentions, fieldNumber: 3)
+    }
+    if self.dynamicDesiredRetentionEnabled != false {
+      try visitor.visitSingularBoolField(value: self.dynamicDesiredRetentionEnabled, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse.Item, rhs: Anki_Scheduler_FsrsDesiredRetentionForIntervalsBatchResponse.Item) -> Bool {
+    if lhs.requestIndex != rhs.requestIndex {return false}
+    if lhs.intervalTargetDesiredRetention != rhs.intervalTargetDesiredRetention {return false}
+    if lhs.dynamicDesiredRetentions != rhs.dynamicDesiredRetentions {return false}
+    if lhs.dynamicDesiredRetentionEnabled != rhs.dynamicDesiredRetentionEnabled {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityByConfigBatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0\u{3}target_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.targetRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    if self.targetRetrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.targetRetrievability, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.targetRetrievability != rhs.targetRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_index\0\u{3}config_id\0\u{1}stability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.requestIndex) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.configID) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.requestIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.requestIndex, fieldNumber: 1)
+    }
+    if self.configID != 0 {
+      try visitor.visitSingularInt64Field(value: self.configID, fieldNumber: 2)
+    }
+    if self.stability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest.Item, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchRequest.Item) -> Bool {
+    if lhs.requestIndex != rhs.requestIndex {return false}
+    if lhs.configID != rhs.configID {return false}
+    if lhs.stability != rhs.stability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FsrsIntervalAtRetrievabilityByConfigBatchResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_index\0\u{1}interval\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.requestIndex) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.interval) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.requestIndex != 0 {
+      try visitor.visitSingularUInt32Field(value: self.requestIndex, fieldNumber: 1)
+    }
+    if self.interval.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.interval, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse.Item, rhs: Anki_Scheduler_FsrsIntervalAtRetrievabilityByConfigBatchResponse.Item) -> Bool {
+    if lhs.requestIndex != rhs.requestIndex {return false}
+    if lhs.interval != rhs.interval {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewQueueScoresRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewQueueScoresRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}deck_id\0\u{1}scores\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.deckID) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.scores) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.deckID != 0 {
+      try visitor.visitSingularInt64Field(value: self.deckID, fieldNumber: 1)
+    }
+    if !self.scores.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.scores, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewQueueScoresRequest, rhs: Anki_Scheduler_RwkvReviewQueueScoresRequest) -> Bool {
+    if lhs.deckID != rhs.deckID {return false}
+    if lhs.scores != rhs.scores {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewQueueScoresRequest.Score: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvReviewQueueScoresRequest.protoMessageName + ".Score"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}retrievability\0\u{3}intervening_reviews\0\u{3}target_retention\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.retrievability) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self._interveningReviews) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self._targetRetention) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.retrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.retrievability, fieldNumber: 2)
+    }
+    try { if let v = self._interveningReviews {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._targetRetention {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewQueueScoresRequest.Score, rhs: Anki_Scheduler_RwkvReviewQueueScoresRequest.Score) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.retrievability != rhs.retrievability {return false}
+    if lhs._interveningReviews != rhs._interveningReviews {return false}
+    if lhs._targetRetention != rhs._targetRetention {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvAnsweredCardQueueScorePatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvAnsweredCardQueueScorePatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}deck_id\0\u{3}card_id\0\u{1}score\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.deckID) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._score) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.deckID != 0 {
+      try visitor.visitSingularInt64Field(value: self.deckID, fieldNumber: 1)
+    }
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 2)
+    }
+    try { if let v = self._score {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvAnsweredCardQueueScorePatchRequest, rhs: Anki_Scheduler_RwkvAnsweredCardQueueScorePatchRequest) -> Bool {
+    if lhs.deckID != rhs.deckID {return false}
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs._score != rhs._score {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewQueueInterveningReviewsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}deck_id\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.deckID) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.deckID != 0 {
+      try visitor.visitSingularInt64Field(value: self.deckID, fieldNumber: 1)
+    }
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest, rhs: Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest) -> Bool {
+    if lhs.deckID != rhs.deckID {return false}
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}intervening_reviews\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.interveningReviews) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.interveningReviews != 0 {
+      try visitor.visitSingularUInt32Field(value: self.interveningReviews, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest.Item, rhs: Anki_Scheduler_RwkvReviewQueueInterveningReviewsRequest.Item) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.interveningReviews != rhs.interveningReviews {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvStatsGraphScoresRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvStatsGraphScoresRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{1}scores\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.search) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.scores) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.search.isEmpty {
+      try visitor.visitSingularStringField(value: self.search, fieldNumber: 1)
+    }
+    if !self.scores.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.scores, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvStatsGraphScoresRequest, rhs: Anki_Scheduler_RwkvStatsGraphScoresRequest) -> Bool {
+    if lhs.search != rhs.search {return false}
+    if lhs.scores != rhs.scores {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvStatsGraphScoresRequest.Score: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvStatsGraphScoresRequest.protoMessageName + ".Score"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}retrievability\0\u{3}intervening_reviews\0\u{3}target_retention\0\u{3}curve_due\0\u{3}curve_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.retrievability) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self._interveningReviews) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self._targetRetention) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self._curveDue) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self._curveRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.retrievability.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.retrievability, fieldNumber: 2)
+    }
+    try { if let v = self._interveningReviews {
+      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._targetRetention {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._curveDue {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._curveRetrievability {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvStatsGraphScoresRequest.Score, rhs: Anki_Scheduler_RwkvStatsGraphScoresRequest.Score) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.retrievability != rhs.retrievability {return false}
+    if lhs._interveningReviews != rhs._interveningReviews {return false}
+    if lhs._targetRetention != rhs._targetRetention {return false}
+    if lhs._curveDue != rhs._curveDue {return false}
+    if lhs._curveRetrievability != rhs._curveRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvCardInfoScoreRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvCardInfoScoreRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}retrievability\0\u{3}curve_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self._retrievability) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self._curveRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    try { if let v = self._retrievability {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._curveRetrievability {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvCardInfoScoreRequest, rhs: Anki_Scheduler_RwkvCardInfoScoreRequest) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs._retrievability != rhs._retrievability {return false}
+    if lhs._curveRetrievability != rhs._curveRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvRetrievabilityScoreResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvRetrievabilityScoreResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularFloatField(value: &self._retrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._retrievability {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvRetrievabilityScoreResponse, rhs: Anki_Scheduler_RwkvRetrievabilityScoreResponse) -> Bool {
+    if lhs._retrievability != rhs._retrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewRetrievabilityCacheRowsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}source\0\u{1}rows\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.source) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.rows) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.source.isEmpty {
+      try visitor.visitSingularStringField(value: self.source, fieldNumber: 1)
+    }
+    if !self.rows.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.rows, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest, rhs: Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest) -> Bool {
+    if lhs.source != rhs.source {return false}
+    if lhs.rows != rhs.rows {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest.Row: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest.protoMessageName + ".Row"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}revlog_id\0\u{1}prediction\0\u{3}sample_role\0\u{3}fold_index\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.revlogID) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.prediction) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.sampleRole) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.foldIndex) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.revlogID != 0 {
+      try visitor.visitSingularInt64Field(value: self.revlogID, fieldNumber: 1)
+    }
+    if self.prediction.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.prediction, fieldNumber: 2)
+    }
+    if !self.sampleRole.isEmpty {
+      try visitor.visitSingularStringField(value: self.sampleRole, fieldNumber: 3)
+    }
+    if self.foldIndex != 0 {
+      try visitor.visitSingularInt32Field(value: self.foldIndex, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest.Row, rhs: Anki_Scheduler_RwkvReviewRetrievabilityCacheRowsRequest.Row) -> Bool {
+    if lhs.revlogID != rhs.revlogID {return false}
+    if lhs.prediction != rhs.prediction {return false}
+    if lhs.sampleRole != rhs.sampleRole {return false}
+    if lhs.foldIndex != rhs.foldIndex {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PruneRwkvReviewRetrievabilityCacheRowsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}source\0\u{1}keep\0\u{3}superseded_sources\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.source) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.keep) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.supersededSources) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.source.isEmpty {
+      try visitor.visitSingularStringField(value: self.source, fieldNumber: 1)
+    }
+    if !self.keep.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.keep, fieldNumber: 2)
+    }
+    if !self.supersededSources.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.supersededSources, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest, rhs: Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest) -> Bool {
+    if lhs.source != rhs.source {return false}
+    if lhs.keep != rhs.keep {return false}
+    if lhs.supersededSources != rhs.supersededSources {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest.Key: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest.protoMessageName + ".Key"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}revlog_id\0\u{3}sample_role\0\u{3}fold_index\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.revlogID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sampleRole) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.foldIndex) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.revlogID != 0 {
+      try visitor.visitSingularInt64Field(value: self.revlogID, fieldNumber: 1)
+    }
+    if !self.sampleRole.isEmpty {
+      try visitor.visitSingularStringField(value: self.sampleRole, fieldNumber: 2)
+    }
+    if self.foldIndex != 0 {
+      try visitor.visitSingularInt32Field(value: self.foldIndex, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest.Key, rhs: Anki_Scheduler_PruneRwkvReviewRetrievabilityCacheRowsRequest.Key) -> Bool {
+    if lhs.revlogID != rhs.revlogID {return false}
+    if lhs.sampleRole != rhs.sampleRole {return false}
+    if lhs.foldIndex != rhs.foldIndex {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewRescheduleRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewRescheduleRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}items\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.items) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.items.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.items, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewRescheduleRequest, rhs: Anki_Scheduler_RwkvReviewRescheduleRequest) -> Bool {
+    if lhs.items != rhs.items {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewRescheduleRequest.Item: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvReviewRescheduleRequest.protoMessageName + ".Item"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}interval_days\0\u{3}elapsed_days\0\u{1}s90\0\u{3}target_retention\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.intervalDays) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.elapsedDays) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self.s90) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self._targetRetention) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.intervalDays != 0 {
+      try visitor.visitSingularUInt32Field(value: self.intervalDays, fieldNumber: 2)
+    }
+    if self.elapsedDays != 0 {
+      try visitor.visitSingularUInt32Field(value: self.elapsedDays, fieldNumber: 3)
+    }
+    if self.s90.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.s90, fieldNumber: 4)
+    }
+    try { if let v = self._targetRetention {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewRescheduleRequest.Item, rhs: Anki_Scheduler_RwkvReviewRescheduleRequest.Item) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.intervalDays != rhs.intervalDays {return false}
+    if lhs.elapsedDays != rhs.elapsedDays {return false}
+    if lhs.s90 != rhs.s90 {return false}
+    if lhs._targetRetention != rhs._targetRetention {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewInputRowsForCardsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewInputRowsForCardsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_ids\0\u{3}include_suspended_review\0\u{3}include_disabled_decks\0\u{3}include_new_cards\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedInt64Field(value: &self.cardIds) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeSuspendedReview) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.includeDisabledDecks) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.includeNewCards) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.cardIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.cardIds, fieldNumber: 1)
+    }
+    if self.includeSuspendedReview != false {
+      try visitor.visitSingularBoolField(value: self.includeSuspendedReview, fieldNumber: 2)
+    }
+    if self.includeDisabledDecks != false {
+      try visitor.visitSingularBoolField(value: self.includeDisabledDecks, fieldNumber: 3)
+    }
+    if self.includeNewCards != false {
+      try visitor.visitSingularBoolField(value: self.includeNewCards, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewInputRowsForCardsRequest, rhs: Anki_Scheduler_RwkvReviewInputRowsForCardsRequest) -> Bool {
+    if lhs.cardIds != rhs.cardIds {return false}
+    if lhs.includeSuspendedReview != rhs.includeSuspendedReview {return false}
+    if lhs.includeDisabledDecks != rhs.includeDisabledDecks {return false}
+    if lhs.includeNewCards != rhs.includeNewCards {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewInputRowsForSearchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewInputRowsForSearchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}search\0\u{3}include_suspended_review\0\u{3}include_disabled_decks\0\u{3}include_new_cards\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.search) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeSuspendedReview) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.includeDisabledDecks) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.includeNewCards) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.search.isEmpty {
+      try visitor.visitSingularStringField(value: self.search, fieldNumber: 1)
+    }
+    if self.includeSuspendedReview != false {
+      try visitor.visitSingularBoolField(value: self.includeSuspendedReview, fieldNumber: 2)
+    }
+    if self.includeDisabledDecks != false {
+      try visitor.visitSingularBoolField(value: self.includeDisabledDecks, fieldNumber: 3)
+    }
+    if self.includeNewCards != false {
+      try visitor.visitSingularBoolField(value: self.includeNewCards, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewInputRowsForSearchRequest, rhs: Anki_Scheduler_RwkvReviewInputRowsForSearchRequest) -> Bool {
+    if lhs.search != rhs.search {return false}
+    if lhs.includeSuspendedReview != rhs.includeSuspendedReview {return false}
+    if lhs.includeDisabledDecks != rhs.includeDisabledDecks {return false}
+    if lhs.includeNewCards != rhs.includeNewCards {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewInputRowsForDeckReviewQueueRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewInputRowsForDeckReviewQueueRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}deck_id\0\u{3}include_disabled_decks\0\u{3}include_new_cards\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.deckID) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeDisabledDecks) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.includeNewCards) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.deckID != 0 {
+      try visitor.visitSingularInt64Field(value: self.deckID, fieldNumber: 1)
+    }
+    if self.includeDisabledDecks != false {
+      try visitor.visitSingularBoolField(value: self.includeDisabledDecks, fieldNumber: 2)
+    }
+    if self.includeNewCards != false {
+      try visitor.visitSingularBoolField(value: self.includeNewCards, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewInputRowsForDeckReviewQueueRequest, rhs: Anki_Scheduler_RwkvReviewInputRowsForDeckReviewQueueRequest) -> Bool {
+    if lhs.deckID != rhs.deckID {return false}
+    if lhs.includeDisabledDecks != rhs.includeDisabledDecks {return false}
+    if lhs.includeNewCards != rhs.includeNewCards {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewInputRowsForCardsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RwkvReviewInputRowsForCardsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rows\0\u{3}loaded_cards\0\u{3}cards_with_supported_state\0\u{3}disabled_config_cards\0\u{3}deck_configs\0\u{3}searched_cards\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.rows) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.loadedCards) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.cardsWithSupportedState) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.disabledConfigCards) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.deckConfigs) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.searchedCards) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.rows.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.rows, fieldNumber: 1)
+    }
+    if self.loadedCards != 0 {
+      try visitor.visitSingularUInt32Field(value: self.loadedCards, fieldNumber: 2)
+    }
+    if self.cardsWithSupportedState != 0 {
+      try visitor.visitSingularUInt32Field(value: self.cardsWithSupportedState, fieldNumber: 3)
+    }
+    if self.disabledConfigCards != 0 {
+      try visitor.visitSingularUInt32Field(value: self.disabledConfigCards, fieldNumber: 4)
+    }
+    if self.deckConfigs != 0 {
+      try visitor.visitSingularUInt32Field(value: self.deckConfigs, fieldNumber: 5)
+    }
+    if self.searchedCards != 0 {
+      try visitor.visitSingularUInt32Field(value: self.searchedCards, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewInputRowsForCardsResponse, rhs: Anki_Scheduler_RwkvReviewInputRowsForCardsResponse) -> Bool {
+    if lhs.rows != rhs.rows {return false}
+    if lhs.loadedCards != rhs.loadedCards {return false}
+    if lhs.cardsWithSupportedState != rhs.cardsWithSupportedState {return false}
+    if lhs.disabledConfigCards != rhs.disabledConfigCards {return false}
+    if lhs.deckConfigs != rhs.deckConfigs {return false}
+    if lhs.searchedCards != rhs.searchedCards {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Scheduler_RwkvReviewInputRowsForCardsResponse.Row: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Scheduler_RwkvReviewInputRowsForCardsResponse.protoMessageName + ".Row"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}note_id\0\u{3}deck_id\0\u{3}preset_id\0\u{3}card_type\0\u{3}card_queue\0\u{3}card_due\0\u{3}interval_days\0\u{3}ease_factor\0\u{1}reps\0\u{1}lapses\0\u{3}day_offset\0\u{3}current_state_kind\0\u{3}current_normal_state_kind\0\u{3}current_elapsed_days\0\u{3}current_elapsed_seconds\0\u{3}target_retention\0\u{3}batch_size\0\u{3}enforce_grade_order\0")
+
+  fileprivate class _StorageClass {
+    var _cardID: Int64 = 0
+    var _noteID: Int64 = 0
+    var _deckID: Int64 = 0
+    var _presetID: String = String()
+    var _cardType: Int32 = 0
+    var _cardQueue: Int32 = 0
+    var _cardDue: Int32 = 0
+    var _intervalDays: UInt32 = 0
+    var _easeFactor: UInt32 = 0
+    var _reps: UInt32 = 0
+    var _lapses: UInt32 = 0
+    var _dayOffset: UInt32 = 0
+    var _currentStateKind: String = String()
+    var _currentNormalStateKind: String = String()
+    var _currentElapsedDays: UInt32? = nil
+    var _currentElapsedSeconds: UInt32? = nil
+    var _targetRetention: Float = 0
+    var _batchSize: UInt32 = 0
+    var _enforceGradeOrder: Bool? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _cardID = source._cardID
+      _noteID = source._noteID
+      _deckID = source._deckID
+      _presetID = source._presetID
+      _cardType = source._cardType
+      _cardQueue = source._cardQueue
+      _cardDue = source._cardDue
+      _intervalDays = source._intervalDays
+      _easeFactor = source._easeFactor
+      _reps = source._reps
+      _lapses = source._lapses
+      _dayOffset = source._dayOffset
+      _currentStateKind = source._currentStateKind
+      _currentNormalStateKind = source._currentNormalStateKind
+      _currentElapsedDays = source._currentElapsedDays
+      _currentElapsedSeconds = source._currentElapsedSeconds
+      _targetRetention = source._targetRetention
+      _batchSize = source._batchSize
+      _enforceGradeOrder = source._enforceGradeOrder
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularInt64Field(value: &_storage._cardID) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._noteID) }()
+        case 3: try { try decoder.decodeSingularInt64Field(value: &_storage._deckID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._presetID) }()
+        case 5: try { try decoder.decodeSingularSInt32Field(value: &_storage._cardType) }()
+        case 6: try { try decoder.decodeSingularSInt32Field(value: &_storage._cardQueue) }()
+        case 7: try { try decoder.decodeSingularSInt32Field(value: &_storage._cardDue) }()
+        case 8: try { try decoder.decodeSingularUInt32Field(value: &_storage._intervalDays) }()
+        case 9: try { try decoder.decodeSingularUInt32Field(value: &_storage._easeFactor) }()
+        case 10: try { try decoder.decodeSingularUInt32Field(value: &_storage._reps) }()
+        case 11: try { try decoder.decodeSingularUInt32Field(value: &_storage._lapses) }()
+        case 12: try { try decoder.decodeSingularUInt32Field(value: &_storage._dayOffset) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._currentStateKind) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._currentNormalStateKind) }()
+        case 15: try { try decoder.decodeSingularUInt32Field(value: &_storage._currentElapsedDays) }()
+        case 16: try { try decoder.decodeSingularUInt32Field(value: &_storage._currentElapsedSeconds) }()
+        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._targetRetention) }()
+        case 18: try { try decoder.decodeSingularUInt32Field(value: &_storage._batchSize) }()
+        case 19: try { try decoder.decodeSingularBoolField(value: &_storage._enforceGradeOrder) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._cardID != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._cardID, fieldNumber: 1)
+      }
+      if _storage._noteID != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._noteID, fieldNumber: 2)
+      }
+      if _storage._deckID != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._deckID, fieldNumber: 3)
+      }
+      if !_storage._presetID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._presetID, fieldNumber: 4)
+      }
+      if _storage._cardType != 0 {
+        try visitor.visitSingularSInt32Field(value: _storage._cardType, fieldNumber: 5)
+      }
+      if _storage._cardQueue != 0 {
+        try visitor.visitSingularSInt32Field(value: _storage._cardQueue, fieldNumber: 6)
+      }
+      if _storage._cardDue != 0 {
+        try visitor.visitSingularSInt32Field(value: _storage._cardDue, fieldNumber: 7)
+      }
+      if _storage._intervalDays != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._intervalDays, fieldNumber: 8)
+      }
+      if _storage._easeFactor != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._easeFactor, fieldNumber: 9)
+      }
+      if _storage._reps != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._reps, fieldNumber: 10)
+      }
+      if _storage._lapses != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._lapses, fieldNumber: 11)
+      }
+      if _storage._dayOffset != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._dayOffset, fieldNumber: 12)
+      }
+      if !_storage._currentStateKind.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._currentStateKind, fieldNumber: 13)
+      }
+      if !_storage._currentNormalStateKind.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._currentNormalStateKind, fieldNumber: 14)
+      }
+      try { if let v = _storage._currentElapsedDays {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._currentElapsedSeconds {
+        try visitor.visitSingularUInt32Field(value: v, fieldNumber: 16)
+      } }()
+      if _storage._targetRetention.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._targetRetention, fieldNumber: 17)
+      }
+      if _storage._batchSize != 0 {
+        try visitor.visitSingularUInt32Field(value: _storage._batchSize, fieldNumber: 18)
+      }
+      try { if let v = _storage._enforceGradeOrder {
+        try visitor.visitSingularBoolField(value: v, fieldNumber: 19)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Scheduler_RwkvReviewInputRowsForCardsResponse.Row, rhs: Anki_Scheduler_RwkvReviewInputRowsForCardsResponse.Row) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._cardID != rhs_storage._cardID {return false}
+        if _storage._noteID != rhs_storage._noteID {return false}
+        if _storage._deckID != rhs_storage._deckID {return false}
+        if _storage._presetID != rhs_storage._presetID {return false}
+        if _storage._cardType != rhs_storage._cardType {return false}
+        if _storage._cardQueue != rhs_storage._cardQueue {return false}
+        if _storage._cardDue != rhs_storage._cardDue {return false}
+        if _storage._intervalDays != rhs_storage._intervalDays {return false}
+        if _storage._easeFactor != rhs_storage._easeFactor {return false}
+        if _storage._reps != rhs_storage._reps {return false}
+        if _storage._lapses != rhs_storage._lapses {return false}
+        if _storage._dayOffset != rhs_storage._dayOffset {return false}
+        if _storage._currentStateKind != rhs_storage._currentStateKind {return false}
+        if _storage._currentNormalStateKind != rhs_storage._currentNormalStateKind {return false}
+        if _storage._currentElapsedDays != rhs_storage._currentElapsedDays {return false}
+        if _storage._currentElapsedSeconds != rhs_storage._currentElapsedSeconds {return false}
+        if _storage._targetRetention != rhs_storage._targetRetention {return false}
+        if _storage._batchSize != rhs_storage._batchSize {return false}
+        if _storage._enforceGradeOrder != rhs_storage._enforceGradeOrder {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

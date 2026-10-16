@@ -187,6 +187,15 @@ public nonisolated struct Anki_Sync_SyncCollectionResponse: Sendable {
 
   public var serverMediaUsn: Int32 = 0
 
+  /// True when normal sync downloaded collection objects or deletions.
+  public var remoteCollectionChanged: Bool = false
+
+  /// Review entries downloaded during normal sync.
+  public var remoteReviewIds: [Int64] = []
+
+  /// True when downloaded collection changes included anything besides reviews.
+  public var remoteNonReviewCollectionChanged: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum ChangesRequired: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -493,7 +502,7 @@ nonisolated extension Anki_Sync_SyncCollectionRequest: SwiftProtobuf.Message, Sw
 
 nonisolated extension Anki_Sync_SyncCollectionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SyncCollectionResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}host_number\0\u{3}server_message\0\u{1}required\0\u{3}new_endpoint\0\u{3}server_media_usn\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}host_number\0\u{3}server_message\0\u{1}required\0\u{3}new_endpoint\0\u{3}server_media_usn\0\u{3}remote_collection_changed\0\u{3}remote_review_ids\0\u{3}remote_non_review_collection_changed\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -506,6 +515,9 @@ nonisolated extension Anki_Sync_SyncCollectionResponse: SwiftProtobuf.Message, S
       case 3: try { try decoder.decodeSingularEnumField(value: &self.required) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._newEndpoint) }()
       case 5: try { try decoder.decodeSingularInt32Field(value: &self.serverMediaUsn) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.remoteCollectionChanged) }()
+      case 7: try { try decoder.decodeRepeatedInt64Field(value: &self.remoteReviewIds) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.remoteNonReviewCollectionChanged) }()
       default: break
       }
     }
@@ -531,6 +543,15 @@ nonisolated extension Anki_Sync_SyncCollectionResponse: SwiftProtobuf.Message, S
     if self.serverMediaUsn != 0 {
       try visitor.visitSingularInt32Field(value: self.serverMediaUsn, fieldNumber: 5)
     }
+    if self.remoteCollectionChanged != false {
+      try visitor.visitSingularBoolField(value: self.remoteCollectionChanged, fieldNumber: 6)
+    }
+    if !self.remoteReviewIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.remoteReviewIds, fieldNumber: 7)
+    }
+    if self.remoteNonReviewCollectionChanged != false {
+      try visitor.visitSingularBoolField(value: self.remoteNonReviewCollectionChanged, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -540,6 +561,9 @@ nonisolated extension Anki_Sync_SyncCollectionResponse: SwiftProtobuf.Message, S
     if lhs.required != rhs.required {return false}
     if lhs._newEndpoint != rhs._newEndpoint {return false}
     if lhs.serverMediaUsn != rhs.serverMediaUsn {return false}
+    if lhs.remoteCollectionChanged != rhs.remoteCollectionChanged {return false}
+    if lhs.remoteReviewIds != rhs.remoteReviewIds {return false}
+    if lhs.remoteNonReviewCollectionChanged != rhs.remoteNonReviewCollectionChanged {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

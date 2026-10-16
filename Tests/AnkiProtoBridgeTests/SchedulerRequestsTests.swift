@@ -87,7 +87,7 @@ private import SwiftProtobuf
     }
 
     @Test func extendLimits_uses_the_offset_scheduler_method_id() {
-        #expect(SchedulerMethod.extendLimits == 9)
+        #expect(SchedulerMethod.extendLimits == 12)
     }
 
     @Test func extendLimits_carries_a_review_only_delta() throws {
@@ -115,7 +115,7 @@ private import SwiftProtobuf
     @Test func setDueDate_dispatches_and_encodes_ids_and_spec() throws {
         let envelope: Request<Void> = .setDueDate(cardIds: [CardID(4), CardID(5)], days: "3-7!")
         #expect(envelope.serviceId == ServiceID.scheduler)
-        #expect(envelope.methodId == 19)
+        #expect(envelope.methodId == 22)
         #expect(envelope.methodId == SchedulerMethod.setDueDate)
         let proto = try Anki_Scheduler_SetDueDateRequest(serializedBytes: envelope.body)
         #expect(proto.cardIds == [4, 5])

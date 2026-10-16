@@ -67,8 +67,8 @@ enum CollectionOpsMethod {
     static let getUndoStatus: UInt32 = 7
     static let undo: UInt32 = 8
     static let redo: UInt32 = 9
-    static let latestProgress: UInt32 = 12
-    static let setWantsAbort: UInt32 = 13
+    static let latestProgress: UInt32 = 4
+    static let setWantsAbort: UInt32 = 5
 }
 
 /// BackendCardsService (5).

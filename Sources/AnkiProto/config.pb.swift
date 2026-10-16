@@ -28,6 +28,44 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+public nonisolated enum Anki_Config_ExperimentalFeatureFlag: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case testFlag // = 0
+  case svelteEditor // = 1
+  case svelteReviewer // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .testFlag
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .testFlag
+    case 1: self = .svelteEditor
+    case 2: self = .svelteReviewer
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .testFlag: return 0
+    case .svelteEditor: return 1
+    case .svelteReviewer: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Anki_Config_ExperimentalFeatureFlag] = [
+    .testFlag,
+    .svelteEditor,
+    .svelteReviewer,
+  ]
+
+}
+
 public nonisolated struct Anki_Config_ConfigKey: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -64,6 +102,8 @@ public nonisolated struct Anki_Config_ConfigKey: Sendable {
     case loadBalancerEnabled // = 26
     case fsrsShortTermWithStepsEnabled // = 27
     case fsrsLegacyEvaluate // = 28
+    case showFuzzDeltaAboveAnswerButtons // = 29
+    case fsrsLearningQueuesDisabled // = 30
     case UNRECOGNIZED(Int)
 
     public init() {
@@ -99,6 +139,8 @@ public nonisolated struct Anki_Config_ConfigKey: Sendable {
       case 26: self = .loadBalancerEnabled
       case 27: self = .fsrsShortTermWithStepsEnabled
       case 28: self = .fsrsLegacyEvaluate
+      case 29: self = .showFuzzDeltaAboveAnswerButtons
+      case 30: self = .fsrsLearningQueuesDisabled
       default: self = .UNRECOGNIZED(rawValue)
       }
     }
@@ -132,6 +174,8 @@ public nonisolated struct Anki_Config_ConfigKey: Sendable {
       case .loadBalancerEnabled: return 26
       case .fsrsShortTermWithStepsEnabled: return 27
       case .fsrsLegacyEvaluate: return 28
+      case .showFuzzDeltaAboveAnswerButtons: return 29
+      case .fsrsLearningQueuesDisabled: return 30
       case .UNRECOGNIZED(let i): return i
       }
     }
@@ -165,6 +209,8 @@ public nonisolated struct Anki_Config_ConfigKey: Sendable {
       .loadBalancerEnabled,
       .fsrsShortTermWithStepsEnabled,
       .fsrsLegacyEvaluate,
+      .showFuzzDeltaAboveAnswerButtons,
+      .fsrsLearningQueuesDisabled,
     ]
 
   }
@@ -419,6 +465,8 @@ public nonisolated struct Anki_Config_Preferences: @unchecked Sendable {
 
     public var fsrsShortTermWithStepsEnabled: Bool = false
 
+    public var showFuzzDeltaOnButtons: Bool = false
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -473,6 +521,10 @@ public nonisolated struct Anki_Config_Preferences: @unchecked Sendable {
 
 fileprivate nonisolated let _protobuf_package = "anki.config"
 
+nonisolated extension Anki_Config_ExperimentalFeatureFlag: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TEST_FLAG\0\u{1}SVELTE_EDITOR\0\u{1}SVELTE_REVIEWER\0")
+}
+
 nonisolated extension Anki_Config_ConfigKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ConfigKey"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
@@ -493,7 +545,7 @@ nonisolated extension Anki_Config_ConfigKey: SwiftProtobuf.Message, SwiftProtobu
 }
 
 nonisolated extension Anki_Config_ConfigKey.BoolEnum: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0BROWSER_TABLE_SHOW_NOTES_MODE\0\u{2}\u{3}PREVIEW_BOTH_SIDES\0\u{1}COLLAPSE_TAGS\0\u{1}COLLAPSE_NOTETYPES\0\u{1}COLLAPSE_DECKS\0\u{1}COLLAPSE_SAVED_SEARCHES\0\u{1}COLLAPSE_TODAY\0\u{1}COLLAPSE_CARD_STATE\0\u{1}COLLAPSE_FLAGS\0\u{1}SCHED_2021\0\u{1}ADDING_DEFAULTS_TO_CURRENT_DECK\0\u{1}HIDE_AUDIO_PLAY_BUTTONS\0\u{1}INTERRUPT_AUDIO_WHEN_ANSWERING\0\u{1}PASTE_IMAGES_AS_PNG\0\u{1}PASTE_STRIPS_FORMATTING\0\u{1}NORMALIZE_NOTE_TEXT\0\u{1}IGNORE_ACCENTS_IN_SEARCH\0\u{1}RESTORE_POSITION_BROWSER\0\u{1}RESTORE_POSITION_REVIEWER\0\u{1}RESET_COUNTS_BROWSER\0\u{1}RESET_COUNTS_REVIEWER\0\u{1}RANDOM_ORDER_REPOSITION\0\u{1}SHIFT_POSITION_OF_EXISTING_CARDS\0\u{1}RENDER_LATEX\0\u{1}LOAD_BALANCER_ENABLED\0\u{1}FSRS_SHORT_TERM_WITH_STEPS_ENABLED\0\u{1}FSRS_LEGACY_EVALUATE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0BROWSER_TABLE_SHOW_NOTES_MODE\0\u{2}\u{3}PREVIEW_BOTH_SIDES\0\u{1}COLLAPSE_TAGS\0\u{1}COLLAPSE_NOTETYPES\0\u{1}COLLAPSE_DECKS\0\u{1}COLLAPSE_SAVED_SEARCHES\0\u{1}COLLAPSE_TODAY\0\u{1}COLLAPSE_CARD_STATE\0\u{1}COLLAPSE_FLAGS\0\u{1}SCHED_2021\0\u{1}ADDING_DEFAULTS_TO_CURRENT_DECK\0\u{1}HIDE_AUDIO_PLAY_BUTTONS\0\u{1}INTERRUPT_AUDIO_WHEN_ANSWERING\0\u{1}PASTE_IMAGES_AS_PNG\0\u{1}PASTE_STRIPS_FORMATTING\0\u{1}NORMALIZE_NOTE_TEXT\0\u{1}IGNORE_ACCENTS_IN_SEARCH\0\u{1}RESTORE_POSITION_BROWSER\0\u{1}RESTORE_POSITION_REVIEWER\0\u{1}RESET_COUNTS_BROWSER\0\u{1}RESET_COUNTS_REVIEWER\0\u{1}RANDOM_ORDER_REPOSITION\0\u{1}SHIFT_POSITION_OF_EXISTING_CARDS\0\u{1}RENDER_LATEX\0\u{1}LOAD_BALANCER_ENABLED\0\u{1}FSRS_SHORT_TERM_WITH_STEPS_ENABLED\0\u{1}FSRS_LEGACY_EVALUATE\0\u{1}SHOW_FUZZ_DELTA_ABOVE_ANSWER_BUTTONS\0\u{1}FSRS_LEARNING_QUEUES_DISABLED\0")
 }
 
 nonisolated extension Anki_Config_ConfigKey.StringEnum: SwiftProtobuf._ProtoNameProviding {
@@ -857,7 +909,7 @@ nonisolated extension Anki_Config_Preferences.Scheduling.NewReviewMix: SwiftProt
 
 nonisolated extension Anki_Config_Preferences.Reviewing: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Anki_Config_Preferences.protoMessageName + ".Reviewing"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}hide_audio_play_buttons\0\u{3}interrupt_audio_when_answering\0\u{3}show_remaining_due_counts\0\u{3}show_intervals_on_buttons\0\u{3}time_limit_secs\0\u{3}load_balancer_enabled\0\u{3}fsrs_short_term_with_steps_enabled\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}hide_audio_play_buttons\0\u{3}interrupt_audio_when_answering\0\u{3}show_remaining_due_counts\0\u{3}show_intervals_on_buttons\0\u{3}time_limit_secs\0\u{3}load_balancer_enabled\0\u{3}fsrs_short_term_with_steps_enabled\0\u{3}show_fuzz_delta_on_buttons\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -872,6 +924,7 @@ nonisolated extension Anki_Config_Preferences.Reviewing: SwiftProtobuf.Message, 
       case 5: try { try decoder.decodeSingularUInt32Field(value: &self.timeLimitSecs) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.loadBalancerEnabled) }()
       case 7: try { try decoder.decodeSingularBoolField(value: &self.fsrsShortTermWithStepsEnabled) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.showFuzzDeltaOnButtons) }()
       default: break
       }
     }
@@ -899,6 +952,9 @@ nonisolated extension Anki_Config_Preferences.Reviewing: SwiftProtobuf.Message, 
     if self.fsrsShortTermWithStepsEnabled != false {
       try visitor.visitSingularBoolField(value: self.fsrsShortTermWithStepsEnabled, fieldNumber: 7)
     }
+    if self.showFuzzDeltaOnButtons != false {
+      try visitor.visitSingularBoolField(value: self.showFuzzDeltaOnButtons, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -910,6 +966,7 @@ nonisolated extension Anki_Config_Preferences.Reviewing: SwiftProtobuf.Message, 
     if lhs.timeLimitSecs != rhs.timeLimitSecs {return false}
     if lhs.loadBalancerEnabled != rhs.loadBalancerEnabled {return false}
     if lhs.fsrsShortTermWithStepsEnabled != rhs.fsrsShortTermWithStepsEnabled {return false}
+    if lhs.showFuzzDeltaOnButtons != rhs.showFuzzDeltaOnButtons {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

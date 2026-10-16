@@ -450,6 +450,9 @@ public nonisolated struct Anki_Decks_DeckTreeNode: Sendable {
   /// with children, without any limits
   public var totalIncludingChildren: UInt32 = 0
 
+  /// Uses this deck's study scope, which can differ from its children's scopes.
+  public var reviewUncappedIncludingChildren: UInt32 = 0
+
   public var filtered: Bool = false
 
   /// low index so key can be packed into a byte, but at bottom
@@ -1226,7 +1229,7 @@ nonisolated extension Anki_Decks_DeckTreeRequest: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension Anki_Decks_DeckTreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeckTreeNode"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}deck_id\0\u{1}name\0\u{1}children\0\u{1}level\0\u{1}collapsed\0\u{3}review_count\0\u{3}learn_count\0\u{3}new_count\0\u{3}intraday_learning\0\u{3}interday_learning_uncapped\0\u{3}new_uncapped\0\u{3}review_uncapped\0\u{3}total_in_deck\0\u{3}total_including_children\0\u{2}\u{2}filtered\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}deck_id\0\u{1}name\0\u{1}children\0\u{1}level\0\u{1}collapsed\0\u{3}review_count\0\u{3}learn_count\0\u{3}new_count\0\u{3}intraday_learning\0\u{3}interday_learning_uncapped\0\u{3}new_uncapped\0\u{3}review_uncapped\0\u{3}total_in_deck\0\u{3}total_including_children\0\u{2}\u{2}filtered\0\u{3}review_uncapped_including_children\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1249,6 +1252,7 @@ nonisolated extension Anki_Decks_DeckTreeNode: SwiftProtobuf.Message, SwiftProto
       case 13: try { try decoder.decodeSingularUInt32Field(value: &self.totalInDeck) }()
       case 14: try { try decoder.decodeSingularUInt32Field(value: &self.totalIncludingChildren) }()
       case 16: try { try decoder.decodeSingularBoolField(value: &self.filtered) }()
+      case 17: try { try decoder.decodeSingularUInt32Field(value: &self.reviewUncappedIncludingChildren) }()
       default: break
       }
     }
@@ -1300,6 +1304,9 @@ nonisolated extension Anki_Decks_DeckTreeNode: SwiftProtobuf.Message, SwiftProto
     if self.filtered != false {
       try visitor.visitSingularBoolField(value: self.filtered, fieldNumber: 16)
     }
+    if self.reviewUncappedIncludingChildren != 0 {
+      try visitor.visitSingularUInt32Field(value: self.reviewUncappedIncludingChildren, fieldNumber: 17)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1317,6 +1324,7 @@ nonisolated extension Anki_Decks_DeckTreeNode: SwiftProtobuf.Message, SwiftProto
     if lhs.reviewUncapped != rhs.reviewUncapped {return false}
     if lhs.totalInDeck != rhs.totalInDeck {return false}
     if lhs.totalIncludingChildren != rhs.totalIncludingChildren {return false}
+    if lhs.reviewUncappedIncludingChildren != rhs.reviewUncappedIncludingChildren {return false}
     if lhs.filtered != rhs.filtered {return false}
     if lhs.children != rhs.children {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

@@ -122,6 +122,27 @@ public nonisolated struct Anki_Collection_OpChangesOnly: Sendable {
   fileprivate var _changes: Anki_Collection_OpChanges? = nil
 }
 
+public nonisolated struct Anki_Collection_NestedOpChanges: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var changes: Anki_Collection_OpChangesOnly {
+    get {_changes ?? Anki_Collection_OpChangesOnly()}
+    set {_changes = newValue}
+  }
+  /// Returns true if `changes` has been explicitly set.
+  public var hasChanges: Bool {self._changes != nil}
+  /// Clears the value of `changes`. Subsequent reads from it will return its default value.
+  public mutating func clearChanges() {self._changes = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _changes: Anki_Collection_OpChangesOnly? = nil
+}
+
 public nonisolated struct Anki_Collection_OpChangesWithCount: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -332,6 +353,14 @@ public nonisolated struct Anki_Collection_Progress: Sendable {
     set {value = .downloadUpdate(newValue)}
   }
 
+  public var computeAllParams: Anki_Collection_ComputeAllParamsProgress {
+    get {
+      if case .computeAllParams(let v)? = value {return v}
+      return Anki_Collection_ComputeAllParamsProgress()
+    }
+    set {value = .computeAllParams(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Value: Equatable, Sendable {
@@ -347,6 +376,7 @@ public nonisolated struct Anki_Collection_Progress: Sendable {
     case computeRetention(Anki_Collection_ComputeRetentionProgress)
     case computeMemory(Anki_Collection_ComputeMemoryProgress)
     case downloadUpdate(Anki_Collection_DownloadUpdateProgress)
+    case computeAllParams(Anki_Collection_ComputeAllParamsProgress)
 
   }
 
@@ -410,6 +440,7 @@ public nonisolated struct Anki_Collection_ComputeParamsProgress: Sendable {
   /// Total iterations
   public var total: UInt32 = 0
 
+  /// Total training targets used by optimizer (long-term + same-day)
   public var reviews: UInt32 = 0
 
   /// Only used in 'compute all params' case
@@ -418,7 +449,93 @@ public nonisolated struct Anki_Collection_ComputeParamsProgress: Sendable {
   /// Only used in 'compute all params' case
   public var totalPresets: UInt32 = 0
 
+  /// Targets where delta_t >= 1 day
+  public var longTermReviews: UInt32 = 0
+
+  /// Targets where delta_t < 1 day (same-day / short-term)
+  public var shortTermReviews: UInt32 = 0
+
+  public var phase: Anki_Collection_ComputeParamsProgress.Phase = .optimizingFsrsParams
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum Phase: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case optimizingFsrsParams // = 0
+    case trainingDynamicDesiredRetention // = 1
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .optimizingFsrsParams
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .optimizingFsrsParams
+      case 1: self = .trainingDynamicDesiredRetention
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .optimizingFsrsParams: return 0
+      case .trainingDynamicDesiredRetention: return 1
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Anki_Collection_ComputeParamsProgress.Phase] = [
+      .optimizingFsrsParams,
+      .trainingDynamicDesiredRetention,
+    ]
+
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Collection_ComputeAllParamsProgress: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var current: UInt32 = 0
+
+  public var total: UInt32 = 0
+
+  public var presets: [Anki_Collection_ComputeAllParamsProgress.Preset] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Preset: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var name: String = String()
+
+    public var current: UInt32 = 0
+
+    public var total: UInt32 = 0
+
+    public var reviews: UInt32 = 0
+
+    public var longTermReviews: UInt32 = 0
+
+    public var shortTermReviews: UInt32 = 0
+
+    public var finished: Bool = false
+
+    public var skipped: Bool = false
+
+    public var phase: Anki_Collection_ComputeParamsProgress.Phase = .optimizingFsrsParams
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
 
   public init() {}
 }
@@ -448,7 +565,41 @@ public nonisolated struct Anki_Collection_ComputeMemoryProgress: Sendable {
 
   public var label: String = String()
 
+  public var presetName: String = String()
+
+  public var currentPreset: UInt32 = 0
+
+  public var totalPresets: UInt32 = 0
+
+  public var rescheduling: Bool = false
+
+  public var presets: [Anki_Collection_ComputeMemoryProgress.Preset] = []
+
+  public var saving: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Preset: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var name: String = String()
+
+    public var currentCards: UInt32 = 0
+
+    public var totalCards: UInt32 = 0
+
+    public var finished: Bool = false
+
+    public var rescheduling: Bool = false
+
+    public var saving: Bool = false
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
 
   public init() {}
 }
@@ -719,6 +870,40 @@ nonisolated extension Anki_Collection_OpChangesOnly: SwiftProtobuf.Message, Swif
   }
 }
 
+nonisolated extension Anki_Collection_NestedOpChanges: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".NestedOpChanges"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}changes\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._changes) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._changes {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Collection_NestedOpChanges, rhs: Anki_Collection_NestedOpChanges) -> Bool {
+    if lhs._changes != rhs._changes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension Anki_Collection_OpChangesWithCount: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".OpChangesWithCount"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}changes\0\u{1}count\0")
@@ -937,7 +1122,7 @@ nonisolated extension Anki_Collection_OpChangesAfterUndo: SwiftProtobuf.Message,
 
 nonisolated extension Anki_Collection_Progress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Progress"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}none\0\u{3}media_sync\0\u{3}media_check\0\u{3}full_sync\0\u{3}normal_sync\0\u{3}database_check\0\u{1}importing\0\u{1}exporting\0\u{3}compute_params\0\u{3}compute_retention\0\u{3}compute_memory\0\u{3}download_update\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}none\0\u{3}media_sync\0\u{3}media_check\0\u{3}full_sync\0\u{3}normal_sync\0\u{3}database_check\0\u{1}importing\0\u{1}exporting\0\u{3}compute_params\0\u{3}compute_retention\0\u{3}compute_memory\0\u{3}download_update\0\u{3}compute_all_params\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1086,6 +1271,19 @@ nonisolated extension Anki_Collection_Progress: SwiftProtobuf.Message, SwiftProt
           self.value = .downloadUpdate(v)
         }
       }()
+      case 13: try {
+        var v: Anki_Collection_ComputeAllParamsProgress?
+        var hadOneofValue = false
+        if let current = self.value {
+          hadOneofValue = true
+          if case .computeAllParams(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.value = .computeAllParams(v)
+        }
+      }()
       default: break
       }
     }
@@ -1144,6 +1342,10 @@ nonisolated extension Anki_Collection_Progress: SwiftProtobuf.Message, SwiftProt
     case .downloadUpdate?: try {
       guard case .downloadUpdate(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+    }()
+    case .computeAllParams?: try {
+      guard case .computeAllParams(let v)? = self.value else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
     }()
     case nil: break
     }
@@ -1274,7 +1476,7 @@ nonisolated extension Anki_Collection_Progress.DatabaseCheck: SwiftProtobuf.Mess
 
 nonisolated extension Anki_Collection_ComputeParamsProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComputeParamsProgress"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}current\0\u{1}total\0\u{1}reviews\0\u{3}current_preset\0\u{3}total_presets\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}current\0\u{1}total\0\u{1}reviews\0\u{3}current_preset\0\u{3}total_presets\0\u{3}long_term_reviews\0\u{3}short_term_reviews\0\u{1}phase\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1287,6 +1489,9 @@ nonisolated extension Anki_Collection_ComputeParamsProgress: SwiftProtobuf.Messa
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.reviews) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.currentPreset) }()
       case 5: try { try decoder.decodeSingularUInt32Field(value: &self.totalPresets) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.longTermReviews) }()
+      case 7: try { try decoder.decodeSingularUInt32Field(value: &self.shortTermReviews) }()
+      case 8: try { try decoder.decodeSingularEnumField(value: &self.phase) }()
       default: break
       }
     }
@@ -1308,6 +1513,15 @@ nonisolated extension Anki_Collection_ComputeParamsProgress: SwiftProtobuf.Messa
     if self.totalPresets != 0 {
       try visitor.visitSingularUInt32Field(value: self.totalPresets, fieldNumber: 5)
     }
+    if self.longTermReviews != 0 {
+      try visitor.visitSingularUInt32Field(value: self.longTermReviews, fieldNumber: 6)
+    }
+    if self.shortTermReviews != 0 {
+      try visitor.visitSingularUInt32Field(value: self.shortTermReviews, fieldNumber: 7)
+    }
+    if self.phase != .optimizingFsrsParams {
+      try visitor.visitSingularEnumField(value: self.phase, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1317,6 +1531,123 @@ nonisolated extension Anki_Collection_ComputeParamsProgress: SwiftProtobuf.Messa
     if lhs.reviews != rhs.reviews {return false}
     if lhs.currentPreset != rhs.currentPreset {return false}
     if lhs.totalPresets != rhs.totalPresets {return false}
+    if lhs.longTermReviews != rhs.longTermReviews {return false}
+    if lhs.shortTermReviews != rhs.shortTermReviews {return false}
+    if lhs.phase != rhs.phase {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Collection_ComputeParamsProgress.Phase: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OPTIMIZING_FSRS_PARAMS\0\u{1}TRAINING_DYNAMIC_DESIRED_RETENTION\0")
+}
+
+nonisolated extension Anki_Collection_ComputeAllParamsProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ComputeAllParamsProgress"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}current\0\u{1}total\0\u{1}presets\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt32Field(value: &self.current) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.total) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.presets) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.current != 0 {
+      try visitor.visitSingularUInt32Field(value: self.current, fieldNumber: 1)
+    }
+    if self.total != 0 {
+      try visitor.visitSingularUInt32Field(value: self.total, fieldNumber: 2)
+    }
+    if !self.presets.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.presets, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Collection_ComputeAllParamsProgress, rhs: Anki_Collection_ComputeAllParamsProgress) -> Bool {
+    if lhs.current != rhs.current {return false}
+    if lhs.total != rhs.total {return false}
+    if lhs.presets != rhs.presets {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Collection_ComputeAllParamsProgress.Preset: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Collection_ComputeAllParamsProgress.protoMessageName + ".Preset"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}current\0\u{1}total\0\u{1}reviews\0\u{3}long_term_reviews\0\u{3}short_term_reviews\0\u{1}finished\0\u{1}skipped\0\u{1}phase\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.current) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.total) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.reviews) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.longTermReviews) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.shortTermReviews) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.finished) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.skipped) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self.phase) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if self.current != 0 {
+      try visitor.visitSingularUInt32Field(value: self.current, fieldNumber: 2)
+    }
+    if self.total != 0 {
+      try visitor.visitSingularUInt32Field(value: self.total, fieldNumber: 3)
+    }
+    if self.reviews != 0 {
+      try visitor.visitSingularUInt32Field(value: self.reviews, fieldNumber: 4)
+    }
+    if self.longTermReviews != 0 {
+      try visitor.visitSingularUInt32Field(value: self.longTermReviews, fieldNumber: 5)
+    }
+    if self.shortTermReviews != 0 {
+      try visitor.visitSingularUInt32Field(value: self.shortTermReviews, fieldNumber: 6)
+    }
+    if self.finished != false {
+      try visitor.visitSingularBoolField(value: self.finished, fieldNumber: 7)
+    }
+    if self.skipped != false {
+      try visitor.visitSingularBoolField(value: self.skipped, fieldNumber: 8)
+    }
+    if self.phase != .optimizingFsrsParams {
+      try visitor.visitSingularEnumField(value: self.phase, fieldNumber: 9)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Collection_ComputeAllParamsProgress.Preset, rhs: Anki_Collection_ComputeAllParamsProgress.Preset) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.current != rhs.current {return false}
+    if lhs.total != rhs.total {return false}
+    if lhs.reviews != rhs.reviews {return false}
+    if lhs.longTermReviews != rhs.longTermReviews {return false}
+    if lhs.shortTermReviews != rhs.shortTermReviews {return false}
+    if lhs.finished != rhs.finished {return false}
+    if lhs.skipped != rhs.skipped {return false}
+    if lhs.phase != rhs.phase {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1359,7 +1690,7 @@ nonisolated extension Anki_Collection_ComputeRetentionProgress: SwiftProtobuf.Me
 
 nonisolated extension Anki_Collection_ComputeMemoryProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComputeMemoryProgress"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}current_cards\0\u{3}total_cards\0\u{1}label\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}current_cards\0\u{3}total_cards\0\u{1}label\0\u{3}preset_name\0\u{3}current_preset\0\u{3}total_presets\0\u{1}rescheduling\0\u{1}presets\0\u{1}saving\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1370,6 +1701,12 @@ nonisolated extension Anki_Collection_ComputeMemoryProgress: SwiftProtobuf.Messa
       case 1: try { try decoder.decodeSingularUInt32Field(value: &self.currentCards) }()
       case 2: try { try decoder.decodeSingularUInt32Field(value: &self.totalCards) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.presetName) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.currentPreset) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.totalPresets) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.rescheduling) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.presets) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.saving) }()
       default: break
       }
     }
@@ -1385,6 +1722,24 @@ nonisolated extension Anki_Collection_ComputeMemoryProgress: SwiftProtobuf.Messa
     if !self.label.isEmpty {
       try visitor.visitSingularStringField(value: self.label, fieldNumber: 3)
     }
+    if !self.presetName.isEmpty {
+      try visitor.visitSingularStringField(value: self.presetName, fieldNumber: 4)
+    }
+    if self.currentPreset != 0 {
+      try visitor.visitSingularUInt32Field(value: self.currentPreset, fieldNumber: 5)
+    }
+    if self.totalPresets != 0 {
+      try visitor.visitSingularUInt32Field(value: self.totalPresets, fieldNumber: 6)
+    }
+    if self.rescheduling != false {
+      try visitor.visitSingularBoolField(value: self.rescheduling, fieldNumber: 7)
+    }
+    if !self.presets.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.presets, fieldNumber: 8)
+    }
+    if self.saving != false {
+      try visitor.visitSingularBoolField(value: self.saving, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1392,6 +1747,67 @@ nonisolated extension Anki_Collection_ComputeMemoryProgress: SwiftProtobuf.Messa
     if lhs.currentCards != rhs.currentCards {return false}
     if lhs.totalCards != rhs.totalCards {return false}
     if lhs.label != rhs.label {return false}
+    if lhs.presetName != rhs.presetName {return false}
+    if lhs.currentPreset != rhs.currentPreset {return false}
+    if lhs.totalPresets != rhs.totalPresets {return false}
+    if lhs.rescheduling != rhs.rescheduling {return false}
+    if lhs.presets != rhs.presets {return false}
+    if lhs.saving != rhs.saving {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Collection_ComputeMemoryProgress.Preset: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Collection_ComputeMemoryProgress.protoMessageName + ".Preset"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}current_cards\0\u{3}total_cards\0\u{1}finished\0\u{1}rescheduling\0\u{1}saving\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.currentCards) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.totalCards) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.finished) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.rescheduling) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.saving) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if self.currentCards != 0 {
+      try visitor.visitSingularUInt32Field(value: self.currentCards, fieldNumber: 2)
+    }
+    if self.totalCards != 0 {
+      try visitor.visitSingularUInt32Field(value: self.totalCards, fieldNumber: 3)
+    }
+    if self.finished != false {
+      try visitor.visitSingularBoolField(value: self.finished, fieldNumber: 4)
+    }
+    if self.rescheduling != false {
+      try visitor.visitSingularBoolField(value: self.rescheduling, fieldNumber: 5)
+    }
+    if self.saving != false {
+      try visitor.visitSingularBoolField(value: self.saving, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Collection_ComputeMemoryProgress.Preset, rhs: Anki_Collection_ComputeMemoryProgress.Preset) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.currentCards != rhs.currentCards {return false}
+    if lhs.totalCards != rhs.totalCards {return false}
+    if lhs.finished != rhs.finished {return false}
+    if lhs.rescheduling != rhs.rescheduling {return false}
+    if lhs.saving != rhs.saving {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

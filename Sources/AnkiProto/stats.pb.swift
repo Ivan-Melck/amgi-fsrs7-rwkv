@@ -23,6 +23,203 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// Current values only: no historical memory-state reconstruction or card
+/// writes.
+public nonisolated struct Anki_Stats_CardMemoryMetricsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardIds: [Int64] = []
+
+  public var includeRetrievability: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Stats_CardMemoryMetrics: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var memoryState: Anki_Cards_FsrsMemoryState {
+    get {_memoryState ?? Anki_Cards_FsrsMemoryState()}
+    set {_memoryState = newValue}
+  }
+  /// Returns true if `memoryState` has been explicitly set.
+  public var hasMemoryState: Bool {self._memoryState != nil}
+  /// Clears the value of `memoryState`. Subsequent reads from it will return its default value.
+  public mutating func clearMemoryState() {self._memoryState = nil}
+
+  public var desiredRetention: Float {
+    get {_desiredRetention ?? 0}
+    set {_desiredRetention = newValue}
+  }
+  /// Returns true if `desiredRetention` has been explicitly set.
+  public var hasDesiredRetention: Bool {self._desiredRetention != nil}
+  /// Clears the value of `desiredRetention`. Subsequent reads from it will return its default value.
+  public mutating func clearDesiredRetention() {self._desiredRetention = nil}
+
+  public var fsrsRetrievability: Float {
+    get {_fsrsRetrievability ?? 0}
+    set {_fsrsRetrievability = newValue}
+  }
+  /// Returns true if `fsrsRetrievability` has been explicitly set.
+  public var hasFsrsRetrievability: Bool {self._fsrsRetrievability != nil}
+  /// Clears the value of `fsrsRetrievability`. Subsequent reads from it will return its default value.
+  public mutating func clearFsrsRetrievability() {self._fsrsRetrievability = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _memoryState: Anki_Cards_FsrsMemoryState? = nil
+  fileprivate var _desiredRetention: Float? = nil
+  fileprivate var _fsrsRetrievability: Float? = nil
+}
+
+public nonisolated struct Anki_Stats_CardMemoryMetricsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Input order and duplicates are preserved; missing cards are omitted.
+  public var entries: [Anki_Stats_CardMemoryMetrics] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// Compact current card data with optional selected note fields and metrics.
+public nonisolated struct Anki_Stats_CardDetailsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardIds: [Int64] = []
+
+  public var includeMemoryState: Bool = false
+
+  public var includeRetrievability: Bool = false
+
+  public var noteFields: Anki_Stats_NoteFieldSelection {
+    get {_noteFields ?? Anki_Stats_NoteFieldSelection()}
+    set {_noteFields = newValue}
+  }
+  /// Returns true if `noteFields` has been explicitly set.
+  public var hasNoteFields: Bool {self._noteFields != nil}
+  /// Clears the value of `noteFields`. Subsequent reads from it will return its default value.
+  public mutating func clearNoteFields() {self._noteFields = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _noteFields: Anki_Stats_NoteFieldSelection? = nil
+}
+
+public nonisolated struct Anki_Stats_NoteFieldSelection: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var names: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Stats_SelectedNoteFields: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var fields: [Anki_Stats_SelectedNoteFields.Field] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct Field: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var name: String = String()
+
+    public var value: String = String()
+
+    public var order: UInt32 = 0
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public init() {}
+}
+
+public nonisolated struct Anki_Stats_CardDetails: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var cardID: Int64 = 0
+
+  public var ctype: UInt32 = 0
+
+  public var queue: Int32 = 0
+
+  public var due: Int32 = 0
+
+  public var interval: UInt32 = 0
+
+  public var reps: UInt32 = 0
+
+  public var metrics: Anki_Stats_CardMemoryMetrics {
+    get {_metrics ?? Anki_Stats_CardMemoryMetrics()}
+    set {_metrics = newValue}
+  }
+  /// Returns true if `metrics` has been explicitly set.
+  public var hasMetrics: Bool {self._metrics != nil}
+  /// Clears the value of `metrics`. Subsequent reads from it will return its default value.
+  public mutating func clearMetrics() {self._metrics = nil}
+
+  /// Absent if not requested, or the note/type/selected field is missing.
+  public var noteFields: Anki_Stats_SelectedNoteFields {
+    get {_noteFields ?? Anki_Stats_SelectedNoteFields()}
+    set {_noteFields = newValue}
+  }
+  /// Returns true if `noteFields` has been explicitly set.
+  public var hasNoteFields: Bool {self._noteFields != nil}
+  /// Clears the value of `noteFields`. Subsequent reads from it will return its default value.
+  public mutating func clearNoteFields() {self._noteFields = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _metrics: Anki_Stats_CardMemoryMetrics? = nil
+  fileprivate var _noteFields: Anki_Stats_SelectedNoteFields? = nil
+}
+
+public nonisolated struct Anki_Stats_CardDetailsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Input order and duplicates are preserved; missing cards are omitted.
+  public var entries: [Anki_Stats_CardDetails] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public nonisolated struct Anki_Stats_ReviewLogs: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -196,7 +393,26 @@ public nonisolated struct Anki_Stats_CardStatsResponse: @unchecked Sendable {
     set {_uniqueStorage()._fsrsParams = newValue}
   }
 
+  public var extraRows: [Anki_Stats_CardStatsResponse.CardInfoRow] {
+    get {_storage._extraRows}
+    set {_uniqueStorage()._extraRows = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated struct CardInfoRow: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var label: String = String()
+
+    public var value: String = String()
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
 
   public nonisolated struct StatsRevlogEntry: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -440,9 +656,48 @@ public nonisolated struct Anki_Stats_GraphsResponse: @unchecked Sendable {
 
     public var sumByNote: Float = 0
 
+    public var fsrs: Anki_Stats_GraphsResponse.Retrievability.Series {
+      get {_fsrs ?? Anki_Stats_GraphsResponse.Retrievability.Series()}
+      set {_fsrs = newValue}
+    }
+    /// Returns true if `fsrs` has been explicitly set.
+    public var hasFsrs: Bool {self._fsrs != nil}
+    /// Clears the value of `fsrs`. Subsequent reads from it will return its default value.
+    public mutating func clearFsrs() {self._fsrs = nil}
+
+    public var rwkv: Anki_Stats_GraphsResponse.Retrievability.Series {
+      get {_rwkv ?? Anki_Stats_GraphsResponse.Retrievability.Series()}
+      set {_rwkv = newValue}
+    }
+    /// Returns true if `rwkv` has been explicitly set.
+    public var hasRwkv: Bool {self._rwkv != nil}
+    /// Clears the value of `rwkv`. Subsequent reads from it will return its default value.
+    public mutating func clearRwkv() {self._rwkv = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
+    public nonisolated struct Series: Sendable {
+      // SwiftProtobuf.Message conformance is added in an extension below. See the
+      // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+      // methods supported on all messages.
+
+      public var retrievability: Dictionary<UInt32,UInt32> = [:]
+
+      public var average: Float = 0
+
+      public var sumByCard: Float = 0
+
+      public var sumByNote: Float = 0
+
+      public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+      public init() {}
+    }
+
     public init() {}
+
+    fileprivate var _fsrs: Anki_Stats_GraphsResponse.Retrievability.Series? = nil
+    fileprivate var _rwkv: Anki_Stats_GraphsResponse.Retrievability.Series? = nil
   }
 
   public nonisolated struct FutureDue: Sendable {
@@ -963,6 +1218,368 @@ public nonisolated struct Anki_Stats_Dataset: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "anki.stats"
 
+nonisolated extension Anki_Stats_CardMemoryMetricsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CardMemoryMetricsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_ids\0\u{3}include_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedInt64Field(value: &self.cardIds) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.cardIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.cardIds, fieldNumber: 1)
+    }
+    if self.includeRetrievability != false {
+      try visitor.visitSingularBoolField(value: self.includeRetrievability, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardMemoryMetricsRequest, rhs: Anki_Stats_CardMemoryMetricsRequest) -> Bool {
+    if lhs.cardIds != rhs.cardIds {return false}
+    if lhs.includeRetrievability != rhs.includeRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_CardMemoryMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CardMemoryMetrics"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{3}memory_state\0\u{3}desired_retention\0\u{3}fsrs_retrievability\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._memoryState) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self._desiredRetention) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self._fsrsRetrievability) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    try { if let v = self._memoryState {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._desiredRetention {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._fsrsRetrievability {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardMemoryMetrics, rhs: Anki_Stats_CardMemoryMetrics) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs._memoryState != rhs._memoryState {return false}
+    if lhs._desiredRetention != rhs._desiredRetention {return false}
+    if lhs._fsrsRetrievability != rhs._fsrsRetrievability {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_CardMemoryMetricsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CardMemoryMetricsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entries\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.entries) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.entries.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.entries, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardMemoryMetricsResponse, rhs: Anki_Stats_CardMemoryMetricsResponse) -> Bool {
+    if lhs.entries != rhs.entries {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_CardDetailsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CardDetailsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_ids\0\u{3}include_memory_state\0\u{3}include_retrievability\0\u{3}note_fields\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedInt64Field(value: &self.cardIds) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.includeMemoryState) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.includeRetrievability) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._noteFields) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.cardIds.isEmpty {
+      try visitor.visitPackedInt64Field(value: self.cardIds, fieldNumber: 1)
+    }
+    if self.includeMemoryState != false {
+      try visitor.visitSingularBoolField(value: self.includeMemoryState, fieldNumber: 2)
+    }
+    if self.includeRetrievability != false {
+      try visitor.visitSingularBoolField(value: self.includeRetrievability, fieldNumber: 3)
+    }
+    try { if let v = self._noteFields {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardDetailsRequest, rhs: Anki_Stats_CardDetailsRequest) -> Bool {
+    if lhs.cardIds != rhs.cardIds {return false}
+    if lhs.includeMemoryState != rhs.includeMemoryState {return false}
+    if lhs.includeRetrievability != rhs.includeRetrievability {return false}
+    if lhs._noteFields != rhs._noteFields {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_NoteFieldSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".NoteFieldSelection"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}names\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.names) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.names.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.names, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_NoteFieldSelection, rhs: Anki_Stats_NoteFieldSelection) -> Bool {
+    if lhs.names != rhs.names {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_SelectedNoteFields: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SelectedNoteFields"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}fields\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.fields) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fields.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.fields, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_SelectedNoteFields, rhs: Anki_Stats_SelectedNoteFields) -> Bool {
+    if lhs.fields != rhs.fields {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_SelectedNoteFields.Field: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Stats_SelectedNoteFields.protoMessageName + ".Field"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}value\0\u{1}order\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.value) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.order) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
+    }
+    if !self.value.isEmpty {
+      try visitor.visitSingularStringField(value: self.value, fieldNumber: 2)
+    }
+    if self.order != 0 {
+      try visitor.visitSingularUInt32Field(value: self.order, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_SelectedNoteFields.Field, rhs: Anki_Stats_SelectedNoteFields.Field) -> Bool {
+    if lhs.name != rhs.name {return false}
+    if lhs.value != rhs.value {return false}
+    if lhs.order != rhs.order {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_CardDetails: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CardDetails"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}card_id\0\u{1}ctype\0\u{1}queue\0\u{1}due\0\u{1}interval\0\u{1}reps\0\u{1}metrics\0\u{3}note_fields\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.cardID) }()
+      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.ctype) }()
+      case 3: try { try decoder.decodeSingularSInt32Field(value: &self.queue) }()
+      case 4: try { try decoder.decodeSingularSInt32Field(value: &self.due) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.interval) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.reps) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._metrics) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._noteFields) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.cardID != 0 {
+      try visitor.visitSingularInt64Field(value: self.cardID, fieldNumber: 1)
+    }
+    if self.ctype != 0 {
+      try visitor.visitSingularUInt32Field(value: self.ctype, fieldNumber: 2)
+    }
+    if self.queue != 0 {
+      try visitor.visitSingularSInt32Field(value: self.queue, fieldNumber: 3)
+    }
+    if self.due != 0 {
+      try visitor.visitSingularSInt32Field(value: self.due, fieldNumber: 4)
+    }
+    if self.interval != 0 {
+      try visitor.visitSingularUInt32Field(value: self.interval, fieldNumber: 5)
+    }
+    if self.reps != 0 {
+      try visitor.visitSingularUInt32Field(value: self.reps, fieldNumber: 6)
+    }
+    try { if let v = self._metrics {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._noteFields {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardDetails, rhs: Anki_Stats_CardDetails) -> Bool {
+    if lhs.cardID != rhs.cardID {return false}
+    if lhs.ctype != rhs.ctype {return false}
+    if lhs.queue != rhs.queue {return false}
+    if lhs.due != rhs.due {return false}
+    if lhs.interval != rhs.interval {return false}
+    if lhs.reps != rhs.reps {return false}
+    if lhs._metrics != rhs._metrics {return false}
+    if lhs._noteFields != rhs._noteFields {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_CardDetailsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CardDetailsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entries\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.entries) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.entries.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.entries, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardDetailsResponse, rhs: Anki_Stats_CardDetailsResponse) -> Bool {
+    if lhs.entries != rhs.entries {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension Anki_Stats_ReviewLogs: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ReviewLogs"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entries\0")
@@ -995,7 +1612,7 @@ nonisolated extension Anki_Stats_ReviewLogs: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension Anki_Stats_CardStatsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CardStatsResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}revlog\0\u{3}card_id\0\u{3}note_id\0\u{1}deck\0\u{1}added\0\u{3}first_review\0\u{3}latest_review\0\u{3}due_date\0\u{3}due_position\0\u{1}interval\0\u{1}ease\0\u{1}reviews\0\u{1}lapses\0\u{3}average_secs\0\u{3}total_secs\0\u{3}card_type\0\u{1}notetype\0\u{3}memory_state\0\u{3}fsrs_retrievability\0\u{3}custom_data\0\u{1}preset\0\u{3}original_deck\0\u{3}desired_retention\0\u{3}fsrs_params\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}revlog\0\u{3}card_id\0\u{3}note_id\0\u{1}deck\0\u{1}added\0\u{3}first_review\0\u{3}latest_review\0\u{3}due_date\0\u{3}due_position\0\u{1}interval\0\u{1}ease\0\u{1}reviews\0\u{1}lapses\0\u{3}average_secs\0\u{3}total_secs\0\u{3}card_type\0\u{1}notetype\0\u{3}memory_state\0\u{3}fsrs_retrievability\0\u{3}custom_data\0\u{1}preset\0\u{3}original_deck\0\u{3}desired_retention\0\u{3}fsrs_params\0\u{3}extra_rows\0")
 
   fileprivate class _StorageClass {
     var _revlog: [Anki_Stats_CardStatsResponse.StatsRevlogEntry] = []
@@ -1022,6 +1639,7 @@ nonisolated extension Anki_Stats_CardStatsResponse: SwiftProtobuf.Message, Swift
     var _originalDeck: String? = nil
     var _desiredRetention: Float? = nil
     var _fsrsParams: [Float] = []
+    var _extraRows: [Anki_Stats_CardStatsResponse.CardInfoRow] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1056,6 +1674,7 @@ nonisolated extension Anki_Stats_CardStatsResponse: SwiftProtobuf.Message, Swift
       _originalDeck = source._originalDeck
       _desiredRetention = source._desiredRetention
       _fsrsParams = source._fsrsParams
+      _extraRows = source._extraRows
     }
   }
 
@@ -1098,6 +1717,7 @@ nonisolated extension Anki_Stats_CardStatsResponse: SwiftProtobuf.Message, Swift
         case 22: try { try decoder.decodeSingularStringField(value: &_storage._originalDeck) }()
         case 23: try { try decoder.decodeSingularFloatField(value: &_storage._desiredRetention) }()
         case 24: try { try decoder.decodeRepeatedFloatField(value: &_storage._fsrsParams) }()
+        case 25: try { try decoder.decodeRepeatedMessageField(value: &_storage._extraRows) }()
         default: break
         }
       }
@@ -1182,6 +1802,9 @@ nonisolated extension Anki_Stats_CardStatsResponse: SwiftProtobuf.Message, Swift
       if !_storage._fsrsParams.isEmpty {
         try visitor.visitPackedFloatField(value: _storage._fsrsParams, fieldNumber: 24)
       }
+      if !_storage._extraRows.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._extraRows, fieldNumber: 25)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1215,10 +1838,46 @@ nonisolated extension Anki_Stats_CardStatsResponse: SwiftProtobuf.Message, Swift
         if _storage._originalDeck != rhs_storage._originalDeck {return false}
         if _storage._desiredRetention != rhs_storage._desiredRetention {return false}
         if _storage._fsrsParams != rhs_storage._fsrsParams {return false}
+        if _storage._extraRows != rhs_storage._extraRows {return false}
         return true
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_CardStatsResponse.CardInfoRow: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Stats_CardStatsResponse.protoMessageName + ".CardInfoRow"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}label\0\u{1}value\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.value) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.label.isEmpty {
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 1)
+    }
+    if !self.value.isEmpty {
+      try visitor.visitSingularStringField(value: self.value, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_CardStatsResponse.CardInfoRow, rhs: Anki_Stats_CardStatsResponse.CardInfoRow) -> Bool {
+    if lhs.label != rhs.label {return false}
+    if lhs.value != rhs.value {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1593,6 +2252,65 @@ nonisolated extension Anki_Stats_GraphsResponse.Eases: SwiftProtobuf.Message, Sw
 
 nonisolated extension Anki_Stats_GraphsResponse.Retrievability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Anki_Stats_GraphsResponse.protoMessageName + ".Retrievability"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}retrievability\0\u{1}average\0\u{3}sum_by_card\0\u{3}sum_by_note\0\u{1}fsrs\0\u{1}rwkv\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: &self.retrievability) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.average) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.sumByCard) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self.sumByNote) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._fsrs) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._rwkv) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.retrievability.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufUInt32,SwiftProtobuf.ProtobufUInt32>.self, value: self.retrievability, fieldNumber: 1)
+    }
+    if self.average.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.average, fieldNumber: 2)
+    }
+    if self.sumByCard.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.sumByCard, fieldNumber: 3)
+    }
+    if self.sumByNote.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.sumByNote, fieldNumber: 4)
+    }
+    try { if let v = self._fsrs {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._rwkv {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Anki_Stats_GraphsResponse.Retrievability, rhs: Anki_Stats_GraphsResponse.Retrievability) -> Bool {
+    if lhs.retrievability != rhs.retrievability {return false}
+    if lhs.average != rhs.average {return false}
+    if lhs.sumByCard != rhs.sumByCard {return false}
+    if lhs.sumByNote != rhs.sumByNote {return false}
+    if lhs._fsrs != rhs._fsrs {return false}
+    if lhs._rwkv != rhs._rwkv {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Anki_Stats_GraphsResponse.Retrievability.Series: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Anki_Stats_GraphsResponse.Retrievability.protoMessageName + ".Series"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}retrievability\0\u{1}average\0\u{3}sum_by_card\0\u{3}sum_by_note\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1626,7 +2344,7 @@ nonisolated extension Anki_Stats_GraphsResponse.Retrievability: SwiftProtobuf.Me
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Anki_Stats_GraphsResponse.Retrievability, rhs: Anki_Stats_GraphsResponse.Retrievability) -> Bool {
+  public static func ==(lhs: Anki_Stats_GraphsResponse.Retrievability.Series, rhs: Anki_Stats_GraphsResponse.Retrievability.Series) -> Bool {
     if lhs.retrievability != rhs.retrievability {return false}
     if lhs.average != rhs.average {return false}
     if lhs.sumByCard != rhs.sumByCard {return false}

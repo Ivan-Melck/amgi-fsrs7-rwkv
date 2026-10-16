@@ -48,6 +48,8 @@ public nonisolated struct Anki_Github_GithubRelease: Sendable {
 
   public var checksum: String = String()
 
+  public var targetCommitish: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -89,7 +91,7 @@ nonisolated extension Anki_Github_LatestReleaseRequest: SwiftProtobuf.Message, S
 
 nonisolated extension Anki_Github_GithubRelease: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GithubRelease"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tag_name\0\u{1}filename\0\u{1}url\0\u{1}checksum\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tag_name\0\u{1}filename\0\u{1}url\0\u{1}checksum\0\u{3}target_commitish\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -101,6 +103,7 @@ nonisolated extension Anki_Github_GithubRelease: SwiftProtobuf.Message, SwiftPro
       case 2: try { try decoder.decodeSingularStringField(value: &self.filename) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.url) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.checksum) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.targetCommitish) }()
       default: break
       }
     }
@@ -119,6 +122,9 @@ nonisolated extension Anki_Github_GithubRelease: SwiftProtobuf.Message, SwiftPro
     if !self.checksum.isEmpty {
       try visitor.visitSingularStringField(value: self.checksum, fieldNumber: 4)
     }
+    if !self.targetCommitish.isEmpty {
+      try visitor.visitSingularStringField(value: self.targetCommitish, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -127,6 +133,7 @@ nonisolated extension Anki_Github_GithubRelease: SwiftProtobuf.Message, SwiftPro
     if lhs.filename != rhs.filename {return false}
     if lhs.url != rhs.url {return false}
     if lhs.checksum != rhs.checksum {return false}
+    if lhs.targetCommitish != rhs.targetCommitish {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
