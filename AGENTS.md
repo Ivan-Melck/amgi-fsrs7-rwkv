@@ -27,7 +27,8 @@ that path — it holds the rules that path enforces.
 `Documentation/` carries the human-facing half: `ARCHITECTURE.md` (layers,
 package layout), `RUST_BRIDGE.md` (the C seam and its build pipeline),
 `DATA_FLOWS.md` (sync, study, browse, stats, widgets), `BUILDING.md`,
-`CODE_STYLE.md` and `FEATURES.md`.
+`CODE_STYLE.md`, `FEATURES.md` and `RWKV_DESKTOP_DIFFERENCES.md` (where the
+RWKV port deliberately differs from the desktop, and why).
 
 ## The layer rule
 
