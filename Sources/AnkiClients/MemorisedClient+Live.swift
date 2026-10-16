@@ -58,10 +58,20 @@ private struct MemorisedUnavailableError: LocalizedError {
 }
 
 #if DEBUG
+/// A wavy rising preview series; spelled out step by step because the
+/// one-line closure is too much for the type checker.
+private func previewWave(days: Int, base: Double, amplitude: Double, wave: (Double) -> Double) -> [Double] {
+    (0..<days).map { (day: Int) -> Double in
+        let x = Double(day)
+        let trend: Double = base + 2 * x
+        return trend - amplitude * wave(x / 3)
+    }
+}
+
 private extension FsrsMemorisedHistory {
     static var preview: Self {
         let days = 30
-        let retrievability = (0..<days).map { 40 + 2 * Double($0) - 6 * sin(Double($0) / 3) }
+        let retrievability = previewWave(days: days, base: 40, amplitude: 6, wave: sin)
         return FsrsMemorisedHistory(
             today: 100,
             retrievability: MemorisedDaySeries(firstDay: 100 - days + 1, values: retrievability),
@@ -76,7 +86,7 @@ private extension FsrsMemorisedHistory {
 private extension RwkvMemorisedProgress {
     static var preview: Self {
         let days = 30
-        let retrievability = (0..<days).map { 42 + 2 * Double($0) - 5 * cos(Double($0) / 3) }
+        let retrievability = previewWave(days: days, base: 42, amplitude: 5, wave: cos)
         return RwkvMemorisedProgress(
             phase: "complete",
             current: 1_500,

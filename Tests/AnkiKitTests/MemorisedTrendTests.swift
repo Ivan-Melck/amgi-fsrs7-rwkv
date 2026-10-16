@@ -99,7 +99,7 @@ struct MemorisedTrendTests {
     // MARK: Candlestick
 
     /// [1, 3, 6, 10, ..., 55]: running totals of 1...10 from day 0.
-    private let cumulative: [Double?] = (1...10).map { n in Double(n * (n + 1) / 2) }
+    private let cumulative: [Double?] = (1...10).map { (n: Int) -> Double? in Double(n * (n + 1) / 2) }
 
     private func finalTotal(bins: Int, binSize: Int, scroll: Int) -> Double {
         let chart = MemorisedCandlestick(firstDay: 0, values: cumulative, bins: bins, binSize: binSize, offset: scroll)

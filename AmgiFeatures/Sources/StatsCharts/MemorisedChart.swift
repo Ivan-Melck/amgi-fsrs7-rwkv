@@ -399,7 +399,13 @@ struct MemorisedLineChart: View {
     @Previewable @State var source = MemorisedSource.both
     @Previewable @State var kind = MemorisedKind.cards
     let days = 60
-    let values = (0..<days).map { 40 + Double($0) - 5 * sin(Double($0) / 4) }
+    // Spelled out step by step: the one-line closure is too much for the
+    // type checker (the same shape broke MemorisedClient+Live.swift).
+    let values = (0..<days).map { (day: Int) -> Double in
+        let x = Double(day)
+        let trend: Double = 40 + x
+        return trend - 5 * sin(x / 4)
+    }
     MemorisedCard(
         phase: .loaded,
         fsrs: FsrsMemorisedHistory(
