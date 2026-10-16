@@ -9,7 +9,7 @@
 </p>
 
 > [!NOTE]
-> **This fork builds Amgi against the [FSRS7/RWKV Anki fork](https://github.com/Ivan-Melck/anki)**
+> **This fork builds Amgi against the [FSRS7/RWKV Anki fork](https://github.com/JSchoreels/anki)**
 > (JSchoreels/anki) instead of official Anki. The `anki-upstream` submodule
 > points at that fork, so the app runs its Rust scheduler (FSRS-7, same-day
 > learning options, review fuzz settings).
