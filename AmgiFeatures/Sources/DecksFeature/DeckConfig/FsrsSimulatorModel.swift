@@ -82,39 +82,48 @@ final class FsrsSimulatorModel {
                 workloadRows = []
                 reviewTime = nil
             case .workload:
-                let result = try await deckClient.simulateFsrsWorkload(request)
-                guard generation == self.generation else { return }
+                // `simulateWorkload`: one sweep per preset in the deck's
+                // subtree, FSRS for every preset first, then RWKV.
+                let presets: [DeckConfig] = context.workloadPresets
+                var fsrsRuns: [FsrsWorkloadPresets.Run] = []
+                for preset in presets {
+                    let presetRequest = FsrsWorkloadPresets.request(
+                        base: request,
+                        deckName: context.workloadDeckName,
+                        preset: preset
+                    )
+                    let result = try await deckClient.simulateFsrsWorkload(presetRequest)
+                    guard generation == self.generation else { return }
+                    fsrsRuns.append(FsrsWorkloadPresets.Run(presetName: preset.name, result: result))
+                }
                 guard context.compareWithRwkv else {
-                    workloadRows = result.cost.keys.sorted().map { retention in
-                        ("\(retention)%", Self.workloadText(result, retention))
-                    }
-                    summary = [("Points", "\(workloadRows.count)")]
-                    reviewTime = result.reviewTime
+                    showRows(FsrsWorkloadPresets.rows(fsrsRuns))
+                    reviewTime = FsrsWorkloadPresets.reviewTime(fsrsRuns)
                     return
                 }
-                var rwkvRequest = RwkvWorkloadRequest(
-                    search: context.search,
-                    daysToSimulate: max(1, daysToSimulate),
-                    reviewLimit: max(0, context.reviewsPerDay),
-                    newLimit: max(0, context.newCardsPerDay),
-                    newCardsIgnoreReviewLimit: context.ignoreNewLimit,
-                    maxInterval: max(1, context.maxIntervalDays),
-                    reviewOrder: context.reviewOrder,
-                    suspendAfterLapseCount: context.suspendLeeches ? max(1, context.leechThreshold) : nil
-                )
-                rwkvRequest.sampleLimit = 0
-                let rwkv = try await rwkvClient.simulateWorkload(rwkvRequest)
-                guard generation == self.generation else { return }
-                // Desired retentions both engines simulated, as the
-                // desktop's comparison chart overlays them.
-                let retentions = Set(result.cost.keys).intersection(rwkv.cost.keys).sorted()
-                workloadRows = retentions.map { retention in
-                    (
-                        "\(retention)%",
-                        "FSRS \(Self.workloadText(result, retention))\nRWKV \(Self.workloadText(rwkv, retention))"
+                var rwkvRuns: [FsrsWorkloadPresets.Run] = []
+                for preset in presets {
+                    var rwkvRequest = RwkvWorkloadRequest(
+                        search: FsrsWorkloadPresets.search(
+                            deckName: context.workloadDeckName,
+                            presetName: preset.name
+                        ),
+                        daysToSimulate: max(1, daysToSimulate),
+                        reviewLimit: max(0, context.reviewsPerDay),
+                        newLimit: max(0, context.newCardsPerDay),
+                        newCardsIgnoreReviewLimit: context.ignoreNewLimit,
+                        maxInterval: max(1, context.maxIntervalDays),
+                        reviewOrder: context.reviewOrder,
+                        suspendAfterLapseCount: context.suspendLeeches ? max(1, context.leechThreshold) : nil
                     )
+                    rwkvRequest.sampleLimit = 0
+                    let rwkv = try await rwkvClient.simulateWorkload(rwkvRequest)
+                    guard generation == self.generation else { return }
+                    rwkvRuns.append(FsrsWorkloadPresets.Run(presetName: preset.name, result: rwkv))
                 }
-                summary = [("Points", "\(workloadRows.count)")]
+                // Desired retentions both engines simulated for a preset,
+                // as the desktop's comparison chart overlays them.
+                showRows(FsrsWorkloadPresets.comparisonRows(fsrs: fsrsRuns, rwkv: rwkvRuns))
                 reviewTime = nil
             }
         } catch {
@@ -123,12 +132,10 @@ final class FsrsSimulatorModel {
         }
     }
 
-    private static func workloadText(_ result: FsrsWorkloadSimulation, _ retention: Int) -> String {
-        String(
-            format: "cost %.2f · reviews %d · memorized %.0f",
-            Double(result.cost[retention] ?? 0),
-            result.reviewCount[retention] ?? 0,
-            Double(result.memorized[retention] ?? 0)
-        )
+    private func showRows(_ rows: [FsrsWorkloadPresets.Row]) {
+        workloadRows = rows.map { (row: FsrsWorkloadPresets.Row) -> (label: String, value: String) in
+            (label: row.label, value: row.value)
+        }
+        summary = [("Points", "\(workloadRows.count)")]
     }
 }

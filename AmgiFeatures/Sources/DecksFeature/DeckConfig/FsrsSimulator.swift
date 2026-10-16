@@ -41,6 +41,13 @@ struct FsrsSimulatorContext: Identifiable, Hashable {
     /// "Compare RWKV with FSRS": the workload sweep also runs RWKV.
     var rwkvAvailable = false
     var compareWithRwkv = false
+    /// The deck whose subtree a workload run covers
+    /// (`getCurrentDeckNameForSearch`, escaped when the search is built).
+    var workloadDeckName = ""
+    /// The presets of the deck and its descendants, sorted by name, the
+    /// current one as edited: a workload run simulates each over its own
+    /// cards in the deck, with its own parameters.
+    var workloadPresets: [DeckConfig] = []
 }
 
 // MARK: - Container
@@ -144,11 +151,14 @@ struct FsrsSimulatorSettingsSection: View {
             }
             Stepper("New/day: \(newCardsPerDay)", value: $newCardsPerDay, in: 0...9999)
             Stepper("Reviews/day: \(reviewsPerDay)", value: $reviewsPerDay, in: 0...9999)
-            LabeledContent("Search") {
-                TextField("preset:\"…\" -is:suspended", text: $search)
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
+            // A workload run searches each preset's cards in the deck.
+            if mode == .review {
+                LabeledContent("Search") {
+                    TextField("preset:\"…\" -is:suspended", text: $search)
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
             }
         }
     }

@@ -233,7 +233,8 @@ struct DeckConfigView: View {
             onCancelOptimize: { model.cancelOptimize() },
             onOpenSimulatorReview: { model.openSimulator(mode: .review) },
             onOpenSimulatorWorkload: { model.openSimulator(mode: .workload) },
-            onOptimizeAll: { Task { await model.optimizeAllPresets() } }
+            onOptimizeAll: { Task { await model.optimizeAllPresets() } },
+            onCommitWeights: { _ = model.commitFsrsWeightsText() }
         )
         EasyDaysSection(
             fsrsEnabled: model.fsrsEnabled,

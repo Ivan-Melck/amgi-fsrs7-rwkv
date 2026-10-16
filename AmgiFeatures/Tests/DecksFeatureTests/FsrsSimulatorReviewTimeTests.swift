@@ -40,6 +40,8 @@ private let reviewTime = FsrsReviewTime(
         )
         context.rwkvAvailable = compare
         context.compareWithRwkv = compare
+        context.workloadDeckName = "Current"
+        context.workloadPresets = [DeckConfig(id: DeckConfigID(1), name: "Default")]
         return context
     }
 

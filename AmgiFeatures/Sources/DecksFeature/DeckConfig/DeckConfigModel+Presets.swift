@@ -261,7 +261,8 @@ extension DeckConfigModel {
     func openSimulator(mode: FsrsSimulatorMode, compareWithRwkv: Bool = false) {
         guard let loaded else { return }
         // The preset as edited, like the desktop's simulator.
-        let edited = editedConfig(from: loaded.config).config
+        let editedPreset = editedConfig(from: loaded.config)
+        let edited = editedPreset.config
         let weights = activeFsrsParams()
         guard !weights.isEmpty else {
             destination = .alert(.fsrsError(
@@ -269,6 +270,11 @@ extension DeckConfigModel {
                 message: "This preset has no weights yet. Run Optimize Weights first, or save the preset."
             ))
             return
+        }
+        // `getCurrentDeckNameForSearch`.
+        var workloadDeckName = loaded.context.currentDeck?.name ?? ""
+        if workloadDeckName.isEmpty {
+            workloadDeckName = deckName
         }
         let context = FsrsSimulatorContext(
             mode: mode,
@@ -278,7 +284,9 @@ extension DeckConfigModel {
             newCardsPerDay: Int(max(0, newCardsPerDay)),
             reviewsPerDay: mode == .workload ? 9999 : Int(max(0, reviewsPerDay)),
             maxIntervalDays: max(1, edited.maximumReviewInterval),
-            search: effectiveParamSearch(),
+            // The desktop simulates the preset's cards, not its optimize
+            // search; a workload run replaces it per preset.
+            search: defaultParamSearch,
             ignoreNewLimit: newCardsIgnoreReviewLimit,
             suspendLeeches: leechAction == .suspend,
             leechThreshold: Int(max(1, leechThreshold)),
@@ -290,7 +298,9 @@ extension DeckConfigModel {
             dynamicDesiredRetention: edited.fsrsDynamicDesiredRetention,
             dynamicDesiredRetentionClamp: edited.fsrsDynamicDesiredRetentionClamp,
             rwkvAvailable: rwkvClient.isAvailable(),
-            compareWithRwkv: compareWithRwkv && rwkvClient.isAvailable()
+            compareWithRwkv: compareWithRwkv && rwkvClient.isAvailable(),
+            workloadDeckName: workloadDeckName,
+            workloadPresets: FsrsWorkloadPresets.subtreeConfigs(loaded.context, current: editedPreset)
         )
         destination = .route(.simulator(context))
     }

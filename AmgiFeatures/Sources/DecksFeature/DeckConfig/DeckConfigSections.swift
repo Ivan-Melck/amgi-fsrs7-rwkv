@@ -268,7 +268,8 @@ struct TimerSection: View {
     var body: some View {
         Section("Answer timer") {
             Toggle("Show answer timer", isOn: $showTimer)
-            Stepper("Max answer seconds: \(capAnswerTimeToSecs)", value: $capAnswerTimeToSecs, in: 5...600, step: 5)
+            // TimerOptions.svelte's 1–7200.
+            Stepper("Max answer seconds: \(capAnswerTimeToSecs)", value: $capAnswerTimeToSecs, in: 1...7200)
             Toggle("Stop timer on answer", isOn: $stopTimerOnAnswer)
         }
     }
@@ -541,8 +542,11 @@ struct FsrsSection: View {
     let onOpenSimulatorReview: () -> Void
     let onOpenSimulatorWorkload: () -> Void
     let onOptimizeAll: () -> Void
+    /// `ParamsInput`'s blur check of the params field.
+    let onCommitWeights: () -> Void
 
     @Environment(\.palette) private var palette
+    @FocusState private var weightsFocused: Bool
 
     /// The desktop's `computing`: one FSRS job at a time.
     private var isComputing: Bool {
@@ -598,7 +602,8 @@ struct FsrsSection: View {
             LabeledSlider(
                 label: "Historical retention",
                 value: $historicalRetentionPercent,
-                in: 70...97,
+                // AdvancedOptions.svelte's 50–100%.
+                in: 50...100,
                 step: 1,
                 valueText: "\(Int(historicalRetentionPercent))%"
             )
@@ -628,6 +633,10 @@ struct FsrsSection: View {
                     .amgiFont(.caption, .monospaced)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .focused($weightsFocused)
+                    .onChange(of: weightsFocused) { _, focused in
+                        if !focused { onCommitWeights() }
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {

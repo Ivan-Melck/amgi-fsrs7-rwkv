@@ -157,7 +157,7 @@ extension DecksService: DependencyKey {
                     configs: [config],
                     mode: applyToChildren ? .applyToChildren : .normal,
                     cardStateCustomizer: context.cardStateCustomizer,
-                    limits: limits ?? context.currentDeck?.limits,
+                    limits: limits ?? context.currentDeck?.limits?.forUpdate,
                     newCardsIgnoreReviewLimit: newCardsIgnoreReviewLimit,
                     fsrs: fsrsEnabled,
                     applyAllParentLimits: applyAllParentLimits,
@@ -276,7 +276,8 @@ private func makeUpdateRequest(
         removedConfigIds: removed,
         mode: mode,
         cardStateCustomizer: context.cardStateCustomizer,
-        limits: context.currentDeck?.limits,
+        // As loaded, less a today-only limit from a past day.
+        limits: context.currentDeck?.limits?.forUpdate,
         newCardsIgnoreReviewLimit: context.newCardsIgnoreReviewLimit,
         fsrs: fsrs,
         applyAllParentLimits: context.applyAllParentLimits,

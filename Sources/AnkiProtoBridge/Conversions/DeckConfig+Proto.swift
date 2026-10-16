@@ -244,7 +244,8 @@ package extension DeckConfigsForUpdate.CurrentDeck {
             name: proto.name,
             configID: DeckConfigID(proto.configID),
             parentConfigIds: proto.parentConfigIds.map { DeckConfigID($0) },
-            limits: proto.hasLimits ? Limits(proto.limits) : nil
+            limits: proto.hasLimits ? Limits(proto.limits) : nil,
+            subtreeConfigIds: proto.subtreeConfigIds.map { DeckConfigID($0) }
         )
     }
 
@@ -253,6 +254,7 @@ package extension DeckConfigsForUpdate.CurrentDeck {
         proto.name = name
         proto.configID = configID.rawValue
         proto.parentConfigIds = parentConfigIds.map(\.rawValue)
+        proto.subtreeConfigIds = subtreeConfigIds.map(\.rawValue)
         if let limits {
             proto.limits = limits.toProto()
         }

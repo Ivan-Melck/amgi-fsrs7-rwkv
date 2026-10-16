@@ -439,6 +439,16 @@ private import SwiftProtobuf
         #expect(!reproto.hasReview)
     }
 
+    @Test func CurrentDeck_round_trips_subtree_config_ids() {
+        var proto = Anki_DeckConfig_DeckConfigsForUpdate.CurrentDeck()
+        proto.name = "Parent"
+        proto.configID = 1
+        proto.subtreeConfigIds = [1, 42]
+        let mirror = DeckConfigsForUpdate.CurrentDeck(proto)
+        #expect(mirror.subtreeConfigIds == [DeckConfigID(1), DeckConfigID(42)])
+        #expect(mirror.toProto().subtreeConfigIds == [1, 42])
+    }
+
     // MARK: - DeckConfigsForUpdate
 
     @Test func DeckConfigsForUpdate_decodes_with_or_without_optional_fields() {

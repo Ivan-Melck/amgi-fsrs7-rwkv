@@ -67,17 +67,22 @@ public struct DeckConfigsForUpdate: Sendable, Hashable {
         public var configID: DeckConfigID
         public var parentConfigIds: [DeckConfigID]
         public var limits: Limits?
+        /// Presets used by this deck and its descendants
+        /// (`subtree_config_ids`), as the workload simulator runs them.
+        public var subtreeConfigIds: [DeckConfigID]
 
         public init(
             name: String = "",
             configID: DeckConfigID = DeckConfigID(0),
             parentConfigIds: [DeckConfigID] = [],
-            limits: Limits? = nil
+            limits: Limits? = nil,
+            subtreeConfigIds: [DeckConfigID] = []
         ) {
             self.name = name
             self.configID = configID
             self.parentConfigIds = parentConfigIds
             self.limits = limits
+            self.subtreeConfigIds = subtreeConfigIds
         }
 
         public struct Limits: Sendable, Hashable {
@@ -108,6 +113,18 @@ public struct DeckConfigsForUpdate: Sendable, Hashable {
                 self.reviewTodayActive = reviewTodayActive
                 self.newTodayActive = newTodayActive
                 self.desiredRetention = desiredRetention
+            }
+
+            /// The limits as the desktop's deck options save them. The
+            /// backend reports the last today-only limit even from a past
+            /// day, and takes any today-only limit it is sent as today's, so
+            /// one that isn't active is left out (`TabbedValue` disables its
+            /// tab).
+            public var forUpdate: Self {
+                var limits = self
+                if !newTodayActive { limits.newToday = nil }
+                if !reviewTodayActive { limits.reviewToday = nil }
+                return limits
             }
         }
     }

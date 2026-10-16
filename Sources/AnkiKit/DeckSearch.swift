@@ -20,9 +20,20 @@ public enum DeckSearch: Sendable {
     /// `My "Korean" Deck` produced a malformed query and silently returned
     /// wrong stats and deck counts.
     public static func term(_ name: String) -> String {
-        let escaped = name
+        "deck:\"\(escape(name))\""
+    }
+
+    /// The desktop's `escapeSearchText` (ts/routes/deck-options/lib.ts):
+    /// backslashes and double quotes, for text inside a quoted term.
+    public static func escape(_ text: String) -> String {
+        text
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        return "deck:\"\(escaped)\""
+    }
+
+    /// The desktop's `preset:"<name>" -is:suspended`, the default search
+    /// of a preset's optimizer and simulator.
+    public static func presetSearch(_ presetName: String) -> String {
+        "preset:\"\(escape(presetName))\" -is:suspended"
     }
 }

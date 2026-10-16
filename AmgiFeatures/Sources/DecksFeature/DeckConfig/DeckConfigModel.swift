@@ -235,9 +235,7 @@ final class DeckConfigModel {
     }
 
     var defaultParamSearch: String {
-        let escaped = (loaded?.config.name ?? deckName)
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        return "preset:\"\(escaped)\" -is:suspended"
+        DeckSearch.presetSearch(loaded?.config.name ?? deckName)
     }
 
     // MARK: - Load / save
@@ -334,7 +332,7 @@ final class DeckConfigModel {
         intradayLearningMix = cfg.intradayLearningMix
 
         showTimer = cfg.showTimer
-        capAnswerTimeToSecs = Int32(max(5, cfg.capAnswerTimeToSecs))
+        capAnswerTimeToSecs = Int32(max(1, cfg.capAnswerTimeToSecs))
         stopTimerOnAnswer = cfg.stopTimerOnAnswer
 
         secondsToShowQuestion = Double(cfg.secondsToShowQuestion)
@@ -483,7 +481,7 @@ final class DeckConfigModel {
         cfg.intradayLearningMix = intradayLearningMix
 
         cfg.showTimer = showTimer
-        cfg.capAnswerTimeToSecs = Int(max(5, capAnswerTimeToSecs))
+        cfg.capAnswerTimeToSecs = Int(max(1, capAnswerTimeToSecs))
         cfg.stopTimerOnAnswer = stopTimerOnAnswer
 
         cfg.secondsToShowQuestion = Float(max(0, secondsToShowQuestion))
@@ -508,6 +506,8 @@ final class DeckConfigModel {
 
     func saveConfig() async -> Bool {
         guard let loaded else { return false }
+        // `commitEditing()`: the params field's check runs before a save.
+        guard commitFsrsWeightsText() else { return false }
         isSaving = true
         defer { isSaving = false }
 
